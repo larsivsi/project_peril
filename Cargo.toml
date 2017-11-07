@@ -1,6 +1,7 @@
 [package]
 name = "project_peril"
 version = "0.1.0"
-authors = ["Lars-Ivar Hesselberg Simonsen <larsivarhs@gmail.com>"]
+authors = ["Lars-Ivar Hesselberg Simonsen <larsivarhs@gmail.com>","Matthew Guise reaverrikku@gmail.com"]
 
 [dependencies]
+vulkano = "0.7.2"
