@@ -8,7 +8,14 @@ mod config;
 
 fn main() {
     // init stuff
-    config::read_config();
+    let cfg = config::read_config();
+    println!(
+        "window dims: {}x{}\nrender dims: {}x{}",
+        cfg.window_dimensions.0,
+        cfg.window_dimensions.1,
+        cfg.render_dimensions.0,
+        cfg.render_dimensions.1,
+    );
 
     // main loop
     let mut running = true;
