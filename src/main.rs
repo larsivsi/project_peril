@@ -1,9 +1,14 @@
+extern crate regex;
+
 use std::time::{Duration, SystemTime};
 //for debug/simulation
 use std::thread::sleep;
 
+mod config;
+
 fn main() {
     // init stuff
+    config::read_config();
 
     // main loop
     let mut running = true;
