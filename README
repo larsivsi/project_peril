@@ -1,0 +1,13 @@
+Project Peril!
+
+An attempt to learn Rust and Vulkan.
+Will probably result in a game or so, we'll see.
+
+Compile:
+$ cargo build [--release]
+
+Run:
+$ ./target/(debug|release)/project_peril
+
+Compile and run!:
+$ cargo run [--release]
