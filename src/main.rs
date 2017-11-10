@@ -1,14 +1,15 @@
 extern crate regex;
 
+mod config;
+
+use config::Config;
 use std::time::{Duration, SystemTime};
 //for debug/simulation
 use std::thread::sleep;
 
-mod config;
-
 fn main() {
     // init stuff
-    let cfg = config::read_config();
+    let cfg = Config::read_config("options.cfg");
     println!(
         "window dims: {}x{}\nrender dims: {}x{}",
         cfg.window_dimensions.0,
