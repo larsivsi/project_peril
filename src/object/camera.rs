@@ -1,5 +1,5 @@
 use vector::Vec3;
-use super::Position;
+use object::Position;
 
 pub struct Camera {
     position: (f64, f64, f64),

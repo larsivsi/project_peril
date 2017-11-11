@@ -1,4 +1,4 @@
-use super::{Drawable, Position};
+use object::{Drawable, Position};
 
 #[derive(Debug)]
 pub struct DrawObject {
