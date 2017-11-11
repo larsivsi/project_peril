@@ -3,6 +3,7 @@ extern crate regex;
 mod config;
 mod object;
 mod scene;
+mod vector;
 
 use config::Config;
 use object::{Position, Camera};
