@@ -1,10 +1,11 @@
 extern crate regex;
 
 mod config;
-mod draw_object;
+mod object;
 mod scene;
 
 use config::Config;
+use object::{Position, Camera};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 //for debug/simulation
@@ -22,6 +23,7 @@ fn main() {
     );
 
     let scene = Scene::new();
+    let camera = Camera::new((0.0, 0.0, 0.0));
 
     // main loop
     let mut running = true;

@@ -1,4 +1,4 @@
-use draw_object::{Drawable, Position, DrawObject};
+use object::{Drawable, Position, DrawObject};
 
 pub struct Scene {
     objects: Vec<DrawObject>,
