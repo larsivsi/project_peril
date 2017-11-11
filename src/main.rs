@@ -2,9 +2,10 @@ extern crate regex;
 
 mod config;
 mod draw_object;
+mod scene;
 
 use config::Config;
-use draw_object::{Drawable, Cuboid};
+use scene::Scene;
 use std::time::{Duration, SystemTime};
 //for debug/simulation
 use std::thread::sleep;
@@ -20,11 +21,7 @@ fn main() {
         cfg.render_dimensions.1,
     );
 
-    let mut q1 = Cuboid::new(1, 1, 1);
-    q1.set_position((1.0, 0.0, 0.0));
-    let q2 = Cuboid::new(2, 2, 2);
-
-    println!("Distance: {}", q1.get_distance(q2));
+    let scene = Scene::new();
 
     // main loop
     let mut running = true;
@@ -51,6 +48,7 @@ fn main() {
 
         //call to render function goes here
         // (now simulated with a sleep)
+        scene.draw();
         sleep(Duration::from_millis(10));
         //then swapbuffers etc.
         framecount += 1;

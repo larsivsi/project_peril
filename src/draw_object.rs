@@ -1,26 +1,27 @@
 pub trait Drawable {
     fn draw(&self);
-    fn get_position(&self) -> (f64, f64, f64);
-    fn set_position(&mut self, position: (f64, f64, f64));
-    fn get_distance<T: Drawable>(&self, object: T) -> f64;
 }
 
-pub struct Cuboid {
-    dimensions: (u32, u32, u32),
+pub trait Position {
+    fn new(postion: (f64, f64, f64)) -> Self;
+    fn get_position(&self) -> (f64, f64, f64);
+    fn set_position(&mut self, position: (f64, f64, f64));
+    fn get_distance<T: Position>(&self, object: T) -> f64;
+}
+
+#[derive(Debug)]
+pub struct DrawObject {
     position: (f64, f64, f64),
 }
 
-impl Cuboid {
-    pub fn new(width: u32, height: u32, depth: u32) -> Cuboid {
-        Cuboid {
-            dimensions: (width, height, depth),
-            position: (0.0, 0.0, 0.0),
-        }
-    }
+impl Drawable for DrawObject {
+    fn draw(&self) {}
 }
 
-impl Drawable for Cuboid {
-    fn draw(&self) {}
+impl Position for DrawObject {
+    fn new(position: (f64, f64, f64)) -> DrawObject {
+        DrawObject { position: position }
+    }
 
     fn get_position(&self) -> (f64, f64, f64) {
         self.position
@@ -30,7 +31,7 @@ impl Drawable for Cuboid {
         self.position = position;
     }
 
-    fn get_distance<T: Drawable>(&self, object: T) -> f64 {
+    fn get_distance<T: Position>(&self, object: T) -> f64 {
         let (x1, y1, z1) = object.get_position();
         let (x2, y2, z2) = self.position;
 
