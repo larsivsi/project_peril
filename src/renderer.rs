@@ -86,7 +86,7 @@ impl RenderState {
                 window.surface().clone(),
                 caps.min_image_count,
                 format,
-                dimensions,
+                caps.current_extent.unwrap(),
                 1,
                 caps.supported_usage_flags,
                 &queue,
