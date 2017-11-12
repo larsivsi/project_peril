@@ -6,3 +6,5 @@ authors = ["Lars-Ivar Hesselberg Simonsen <larsivarhs@gmail.com>","Matthew Guise
 [dependencies]
 regex = "0.2.2"
 vulkano = "0.7.2"
+vulkano-win = "0.7.2"
+winit = "0.7.0"

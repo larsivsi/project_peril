@@ -1,12 +1,17 @@
 extern crate regex;
+extern crate vulkano;
+extern crate winit;
+extern crate vulkano_win;
 
 mod config;
 mod object;
+mod renderer;
 mod scene;
 mod vector;
 
 use config::Config;
 use object::{Position, Camera};
+use renderer::RenderState;
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 //for debug/simulation
@@ -23,6 +28,7 @@ fn main() {
         cfg.render_dimensions.1,
     );
 
+    let mut renderstate = RenderState::init(cfg);
     let scene = Scene::new();
     let camera = Camera::new((0.0, 0.0, 0.0));
 
@@ -65,10 +71,14 @@ fn main() {
             );
         }
 
-        // need some condition to stop the main loop
-        if framecount == 1000 {
-            running = false;
-        }
+        renderstate.event_loop.poll_events(|ev| match ev {
+            winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
+//            winit::Event::WindowEvent { event: winit::WindowEvent::Resized(_, _), .. } => {
+//                recreate_swapchain = true
+//            }
+            _ => (),
+        });
+
     }
 
     //cleanup
