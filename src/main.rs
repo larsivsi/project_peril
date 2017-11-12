@@ -5,12 +5,14 @@ extern crate winit;
 extern crate vulkano_win;
 
 mod config;
+mod nurbs;
 mod object;
 mod renderer;
 mod scene;
 
 use cgmath::Point3;
 use config::Config;
+use nurbs::NURBSpline;
 use object::{Position, Camera};
 use renderer::RenderState;
 use scene::Scene;
@@ -32,6 +34,27 @@ fn main() {
     let mut renderstate = RenderState::init(cfg);
     let scene = Scene::new();
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
+
+    let cp = vec![
+        Point3::new(1.0, 0.0, 0.0),
+        Point3::new(0.0, 1.0, 0.0),
+        Point3::new(-1.0, 0.0, 0.0),
+        Point3::new(0.0, -1.0, 0.0),
+        Point3::new(0.0, 0.0, 1.0),
+        Point3::new(0.0, 0.0, -1.0),
+    ];
+
+    let mut time = 0.0;
+    let timestep = 0.1;
+    let maxtime = cp.len() as f64;
+    let spline = NURBSpline::new(3, cp, 1.0);
+
+    while time < maxtime {
+        println!("evaluating spline at time {}", time);
+        let point = spline.evaluate_at(time);
+        println!("point: {:?}", point);
+        time += timestep;
+    }
 
     // main loop
     let mut running = true;
