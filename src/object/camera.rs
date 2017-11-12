@@ -1,3 +1,4 @@
+use cgmath::prelude::*;
 use cgmath::{Point3, Vector3};
 use object::Position;
 
@@ -17,11 +18,11 @@ impl Camera {
         self.front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
         self.front.y = self.pitch.to_radians().sin();
         self.front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
-        //self.front.normalize();
+        self.front.normalize();
         self.right = self.front.cross(self.world_up);
-        //self.right.normalize();
+        self.right.normalize();
         self.up = self.right.cross(self.front);
-        //self.up.normalize();
+        self.up.normalize();
     }
 }
 
