@@ -1,3 +1,4 @@
+extern crate cgmath;
 extern crate regex;
 extern crate vulkano;
 extern crate winit;
@@ -7,7 +8,6 @@ mod config;
 mod object;
 mod renderer;
 mod scene;
-mod vector;
 
 use config::Config;
 use object::{Position, Camera};

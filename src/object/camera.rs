@@ -1,12 +1,13 @@
-use vector::Vec3;
+use cgmath::Vector3;
 use object::Position;
+
 
 pub struct Camera {
     position: (f64, f64, f64),
-    front: Vec3,
-    up: Vec3,
-    right: Vec3,
-    world_up: Vec3,
+    front: Vector3<f64>,
+    up: Vector3<f64>,
+    right: Vector3<f64>,
+    world_up: Vector3<f64>,
     yaw: f64,
     pitch: f64,
 }
@@ -16,11 +17,11 @@ impl Camera {
         self.front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
         self.front.y = self.pitch.to_radians().sin();
         self.front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
-        self.front.normalize();
-        self.right = self.front.cross(&self.world_up);
-        self.right.normalize();
-        self.up = self.right.cross(&self.front);
-        self.up.normalize();
+        //self.front.normalize();
+        self.right = self.front.cross(self.world_up);
+        //self.right.normalize();
+        self.up = self.right.cross(self.front);
+        //self.up.normalize();
     }
 }
 
@@ -28,22 +29,22 @@ impl Position for Camera {
     fn new(position: (f64, f64, f64)) -> Camera {
         let mut camera = Camera {
             position: position,
-            front: Vec3 {
+            front: Vector3 {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
             },
-            up: Vec3 {
+            up: Vector3 {
                 x: 0.0,
                 y: 1.0,
                 z: 0.0,
             },
-            right: Vec3 {
+            right: Vector3 {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
             },
-            world_up: Vec3 {
+            world_up: Vector3 {
                 x: 0.0,
                 y: 1.0,
                 z: 0.0,
