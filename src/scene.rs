@@ -1,3 +1,4 @@
+use cgmath::Point3;
 use object::{Drawable, Position, DrawObject};
 
 pub struct Scene {
@@ -6,8 +7,8 @@ pub struct Scene {
 
 impl Scene {
     pub fn new() -> Scene {
-        let q1 = DrawObject::new((1.0, 0.0, 0.0));
-        let q2 = DrawObject::new((2.0, 2.0, 0.0));
+        let q1 = DrawObject::new(Point3::new(1.0, 0.0, 0.0));
+        let q2 = DrawObject::new(Point3::new(2.0, 2.0, 0.0));
 
         let mut scene = Scene { objects: Vec::new() };
 

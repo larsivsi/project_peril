@@ -9,6 +9,7 @@ mod object;
 mod renderer;
 mod scene;
 
+use cgmath::Point3;
 use config::Config;
 use object::{Position, Camera};
 use renderer::RenderState;
@@ -30,7 +31,7 @@ fn main() {
 
     let mut renderstate = RenderState::init(cfg);
     let scene = Scene::new();
-    let camera = Camera::new((0.0, 0.0, 0.0));
+    let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
 
     // main loop
     let mut running = true;
