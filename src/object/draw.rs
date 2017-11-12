@@ -1,7 +1,6 @@
 use cgmath::Point3;
 use object::{Drawable, Position};
 
-#[derive(Debug)]
 pub struct DrawObject {
     position: Point3<f64>,
 }

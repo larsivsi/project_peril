@@ -7,8 +7,10 @@ pub struct Scene {
 
 impl Scene {
     pub fn new() -> Scene {
-        let q1 = DrawObject::new(Point3::new(1.0, 0.0, 0.0));
-        let q2 = DrawObject::new(Point3::new(2.0, 2.0, 0.0));
+        let q1 = DrawObject::new(Point3::new(0.0, 0.0, 0.0));
+        let q2 = DrawObject::new(Point3::new(1.0, 1.0, 1.0));
+
+        println!("distance: {}", q1.get_distance(&q2));
 
         let mut scene = Scene { objects: Vec::new() };
 
@@ -20,7 +22,6 @@ impl Scene {
 
     pub fn draw(&self) {
         for object in self.objects.iter() {
-            println!("Would draw {:?}", object);
             object.draw();
         }
     }
