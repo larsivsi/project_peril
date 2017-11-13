@@ -2,10 +2,10 @@ use config::Config;
 use vulkano;
 use vulkano::device::{Device, Queue};
 use vulkano::image::SwapchainImage;
-use vulkano::instance::{Instance, PhysicalDevice, QueueFamily};
-use vulkano::swapchain::{PresentMode, SurfaceTransform, Swapchain, SwapchainCreationError};
+use vulkano::instance::Instance;
+use vulkano::swapchain::{PresentMode, SurfaceTransform, Swapchain};
 use winit;
-use winit::{EventsLoop, WindowBuilder};
+use winit::EventsLoop;
 use vulkano_win;
 use vulkano_win::{Window, VkSurfaceBuild};
 
@@ -40,12 +40,12 @@ impl RenderState {
             physical.ty()
         );
 
-        let mut dimensions = {
+        let dimensions = {
             let (width, height) = cfg.window_dimensions;
             [width, height]
         };
 
-        let mut events_loop = winit::EventsLoop::new();
+        let events_loop = winit::EventsLoop::new();
         let window = winit::WindowBuilder::new()
             .with_dimensions(dimensions[0], dimensions[1])
             .build_vk_surface(&events_loop, instance.clone())
