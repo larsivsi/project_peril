@@ -12,7 +12,7 @@ mod scene;
 
 use cgmath::Point3;
 use config::Config;
-use nurbs::NURBSpline;
+use nurbs::{Order, NURBSpline};
 use object::{Position, Camera};
 use renderer::RenderState;
 use scene::Scene;
@@ -46,8 +46,8 @@ fn main() {
 
     let mut time = 0.0;
     let timestep = 0.1;
-    let maxtime = cp.len() as f64;
-    let spline = NURBSpline::new(3, cp, 1.0);
+    let maxtime = (cp.len() - Order::CUBIC as usize + 1) as f64;
+    let spline = NURBSpline::new(Order::CUBIC, cp, 1.0);
 
     while time < maxtime {
         println!("evaluating spline at time {}", time);

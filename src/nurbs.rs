@@ -1,17 +1,24 @@
 use cgmath::prelude::*;
 use cgmath::Point3;
 
+#[derive(Copy, Clone)]
+pub enum Order {
+    LINEAR = 2,
+    QUADRATIC = 3,
+    CUBIC = 4,
+    QUARTIC = 5,
+}
+
 pub struct NURBSpline {
-    order: u32,
+    order: Order,
     control_points: Vec<Point3<f64>>,
     knots: Vec<f64>,
 }
 
 impl NURBSpline {
-    pub fn new(degree: u32, control_points: Vec<Point3<f64>>, knot_step: f64) -> NURBSpline {
-        let order = degree + 1;
+    pub fn new(order: Order, control_points: Vec<Point3<f64>>, knot_step: f64) -> NURBSpline {
         debug_assert!(order as usize <= control_points.len());
-        let knots_size = control_points.len() + (2 * order) as usize;
+        let knots_size = control_points.len() + order as usize;
 
         let mut spline = NURBSpline {
             order: order,
@@ -27,7 +34,7 @@ impl NURBSpline {
         let mut res = Point3::new(0.0, 0.0, 0.0);
         //TODO: only have to evaluate #order points here
         for (idx, cp) in self.control_points.iter().enumerate() {
-            let val = self.coxdeboor(idx, self.order, time);
+            let val = self.coxdeboor(idx, self.order as u32, time);
             println!("idx {} contributes with {}", idx, val);
             res += (val * cp).to_vec();
         }
@@ -37,10 +44,9 @@ impl NURBSpline {
     //Cox-de Boor recursion formula
     fn coxdeboor(&self, cp_idx: usize, order: u32, t: f64) -> f64 {
         debug_assert!(order > 0);
-        debug_assert!(self.order >= order);
 
-        if (order == 1) {
-            if (self.knots[cp_idx] <= t && t <= self.knots[cp_idx + 1]) {
+        if order == 1 {
+            if self.knots[cp_idx] <= t && t <= self.knots[cp_idx + 1] {
                 return 1.0;
             } else {
                 return 0.0;
@@ -48,14 +54,14 @@ impl NURBSpline {
         }
 
         let divident = self.knots[cp_idx + order as usize - 1] - self.knots[cp_idx];
-        let equation1 = if (divident > 0.0) {
+        let equation1 = if divident > 0.0 {
             (t - self.knots[cp_idx]) / divident * self.coxdeboor(cp_idx, order - 1, t)
         } else {
             0.0
         };
 
         let divident = self.knots[cp_idx + order as usize] - self.knots[cp_idx + 1];
-        let equation2 = if (divident > 0.0) {
+        let equation2 = if divident > 0.0 {
             (self.knots[cp_idx + order as usize] - t) / divident *
                 self.coxdeboor(cp_idx + 1, order - 1, t)
         } else {
@@ -70,19 +76,19 @@ impl NURBSpline {
         let mut val = 0.0;
         println!("knots!");
         // #order zeroes to start
-        for i in 0..self.order {
+        for _i in 0..self.order as usize {
             self.knots.push(val);
             println!("{}", val);
         }
         val += step;
         // monotonically increasing knots
-        for i in 0..self.control_points.len() {
+        for _i in 0..(self.control_points.len() - self.order as usize) {
             self.knots.push(val);
-            val += step;
             println!("{}", val);
+            val += step;
         }
         // #order
-        for i in 0..self.order {
+        for _i in 0..self.order as usize {
             self.knots.push(val);
             println!("{}", val);
         }
