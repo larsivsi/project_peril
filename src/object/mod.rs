@@ -5,7 +5,7 @@ pub use self::camera::Camera;
 pub use self::draw::DrawObject;
 
 use cgmath::prelude::*;
-use cgmath::{Point3, Vector3};
+use cgmath::Point3;
 
 pub trait Drawable {
     fn draw(&self);
