@@ -35,25 +35,26 @@ fn main() {
     let scene = Scene::new();
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
 
-    let cp = vec![
+    let points = vec![
         Point3::new(1.0, 0.0, 0.0),
         Point3::new(0.0, 1.0, 0.0),
         Point3::new(-1.0, 0.0, 0.0),
         Point3::new(0.0, -1.0, 0.0),
         Point3::new(0.0, 0.0, 1.0),
         Point3::new(0.0, 0.0, -1.0),
+        Point3::new(0.0, 1.0, -1.0),
+        Point3::new(1.0, 0.0, -1.0),
     ];
 
-    let mut time = 0.0;
-    let timestep = 0.1;
-    let maxtime = (cp.len() - Order::CUBIC as usize + 1) as f64;
-    let spline = NURBSpline::new(Order::CUBIC, cp, 1.0);
+    let mut u = 0.0;
+    let step = 0.1;
+    let spline = NURBSpline::new(Order::CUBIC, points);
 
-    while time < maxtime {
-        println!("evaluating spline at time {}", time);
-        let point = spline.evaluate_at(time);
+    while u < spline.eval_limit() {
+        println!("evaluating spline at time {}", u);
+        let point = spline.evaluate_at(u);
         println!("point: {:?}", point);
-        time += timestep;
+        u += step;
     }
 
     // main loop
