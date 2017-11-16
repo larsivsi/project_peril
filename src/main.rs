@@ -1,5 +1,6 @@
 extern crate cgmath;
 extern crate regex;
+#[macro_use]
 extern crate vulkano;
 extern crate winit;
 extern crate vulkano_win;
@@ -14,7 +15,7 @@ use cgmath::Point3;
 use config::Config;
 use nurbs::{Order, NURBSpline};
 use object::{Position, Camera};
-use renderer::RenderState;
+use renderer::{Frame, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 //for debug/simulation
@@ -59,6 +60,7 @@ fn main() {
 
     // main loop
     let mut running = true;
+    let mut recreate_swapchain = false;
     let mut framecount: u64 = 0;
     // aim for 60fps = 16.66666... ms
     let delta_time = Duration::from_millis(17);
@@ -80,6 +82,12 @@ fn main() {
             elapsed_time += delta_time;
         }
 
+        if recreate_swapchain {
+            renderstate.recreate_swapchain();
+            recreate_swapchain = false;
+        }
+        //let _frame = Frame::new(&renderstate);
+
         //call to render function goes here
         // (now simulated with a sleep)
         scene.draw();
@@ -98,9 +106,9 @@ fn main() {
 
         renderstate.event_loop.poll_events(|ev| match ev {
             winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
-//            winit::Event::WindowEvent { event: winit::WindowEvent::Resized(_, _), .. } => {
-//                recreate_swapchain = true
-//            }
+            winit::Event::WindowEvent { event: winit::WindowEvent::Resized(_, _), .. } => {
+                recreate_swapchain = true
+            }
             _ => (),
         });
 
