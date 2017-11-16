@@ -11,6 +11,8 @@ use vulkano_win::{Window, VkSurfaceBuild};
 
 use std::sync::Arc;
 
+/* TODO: when used, remove the dead code allowence */
+#[allow(dead_code)]
 pub struct RenderState {
     // vulkan stuff
     instance: Arc<Instance>,
@@ -74,7 +76,7 @@ impl RenderState {
 
         let queue = queues.next().unwrap();
 
-        let (mut swapchain, mut images) = {
+        let (swapchain, images) = {
             let caps = window
                 .surface()
                 .capabilities(device.physical_device())

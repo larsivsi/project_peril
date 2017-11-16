@@ -2,6 +2,7 @@ use cgmath::prelude::*;
 use cgmath::Point3;
 
 #[derive(Copy, Clone)]
+#[allow(dead_code)]
 pub enum Order {
     LINEAR = 2,
     QUADRATIC = 3,

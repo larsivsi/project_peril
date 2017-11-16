@@ -33,7 +33,7 @@ fn main() {
 
     let mut renderstate = RenderState::init(cfg);
     let scene = Scene::new();
-    let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
+    let _camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
 
     let points = vec![
         Point3::new(1.0, 0.0, 0.0),
