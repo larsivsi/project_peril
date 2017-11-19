@@ -23,13 +23,6 @@ use std::thread::sleep;
 fn main() {
     // init stuff
     let cfg = Config::read_config("options.cfg");
-    println!(
-        "window dims: {}x{}\nrender dims: {}x{}",
-        cfg.window_dimensions.0,
-        cfg.window_dimensions.1,
-        cfg.render_dimensions.0,
-        cfg.render_dimensions.1,
-    );
 
     let mut renderstate = RenderState::init(cfg);
     let scene = Scene::new();

@@ -69,7 +69,7 @@ impl RenderState {
             .unwrap();
 
         unsafe {
-            let entry = Entry::new().unwrap();
+            let entry: Entry<V1_0> = Entry::new().unwrap();
             let app_name = CString::new(cfg.app_name).unwrap();
             let raw_name = app_name.as_ptr();
 
