@@ -63,14 +63,14 @@ impl RenderState {
 
         let events_loop = winit::EventsLoop::new();
         let window = winit::WindowBuilder::new()
-            .with_title("ProjectPeril")
+            .with_title(format!("{} {}", cfg.app_name, cfg.version_to_string()))
             .with_dimensions(dimensions[0], dimensions[1])
             .build(&events_loop)
             .unwrap();
 
         unsafe {
             let entry = Entry::new().unwrap();
-            let app_name = CString::new("ProjectPeril").unwrap();
+            let app_name = CString::new(cfg.app_name).unwrap();
             let raw_name = app_name.as_ptr();
 
             let layer_names = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
@@ -83,10 +83,10 @@ impl RenderState {
                 p_application_name: raw_name,
                 s_type: vk::StructureType::ApplicationInfo,
                 p_next: ptr::null(),
-                application_version: 0,
+                application_version: cfg.app_version,
                 p_engine_name: raw_name,
                 engine_version: 0,
-                api_version: vk_make_version!(1, 0, 36),
+                api_version: vk_make_version!(1, 0, 57),
             };
 
             let create_info = vk::InstanceCreateInfo {

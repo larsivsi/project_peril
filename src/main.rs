@@ -85,7 +85,6 @@ fn main() {
             renderstate.recreate_swapchain();
             recreate_swapchain = false;
         }
-        //let _frame = Frame::new(&renderstate);
 
         //call to render function goes here
         // (now simulated with a sleep)
