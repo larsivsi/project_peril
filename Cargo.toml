@@ -4,8 +4,7 @@ version = "0.1.0"
 authors = ["Lars-Ivar Hesselberg Simonsen <larsivarhs@gmail.com>","Matthew Guise <reaverrikku@gmail.com>"]
 
 [dependencies]
+ash = "0.20.1"
 cgmath = "0.15.0"
 regex = "0.2.2"
-vulkano = "0.7.2"
-vulkano-win = "0.7.2"
-winit = "0.7.0"
+winit = "0.8.3"

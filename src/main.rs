@@ -1,9 +1,8 @@
+#[macro_use]
+extern crate ash;
 extern crate cgmath;
 extern crate regex;
-#[macro_use]
-extern crate vulkano;
 extern crate winit;
-extern crate vulkano_win;
 
 mod config;
 mod nurbs;
@@ -15,7 +14,7 @@ use cgmath::Point3;
 use config::Config;
 use nurbs::{Order, NURBSpline};
 use object::{Position, Camera};
-use renderer::{Frame, RenderState};
+use renderer::RenderState;
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 //for debug/simulation
