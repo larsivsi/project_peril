@@ -2,7 +2,6 @@ use cgmath::prelude::*;
 use cgmath::{Point3, Vector3};
 use object::Position;
 
-
 pub struct Camera {
     position: Point3<f64>,
     front: Vector3<f64>,
@@ -27,7 +26,17 @@ impl Camera {
 }
 
 impl Position for Camera {
-    fn new(position: Point3<f64>) -> Camera {
+    fn get_position(&self) -> Point3<f64> {
+        self.position
+    }
+
+    fn set_position(&mut self, position: Point3<f64>) {
+        self.position = position;
+    }
+}
+
+impl Camera {
+    pub fn new(position: Point3<f64>) -> Camera {
         let mut camera = Camera {
             position: position,
             front: Vector3 {
@@ -55,13 +64,5 @@ impl Position for Camera {
         };
         camera.update();
         camera
-    }
-
-    fn get_position(&self) -> Point3<f64> {
-        self.position
-    }
-
-    fn set_position(&mut self, position: Point3<f64>) {
-        self.position = position;
     }
 }

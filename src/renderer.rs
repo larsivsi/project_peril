@@ -13,9 +13,10 @@ use winit::Window;
 
 pub struct RenderState {
     instance: Instance<V1_0>,
-    device: Device<V1_0>,
+    pub device: Device<V1_0>,
     pdevice: vk::PhysicalDevice,
     queue_family_index: u32,
+    device_memory_properties: vk::PhysicalDeviceMemoryProperties,
     // window stuff
     pub event_loop: EventsLoop,
     window: Window,
@@ -280,11 +281,14 @@ impl RenderState {
                 })
                 .collect();
 
+            let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
+
             RenderState {
                 instance: instance,
                 device: device,
                 pdevice: pdevice,
                 queue_family_index: queue_family_index,
+                device_memory_properties: device_memory_properties,
                 // window stuff
                 event_loop: events_loop,
                 window: window,
