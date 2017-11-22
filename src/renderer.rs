@@ -13,9 +13,9 @@ use winit::Window;
 
 pub struct RenderState {
     instance: Instance<V1_0>,
-    pub device: Device<V1_0>,
     pdevice: vk::PhysicalDevice,
     queue_family_index: u32,
+    pub device: Device<V1_0>,
     device_memory_properties: vk::PhysicalDeviceMemoryProperties,
     // window stuff
     pub event_loop: EventsLoop,
@@ -25,7 +25,6 @@ pub struct RenderState {
     // swapchain
     swapchain_loader: Swapchain,
     swapchain: vk::SwapchainKHR,
-    present_images: Vec<vk::Image>,
     present_image_views: Vec<vk::ImageView>,
 }
 
@@ -83,6 +82,7 @@ impl RenderState {
         (buffer, memory)
     }
 
+    // Names the extensions we need to create our surface
     fn extension_names() -> Vec<*const i8> {
         vec![Surface::name().as_ptr(), XlibSurface::name().as_ptr()]
     }
@@ -109,42 +109,48 @@ impl RenderState {
     }
 
     // In case window changes dimensions (resized etc.)
-    pub fn recreate_swapchain(&mut self) {}
+    pub fn recreate_swapchain(&mut self) {
+        //TODO
+    }
 
+    // Initializes the RenderState for Vulkan rendering
     pub fn init(cfg: Config) -> RenderState {
-        let dimensions = {
-            let (width, height) = cfg.window_dimensions;
-            [width, height]
-        };
 
+        // Window and event handler
         let events_loop = winit::EventsLoop::new();
         let window = winit::WindowBuilder::new()
             .with_title(format!("{} {}", cfg.app_name, cfg.version_to_string()))
-            .with_dimensions(dimensions[0], dimensions[1])
+            .with_dimensions(cfg.window_dimensions.0, cfg.window_dimensions.1)
             .build(&events_loop)
             .unwrap();
 
+        // Vulkan!
         unsafe {
+            // ash entry point
             let entry: Entry<V1_0> = Entry::new().unwrap();
+
+            // Application info
             let app_name = CString::new(cfg.app_name).unwrap();
             let raw_name = app_name.as_ptr();
+            let appinfo = vk::ApplicationInfo {
+                s_type: vk::StructureType::ApplicationInfo,
+                p_next: ptr::null(),
+                p_application_name: raw_name,
+                application_version: cfg.app_version,
+                p_engine_name: raw_name,
+                engine_version: cfg.app_version,
+                api_version: vk_make_version!(1, 0, 57),
+            };
 
+            // Layers and extensions
             let layer_names = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
             let layers_names_raw: Vec<*const i8> = layer_names
                 .iter()
                 .map(|raw_name| raw_name.as_ptr())
                 .collect();
             let extension_names_raw = RenderState::extension_names();
-            let appinfo = vk::ApplicationInfo {
-                p_application_name: raw_name,
-                s_type: vk::StructureType::ApplicationInfo,
-                p_next: ptr::null(),
-                application_version: cfg.app_version,
-                p_engine_name: raw_name,
-                engine_version: 0,
-                api_version: vk_make_version!(1, 0, 57),
-            };
 
+            // Instance
             let create_info = vk::InstanceCreateInfo {
                 s_type: vk::StructureType::InstanceCreateInfo,
                 p_next: ptr::null(),
@@ -155,18 +161,20 @@ impl RenderState {
                 pp_enabled_extension_names: extension_names_raw.as_ptr(),
                 enabled_extension_count: extension_names_raw.len() as u32,
             };
-
             let instance: Instance<V1_0> = entry.create_instance(&create_info, None).expect(
                 "Instance creation error",
             );
+            //TODO debug layer callback
 
+            // Surface
+            let surface_loader =
+                Surface::new(&entry, &instance).expect("Unable to load the Surface extension");
             let surface = RenderState::create_surface(&entry, &instance, &window).unwrap();
+
+            // Physical device
             let pdevices = instance.enumerate_physical_devices().expect(
                 "Physical device error",
             );
-            let surface_loader =
-                Surface::new(&entry, &instance).expect("Unable to load the Surface extension");
-
             let (pdevice, queue_family_index) = pdevices
                 .iter()
                 .map(|pdevice| {
@@ -176,6 +184,7 @@ impl RenderState {
                         .enumerate()
                         .filter_map(|(index, ref info)| {
                             let supports_graphic_and_surface =
+                                // Any GPU that can render to our surface will do
                                 info.queue_flags.subset(vk::QUEUE_GRAPHICS_BIT) &&
                                     surface_loader.get_physical_device_surface_support_khr(
                                         *pdevice,
@@ -192,22 +201,23 @@ impl RenderState {
                 .filter_map(|v| v)
                 .nth(0)
                 .expect("Couldn't find suitable device.");
-
             let queue_family_index = queue_family_index as u32;
-            let device_extension_names_raw = [Swapchain::name().as_ptr()];
-            let features = vk::PhysicalDeviceFeatures {
-                shader_clip_distance: 1,
-                ..Default::default()
-            };
 
-            let priorities = [1.0];
+            // Logical device
+            let queue_priorities = [1.0]; // One queue of priority 1.0
             let queue_info = vk::DeviceQueueCreateInfo {
                 s_type: vk::StructureType::DeviceQueueCreateInfo,
                 p_next: ptr::null(),
                 flags: Default::default(),
-                queue_family_index: queue_family_index as u32,
-                p_queue_priorities: priorities.as_ptr(),
-                queue_count: priorities.len() as u32,
+                queue_family_index: queue_family_index,
+                p_queue_priorities: queue_priorities.as_ptr(),
+                queue_count: queue_priorities.len() as u32,
+            };
+            let device_extension_names_raw = [Swapchain::name().as_ptr()]; //VK_KHR_swapchain
+            let features = vk::PhysicalDeviceFeatures {
+                shader_clip_distance: vk::VK_TRUE,
+                // Can request more stuff here later
+                ..Default::default()
             };
             let device_create_info = vk::DeviceCreateInfo {
                 s_type: vk::StructureType::DeviceCreateInfo,
@@ -221,12 +231,12 @@ impl RenderState {
                 pp_enabled_extension_names: device_extension_names_raw.as_ptr(),
                 p_enabled_features: &features,
             };
-
             let device: Device<V1_0> = instance
                 .create_device(pdevice, &device_create_info, None)
-                .unwrap();
-            let present_queue = device.get_device_queue(queue_family_index as u32, 0);
+                .expect("Failed to create logical device");
+            let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
 
+            // Swapchain
             let surface_formats = surface_loader
                 .get_physical_device_surface_formats_khr(pdevice, surface)
                 .unwrap();
@@ -252,17 +262,15 @@ impl RenderState {
             {
                 desired_image_count = surface_capabilities.max_image_count;
             }
-
             let surface_resolution = match surface_capabilities.current_extent.width {
                 std::u32::MAX => {
                     vk::Extent2D {
-                        width: dimensions[0],
-                        height: dimensions[1],
+                        width: cfg.window_dimensions.0,
+                        height: cfg.window_dimensions.1,
                     }
                 }
                 _ => surface_capabilities.current_extent,
             };
-
             let pre_transform = if surface_capabilities.supported_transforms.subset(
                 vk::SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
             )
@@ -305,6 +313,7 @@ impl RenderState {
                 .create_swapchain_khr(&swapchain_create_info, None)
                 .unwrap();
 
+            // Present image views
             let present_images = swapchain_loader
                 .get_swapchain_images_khr(swapchain)
                 .unwrap();
@@ -336,13 +345,13 @@ impl RenderState {
                 })
                 .collect();
 
-            let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
+            //TODO: graphics pipeline, framebuffers, command buffer, etc.
 
             RenderState {
                 instance: instance,
-                device: device,
                 pdevice: pdevice,
                 queue_family_index: queue_family_index,
+                device: device,
                 device_memory_properties: device_memory_properties,
                 // window stuff
                 event_loop: events_loop,
@@ -352,7 +361,6 @@ impl RenderState {
                 // swapchain
                 swapchain_loader: swapchain_loader,
                 swapchain: swapchain,
-                present_images: present_images,
                 present_image_views: present_image_views,
             }
         }
@@ -367,14 +375,13 @@ impl Drop for RenderState {
             for &image_view in self.present_image_views.iter() {
                 self.device.destroy_image_view(image_view, None);
             }
-            // present_images are destroyed with the swapchain, I think...
+
             self.swapchain_loader.destroy_swapchain_khr(
                 self.swapchain,
                 None,
             );
-            self.surface_loader.destroy_surface_khr(self.surface, None);
-
             self.device.destroy_device(None);
+            self.surface_loader.destroy_surface_khr(self.surface, None);
             self.instance.destroy_instance(None);
         }
     }
