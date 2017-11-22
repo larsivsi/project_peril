@@ -20,8 +20,10 @@ pub struct RenderState {
     // window stuff
     pub event_loop: EventsLoop,
     window: Window,
+    surface_loader: Surface,
     surface: vk::SurfaceKHR,
     // swapchain
+    swapchain_loader: Swapchain,
     swapchain: vk::SwapchainKHR,
     present_images: Vec<vk::Image>,
     present_image_views: Vec<vk::ImageView>,
@@ -307,12 +309,35 @@ impl RenderState {
                 // window stuff
                 event_loop: events_loop,
                 window: window,
+                surface_loader: surface_loader,
                 surface: surface,
                 // swapchain
+                swapchain_loader: swapchain_loader,
                 swapchain: swapchain,
                 present_images: present_images,
                 present_image_views: present_image_views,
             }
+        }
+    }
+}
+
+impl Drop for RenderState {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.device_wait_idle().unwrap();
+
+            for &image_view in self.present_image_views.iter() {
+                self.device.destroy_image_view(image_view, None);
+            }
+            // present_images are destroyed with the swapchain, I think...
+            self.swapchain_loader.destroy_swapchain_khr(
+                self.swapchain,
+                None,
+            );
+            self.surface_loader.destroy_surface_khr(self.surface, None);
+
+            self.device.destroy_device(None);
+            self.instance.destroy_instance(None);
         }
     }
 }
