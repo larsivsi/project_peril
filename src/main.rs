@@ -13,7 +13,7 @@ mod scene;
 use cgmath::Point3;
 use config::Config;
 use nurbs::{Order, NURBSpline};
-use object::{Position, Camera};
+use object::Camera;
 use renderer::RenderState;
 use scene::Scene;
 use std::time::{Duration, SystemTime};
@@ -25,7 +25,7 @@ fn main() {
     let cfg = Config::read_config("options.cfg");
 
     let mut renderstate = RenderState::init(cfg);
-    let scene = Scene::new();
+    let scene = Scene::new(&renderstate);
     let _camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
 
     let points = vec![

@@ -49,7 +49,10 @@ unsafe fn create_vk_buffer(
         s_type: vk::StructureType::MemoryAllocateInfo,
         p_next: ptr::null(),
         allocation_size: mem_req.size,
-        memory_type_index: 0, //TODO! FIX THIS!
+        memory_type_index: rs.find_memory_type(
+            mem_req.memory_type_bits,
+            vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+        ),
     };
     let memory = rs.device.allocate_memory(&alloc_info, None).expect(
         "Failed to allocate buffer memory",
@@ -75,7 +78,12 @@ impl Position for DrawObject {
 }
 
 impl DrawObject {
-    fn new_quad(rs: &RenderState, position: Point3<f64>, width: f32, height: f32) -> DrawObject {
+    pub fn new_quad(
+        rs: &RenderState,
+        position: Point3<f64>,
+        width: f32,
+        height: f32,
+    ) -> DrawObject {
         let vertices = [
             Vertex {
                 pos: [-width, -height, 0.0, 1.0],

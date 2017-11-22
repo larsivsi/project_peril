@@ -28,6 +28,21 @@ pub struct RenderState {
 }
 
 impl RenderState {
+    pub fn find_memory_type(&self, mem_type_bits: u32, properties: vk::MemoryPropertyFlags) -> u32 {
+        for (idx, mem_type) in self.device_memory_properties
+            .memory_types
+            .iter()
+            .enumerate()
+        {
+            if mem_type_bits & (1 << idx) != 0 &&
+                (mem_type.property_flags & properties) == properties
+            {
+                return idx as u32;
+            }
+        }
+        panic!("Cannot find memory type!");
+    }
+
     fn extension_names() -> Vec<*const i8> {
         vec![Surface::name().as_ptr(), XlibSurface::name().as_ptr()]
     }
