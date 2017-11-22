@@ -4,7 +4,6 @@ use ash::util::Align;
 use cgmath::Point3;
 use object::{Drawable, Position};
 use renderer::RenderState;
-use std::ptr;
 use std::mem::{align_of, size_of};
 
 #[derive(Clone, Copy)]
@@ -21,43 +20,6 @@ pub struct DrawObject {
     index_mem: vk::DeviceMemory,
 
     position: Point3<f64>,
-}
-
-//TODO: move somewhere else
-unsafe fn create_vk_buffer(
-    rs: &RenderState,
-    size: vk::DeviceSize,
-    usage: vk::BufferUsageFlags,
-    properties: vk::MemoryPropertyFlags,
-) -> (vk::Buffer, vk::DeviceMemory) {
-    let bufferinfo = vk::BufferCreateInfo {
-        s_type: vk::StructureType::BufferCreateInfo,
-        p_next: ptr::null(),
-        flags: vk::BufferCreateFlags::empty(),
-        size: size,
-        usage: usage,
-        sharing_mode: vk::SharingMode::Exclusive,
-        queue_family_index_count: 0,
-        p_queue_family_indices: ptr::null(),
-    };
-    let buffer = rs.device.create_buffer(&bufferinfo, None).expect(
-        "Failed to create buffer",
-    );
-
-    let mem_req = rs.device.get_buffer_memory_requirements(buffer);
-    let alloc_info = vk::MemoryAllocateInfo {
-        s_type: vk::StructureType::MemoryAllocateInfo,
-        p_next: ptr::null(),
-        allocation_size: mem_req.size,
-        memory_type_index: rs.find_memory_type(mem_req.memory_type_bits, properties),
-    };
-    let memory = rs.device.allocate_memory(&alloc_info, None).expect(
-        "Failed to allocate buffer memory",
-    );
-
-    rs.device.bind_buffer_memory(buffer, memory, 0);
-
-    (buffer, memory)
 }
 
 impl Drawable for DrawObject {
@@ -108,8 +70,7 @@ impl DrawObject {
         unsafe {
             // Create buffer for vertices
             let buffersize: vk::DeviceSize = (size_of::<Vertex>() * vertices.len()) as u64;
-            let (vert_buffer, vert_mem) = create_vk_buffer(
-                rs,
+            let (vert_buffer, vert_mem) = rs.create_vk_buffer(
                 buffersize,
                 vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -124,8 +85,7 @@ impl DrawObject {
 
             // Create buffer for indices
             let buffersize: vk::DeviceSize = (size_of::<u16>() * indices.len()) as u64;
-            let (idx_buffer, idx_mem) = create_vk_buffer(
-                rs,
+            let (idx_buffer, idx_mem) = rs.create_vk_buffer(
                 buffersize,
                 vk::BUFFER_USAGE_INDEX_BUFFER_BIT,
                 vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |

@@ -30,7 +30,7 @@ pub struct RenderState {
 }
 
 impl RenderState {
-    pub fn find_memory_type(&self, mem_type_bits: u32, properties: vk::MemoryPropertyFlags) -> u32 {
+    fn find_memory_type(&self, mem_type_bits: u32, properties: vk::MemoryPropertyFlags) -> u32 {
         for (idx, mem_type) in self.device_memory_properties
             .memory_types
             .iter()
@@ -43,6 +43,44 @@ impl RenderState {
             }
         }
         panic!("Cannot find memory type!");
+    }
+
+    pub unsafe fn create_vk_buffer(
+        &self,
+        size: vk::DeviceSize,
+        usage: vk::BufferUsageFlags,
+        properties: vk::MemoryPropertyFlags,
+    ) -> (vk::Buffer, vk::DeviceMemory) {
+        let bufferinfo = vk::BufferCreateInfo {
+            s_type: vk::StructureType::BufferCreateInfo,
+            p_next: ptr::null(),
+            flags: vk::BufferCreateFlags::empty(),
+            size: size,
+            usage: usage,
+            sharing_mode: vk::SharingMode::Exclusive,
+            queue_family_index_count: 0,
+            p_queue_family_indices: ptr::null(),
+        };
+        let buffer = self.device.create_buffer(&bufferinfo, None).expect(
+            "Failed to create buffer",
+        );
+
+        let mem_req = self.device.get_buffer_memory_requirements(buffer);
+        let alloc_info = vk::MemoryAllocateInfo {
+            s_type: vk::StructureType::MemoryAllocateInfo,
+            p_next: ptr::null(),
+            allocation_size: mem_req.size,
+            memory_type_index: self.find_memory_type(mem_req.memory_type_bits, properties),
+        };
+        let memory = self.device.allocate_memory(&alloc_info, None).expect(
+            "Failed to allocate buffer memory",
+        );
+
+        self.device.bind_buffer_memory(buffer, memory, 0).expect(
+            "Failed to bind memory",
+        );
+
+        (buffer, memory)
     }
 
     fn extension_names() -> Vec<*const i8> {
