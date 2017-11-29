@@ -11,3 +11,9 @@ $ ./target/(debug|release)/project_peril
 
 Compile and run!:
 $ cargo run [--release]
+
+Compile glsl to spv:
+Get glslangValidator from https://cvs.khronos.org/svn/repos/ogl/trunk/ecosystem/public/sdk/tools/glslang/Install/
+Add it to your PATH
+$ glslangValidator -V shader.<stage> [-o <output.spv>]
+For more details, check https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/
