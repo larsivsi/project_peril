@@ -72,45 +72,57 @@ impl DrawObject {
         ];
         let indices = [0u16, 1, 3, 0, 3, 2];
 
+        let vert_buffer;
+        let vert_mem;
+        // Create buffer for vertices
+        let buffersize: vk::DeviceSize = (size_of::<Vertex>() * vertices.len()) as u64;
         unsafe {
-            // Create buffer for vertices
-            let buffersize: vk::DeviceSize = (size_of::<Vertex>() * vertices.len()) as u64;
-            let (vert_buffer, vert_mem) = rs.create_vk_buffer(
+            let (vert_buffer_unsafe, vert_mem_unsafe) = rs.create_vk_buffer(
                 buffersize,
                 vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
             );
             let vert_ptr = rs.device
-                .map_memory(vert_mem, 0, buffersize, vk::MemoryMapFlags::empty())
+                .map_memory(vert_mem_unsafe, 0, buffersize, vk::MemoryMapFlags::empty())
                 .expect("Failed to map vertex memory");
             let mut vert_align = Align::new(vert_ptr, align_of::<Vertex>() as u64, buffersize);
             vert_align.copy_from_slice(&vertices);
-            rs.device.unmap_memory(vert_mem);
+            rs.device.unmap_memory(vert_mem_unsafe);
 
-            // Create buffer for indices
-            let buffersize: vk::DeviceSize = (size_of::<u16>() * indices.len()) as u64;
-            let (idx_buffer, idx_mem) = rs.create_vk_buffer(
+            vert_buffer = vert_buffer_unsafe;
+            vert_mem = vert_mem_unsafe;
+        }
+
+        let idx_buffer;
+        let idx_mem;
+        // Create buffer for indices
+        let buffersize: vk::DeviceSize = (size_of::<u16>() * indices.len()) as u64;
+        unsafe {
+            let (idx_buffer_unsafe, idx_mem_unsafe) = rs.create_vk_buffer(
                 buffersize,
                 vk::BUFFER_USAGE_INDEX_BUFFER_BIT,
                 vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
             );
             let idx_ptr = rs.device
-                .map_memory(idx_mem, 0, buffersize, vk::MemoryMapFlags::empty())
+                .map_memory(idx_mem_unsafe, 0, buffersize, vk::MemoryMapFlags::empty())
                 .expect("Failed to map index memory");
             let mut idx_align = Align::new(idx_ptr, align_of::<u16>() as u64, buffersize);
             idx_align.copy_from_slice(&indices);
-            rs.device.unmap_memory(idx_mem);
+            rs.device.unmap_memory(idx_mem_unsafe);
 
-            DrawObject {
-                vertices: vert_buffer,
-                vertex_mem: vert_mem,
-                indices: idx_buffer,
-                index_mem: idx_mem,
-                position: position,
-                device: Rc::clone(&rs.device),
-            }
+            idx_buffer = idx_buffer_unsafe;
+            idx_mem = idx_mem_unsafe;
+        }
+
+        DrawObject {
+            vertices: vert_buffer,
+            vertex_mem: vert_mem,
+            indices: idx_buffer,
+            index_mem: idx_mem,
+            position: position,
+            device: Rc::clone(&rs.device),
         }
     }
 }
