@@ -184,12 +184,11 @@ impl RenderState {
 
         // Layers
         let mut layer_names_raw: Vec<*const i8> = Vec::new();
+        let requested_layers = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
         // Only enable debug layers in debug builds
         #[cfg(debug_assertions)]
         {
             println!("Debug layers:");
-            let requested_layers = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
-
             let available_layers = entry.enumerate_instance_layer_properties().unwrap();
             for layer in available_layers.iter() {
                 let layer_name;
@@ -200,9 +199,7 @@ impl RenderState {
                 for req_layer in requested_layers.iter() {
                     if layer_name == req_layer.as_c_str() {
                         println!("Will enable {:?}", req_layer);
-                        //TODO: This doesn't work for me for some reason...
-                        //      Need to figure out why. Until then: leaving disabled.
-                        //layer_names_raw.push(req_layer.as_ptr());
+                        layer_names_raw.push(req_layer.as_ptr());
                     }
                 }
             }
