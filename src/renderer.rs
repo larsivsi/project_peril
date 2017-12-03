@@ -530,10 +530,6 @@ impl Pipeline {
             attachment: 0,
             layout: vk::ImageLayout::ColorAttachmentOptimal,
         };
-        let depth_attachment_ref = vk::AttachmentReference {
-            attachment: 1,
-            layout: vk::ImageLayout::DepthStencilAttachmentOptimal,
-        };
         let dependency = vk::SubpassDependency {
             dependency_flags: Default::default(),
             src_subpass: vk::VK_SUBPASS_EXTERNAL,
@@ -547,7 +543,7 @@ impl Pipeline {
         let subpass = vk::SubpassDescription {
             color_attachment_count: 1,
             p_color_attachments: &color_attachment_ref,
-            p_depth_stencil_attachment: &depth_attachment_ref,
+            p_depth_stencil_attachment: ptr::null(),
             flags: Default::default(),
             pipeline_bind_point: vk::PipelineBindPoint::Graphics,
             input_attachment_count: 0,
@@ -790,6 +786,13 @@ impl Pipeline {
                     None,
                 )
                 .expect("Unable to create graphics pipeline");
+
+            // Graphics pipeline created, we no longer need the shader modules
+            rs.device.destroy_shader_module(
+                fragment_shader_module,
+                None,
+            );
+            rs.device.destroy_shader_module(vertex_shader_module, None);
         }
 
         Pipeline {
