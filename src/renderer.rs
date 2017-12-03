@@ -3,9 +3,9 @@ use config::Config;
 use ash::{Device, Entry, Instance};
 use ash::vk;
 use ash::version::{V1_0, InstanceV1_0, DeviceV1_0, EntryV1_0};
-use ash::extensions::{Surface, Swapchain, XlibSurface};
+use ash::extensions::{DebugReport, Surface, Swapchain, XlibSurface};
 use std;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -32,9 +32,28 @@ pub struct RenderState {
     swapchain_loader: Swapchain,
     swapchain: vk::SwapchainKHR,
     present_image_views: Vec<vk::ImageView>,
+    // debug
+    debug_report_loader: DebugReport,
+    debug_callback: vk::DebugReportCallbackEXT,
 }
 
 impl RenderState {
+    // Debug layer callback function
+    unsafe extern "system" fn vulkan_debug_callback(
+        _: vk::DebugReportFlagsEXT,
+        _: vk::DebugReportObjectTypeEXT,
+        _: vk::uint64_t,
+        _: vk::size_t,
+        _: vk::int32_t,
+        _: *const vk::c_char,
+        p_message: *const vk::c_char,
+        _: *mut vk::c_void,
+    ) -> u32 {
+        println!("{:?}", CStr::from_ptr(p_message));
+        1
+    }
+
+    // Finds suitable memory type based on device and requirements
     fn find_memory_type(&self, mem_type_bits: u32, properties: vk::MemoryPropertyFlags) -> u32 {
         for (idx, mem_type) in self.device_memory_properties
             .memory_types
@@ -50,6 +69,7 @@ impl RenderState {
         panic!("Cannot find memory type!");
     }
 
+    // Creates a vk::Buffer
     pub fn create_vk_buffer(
         &self,
         size: vk::DeviceSize,
@@ -96,7 +116,12 @@ impl RenderState {
 
     // Names the extensions we need to create our surface
     fn extension_names() -> Vec<*const i8> {
-        vec![Surface::name().as_ptr(), XlibSurface::name().as_ptr()]
+        let mut extensions = vec![Surface::name().as_ptr(), XlibSurface::name().as_ptr()];
+        #[cfg(debug_assertions)]
+        {
+            extensions.push(DebugReport::name().as_ptr());
+        }
+        extensions
     }
 
     // Creates X11 surface
@@ -157,22 +182,43 @@ impl RenderState {
             api_version: vk_make_version!(1, 0, 57),
         };
 
-        // Layers and extensions
-        let layer_names = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
-        let layers_names_raw: Vec<*const i8> = layer_names
-            .iter()
-            .map(|raw_name| raw_name.as_ptr())
-            .collect();
-        let extension_names_raw = RenderState::extension_names();
+        // Layers
+        let mut layer_names_raw: Vec<*const i8> = Vec::new();
+        // Only enable debug layers in debug builds
+        #[cfg(debug_assertions)]
+        {
+            println!("Debug layers:");
+            let requested_layers = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
+
+            let available_layers = entry.enumerate_instance_layer_properties().unwrap();
+            for layer in available_layers.iter() {
+                let layer_name;
+                unsafe {
+                    layer_name = CStr::from_ptr(layer.layer_name.as_ptr());
+                }
+                println!("Found layer {:?}", layer_name);
+                for req_layer in requested_layers.iter() {
+                    if layer_name == req_layer.as_c_str() {
+                        println!("Will enable {:?}", req_layer);
+                        //TODO: This doesn't work for me for some reason...
+                        //      Need to figure out why. Until then: leaving disabled.
+                        //layer_names_raw.push(req_layer.as_ptr());
+                    }
+                }
+            }
+
+            println!("Will enable {} debug layers", layer_names_raw.len());
+        }
 
         // Instance
+        let extension_names_raw = RenderState::extension_names();
         let create_info = vk::InstanceCreateInfo {
             s_type: vk::StructureType::InstanceCreateInfo,
             p_next: ptr::null(),
             flags: Default::default(),
             p_application_info: &appinfo,
-            pp_enabled_layer_names: layers_names_raw.as_ptr(),
-            enabled_layer_count: layers_names_raw.len() as u32,
+            pp_enabled_layer_names: layer_names_raw.as_ptr(),
+            enabled_layer_count: layer_names_raw.len() as u32,
             pp_enabled_extension_names: extension_names_raw.as_ptr(),
             enabled_extension_count: extension_names_raw.len() as u32,
         };
@@ -182,7 +228,24 @@ impl RenderState {
                 "Instance creation error",
             );
         }
-        //TODO debug layer callback
+
+        // Debug layer callback
+        let debug_info = vk::DebugReportCallbackCreateInfoEXT {
+            s_type: vk::StructureType::DebugReportCallbackCreateInfoExt,
+            p_next: ptr::null(),
+            flags: vk::DEBUG_REPORT_ERROR_BIT_EXT | vk::DEBUG_REPORT_WARNING_BIT_EXT |
+                vk::DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
+            pfn_callback: RenderState::vulkan_debug_callback,
+            p_user_data: ptr::null_mut(),
+        };
+        let debug_report_loader =
+            DebugReport::new(&entry, &instance).expect("Unable to load debug report");
+        let debug_callback;
+        unsafe {
+            debug_callback = debug_report_loader
+                .create_debug_report_callback_ext(&debug_info, None)
+                .unwrap();
+        }
 
         // Surface
         let surface_loader =
@@ -388,6 +451,10 @@ impl RenderState {
             swapchain_loader: swapchain_loader,
             swapchain: swapchain,
             present_image_views: present_image_views,
+
+            // debug
+            debug_callback: debug_callback,
+            debug_report_loader: debug_report_loader,
         }
     }
 }
@@ -410,6 +477,10 @@ impl Drop for RenderState {
             );
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface_khr(self.surface, None);
+            self.debug_report_loader.destroy_debug_report_callback_ext(
+                self.debug_callback,
+                None,
+            );
             self.instance.destroy_instance(None);
         }
     }
