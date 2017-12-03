@@ -3,9 +3,9 @@ use std::fs::File;
 use std::io::prelude::*;
 
 const APP_NAME: &'static str = "ProjectPeril";
-const APP_VERSION_MAJOR: u32 = 0;
-const APP_VERSION_MINOR: u32 = 1;
-const APP_VERSION_PATCH: u32 = 0;
+const APP_VERSION_MAJOR: &'static str = env!("CARGO_PKG_VERSION_MAJOR");
+const APP_VERSION_MINOR: &'static str = env!("CARGO_PKG_VERSION_MINOR");
+const APP_VERSION_PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
 
 pub struct Config {
     pub app_name: &'static str,
@@ -70,9 +70,9 @@ impl Config {
         let mut cfg = Config {
             app_name: APP_NAME,
             app_version: Config::make_version(
-                APP_VERSION_MAJOR,
-                APP_VERSION_MINOR,
-                APP_VERSION_PATCH,
+                APP_VERSION_MAJOR.parse().unwrap(),
+                APP_VERSION_MINOR.parse().unwrap(),
+                APP_VERSION_PATCH.parse().unwrap(),
             ),
             window_dimensions: (0, 0),
             render_dimensions: (0, 0),
