@@ -50,7 +50,7 @@ impl RenderState {
         panic!("Cannot find memory type!");
     }
 
-    pub unsafe fn create_vk_buffer(
+    pub fn create_vk_buffer(
         &self,
         size: vk::DeviceSize,
         usage: vk::BufferUsageFlags,
@@ -66,9 +66,12 @@ impl RenderState {
             queue_family_index_count: 0,
             p_queue_family_indices: ptr::null(),
         };
-        let buffer = self.device.create_buffer(&bufferinfo, None).expect(
-            "Failed to create buffer",
-        );
+        let buffer;
+        unsafe {
+            buffer = self.device.create_buffer(&bufferinfo, None).expect(
+                "Failed to create buffer",
+            );
+        }
 
         let mem_req = self.device.get_buffer_memory_requirements(buffer);
         let alloc_info = vk::MemoryAllocateInfo {
@@ -77,13 +80,16 @@ impl RenderState {
             allocation_size: mem_req.size,
             memory_type_index: self.find_memory_type(mem_req.memory_type_bits, properties),
         };
-        let memory = self.device.allocate_memory(&alloc_info, None).expect(
-            "Failed to allocate buffer memory",
-        );
+        let memory;
+        unsafe {
+            memory = self.device.allocate_memory(&alloc_info, None).expect(
+                "Failed to allocate buffer memory",
+            );
 
-        self.device.bind_buffer_memory(buffer, memory, 0).expect(
-            "Failed to bind memory",
-        );
+            self.device.bind_buffer_memory(buffer, memory, 0).expect(
+                "Failed to bind memory",
+            );
+        }
 
         (buffer, memory)
     }
@@ -494,32 +500,35 @@ impl Pipeline {
             p_dependencies: &dependency,
         };
         let renderpass;
-        let framebuffers: Vec<vk::Framebuffer>;
         unsafe {
             renderpass = rs.device
                 .create_render_pass(&renderpass_create_info, None)
                 .unwrap();
-            framebuffers = rs.present_image_views
-                .iter()
-                .map(|&present_image_view| {
-                    let framebuffer_attachments = [present_image_view];
-                    let frame_buffer_create_info = vk::FramebufferCreateInfo {
-                        s_type: vk::StructureType::FramebufferCreateInfo,
-                        p_next: ptr::null(),
-                        flags: Default::default(),
-                        render_pass: renderpass,
-                        attachment_count: framebuffer_attachments.len() as u32,
-                        p_attachments: framebuffer_attachments.as_ptr(),
-                        width: rs.surface_dimensions.width,
-                        height: rs.surface_dimensions.height,
-                        layers: 1,
-                    };
-                    rs.device
-                        .create_framebuffer(&frame_buffer_create_info, None)
-                        .unwrap()
-                })
-                .collect();
         }
+        let framebuffers: Vec<vk::Framebuffer> = rs.present_image_views
+            .iter()
+            .map(|&present_image_view| {
+                let framebuffer_attachments = [present_image_view];
+                let frame_buffer_create_info = vk::FramebufferCreateInfo {
+                    s_type: vk::StructureType::FramebufferCreateInfo,
+                    p_next: ptr::null(),
+                    flags: Default::default(),
+                    render_pass: renderpass,
+                    attachment_count: framebuffer_attachments.len() as u32,
+                    p_attachments: framebuffer_attachments.as_ptr(),
+                    width: rs.surface_dimensions.width,
+                    height: rs.surface_dimensions.height,
+                    layers: 1,
+                };
+                let framebuffer;
+                unsafe {
+                    framebuffer = rs.device
+                        .create_framebuffer(&frame_buffer_create_info, None)
+                        .unwrap();
+                }
+                framebuffer
+            })
+            .collect();
         let layout_create_info = vk::PipelineLayoutCreateInfo {
             s_type: vk::StructureType::PipelineLayoutCreateInfo,
             p_next: ptr::null(),
