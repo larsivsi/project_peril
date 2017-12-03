@@ -45,9 +45,7 @@ fn main() {
     let spline = NURBSpline::new(Order::CUBIC, points);
 
     while u < spline.eval_limit() {
-        println!("evaluating spline at time {}", u);
         let point = spline.evaluate_at(u);
-        println!("point: {:?}", point);
         u += step;
     }
 

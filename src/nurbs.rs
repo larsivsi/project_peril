@@ -49,7 +49,6 @@ impl NURBSpline {
         for idx in start_idx..(start_idx + order) {
             let contrib = self.coxdeboor(idx, order, u);
             let controlpoint = self.controlpoints[idx];
-            println!("idx {} contributes with {}", idx, contrib);
             result += (contrib * controlpoint).to_vec();
         }
         result
