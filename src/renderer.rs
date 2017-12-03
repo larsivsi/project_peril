@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::ptr;
+use std::rc::Rc;
 use winit;
 use winit::EventsLoop;
 use winit::Window;
@@ -18,7 +19,7 @@ pub struct RenderState {
     instance: Instance<V1_0>,
     pdevice: vk::PhysicalDevice,
     queue_family_index: u32,
-    pub device: Device<V1_0>,
+    pub device: Rc<Device<V1_0>>,
     device_memory_properties: vk::PhysicalDeviceMemoryProperties,
     // window stuff
     pub event_loop: EventsLoop,
@@ -354,7 +355,7 @@ impl RenderState {
                 instance: instance,
                 pdevice: pdevice,
                 queue_family_index: queue_family_index,
-                device: device,
+                device: Rc::new(device),
                 device_memory_properties: device_memory_properties,
                 // window stuff
                 event_loop: events_loop,
@@ -374,6 +375,9 @@ impl RenderState {
 
 impl Drop for RenderState {
     fn drop(&mut self) {
+        // We must have the only reference to device at this point
+        debug_assert!(1 == Rc::strong_count(&self.device));
+
         unsafe {
             self.device.device_wait_idle().unwrap();
 
@@ -396,6 +400,9 @@ pub struct Pipeline {
     renderpass: vk::RenderPass,
     framebuffers: Vec<vk::Framebuffer>,
     pipeline: vk::Pipeline,
+    pipeline_layout: vk::PipelineLayout,
+    // Keep a pointer to the device for cleanup
+    device: Rc<Device<V1_0>>,
 }
 
 impl Pipeline {
@@ -687,8 +694,29 @@ impl Pipeline {
             Pipeline {
                 renderpass: renderpass,
                 framebuffers: framebuffers,
+                pipeline_layout: pipeline_layout,
                 pipeline: graphics_pipelines[0],
+                device: Rc::clone(&rs.device),
             }
+        }
+    }
+}
+
+impl Drop for Pipeline {
+    fn drop(&mut self) {
+        // We cannot have the last reference to device at this point
+        debug_assert!(1 < Rc::strong_count(&self.device));
+
+        unsafe {
+            self.device.destroy_pipeline(self.pipeline, None);
+            self.device.destroy_pipeline_layout(
+                self.pipeline_layout,
+                None,
+            );
+            for &framebuffer in self.framebuffers.iter() {
+                self.device.destroy_framebuffer(framebuffer, None);
+            }
+            self.device.destroy_render_pass(self.renderpass, None);
         }
     }
 }

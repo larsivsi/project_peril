@@ -1,10 +1,12 @@
 use ash::vk;
-use ash::version::DeviceV1_0;
+use ash::Device;
+use ash::version::{V1_0, DeviceV1_0};
 use ash::util::Align;
 use cgmath::Point3;
 use object::{Drawable, Position};
 use renderer::RenderState;
 use std::mem::{align_of, size_of};
+use std::rc::Rc;
 
 #[derive(Clone, Copy)]
 struct Vertex {
@@ -20,6 +22,9 @@ pub struct DrawObject {
     index_mem: vk::DeviceMemory,
 
     position: Point3<f64>,
+
+    // Keep a pointer to the device for cleanup
+    device: Rc<Device<V1_0>>,
 }
 
 impl Drawable for DrawObject {
@@ -104,7 +109,22 @@ impl DrawObject {
                 indices: idx_buffer,
                 index_mem: idx_mem,
                 position: position,
+                device: Rc::clone(&rs.device),
             }
+        }
+    }
+}
+
+impl Drop for DrawObject {
+    fn drop(&mut self) {
+        // We cannot have the last reference to device at this point
+        debug_assert!(1 < Rc::strong_count(&self.device));
+
+        unsafe {
+            self.device.destroy_buffer(self.indices, None);
+            self.device.free_memory(self.index_mem, None);
+            self.device.destroy_buffer(self.vertices, None);
+            self.device.free_memory(self.vertex_mem, None);
         }
     }
 }
