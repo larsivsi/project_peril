@@ -14,7 +14,7 @@ use cgmath::Point3;
 use config::Config;
 use nurbs::{Order, NURBSpline};
 use object::Camera;
-use renderer::{Pipeline, RenderState};
+use renderer::{CommandBuffers, Pipeline, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 //for debug/simulation
@@ -26,6 +26,7 @@ fn main() {
 
     let mut renderstate = RenderState::init(cfg);
     let pipeline = Pipeline::new(&renderstate);
+    let cmd_buffers = CommandBuffers::new(&renderstate, &pipeline);
     let scene = Scene::new(&renderstate);
     let _camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
 

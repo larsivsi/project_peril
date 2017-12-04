@@ -32,6 +32,9 @@ pub struct RenderState {
     swapchain_loader: Swapchain,
     swapchain: vk::SwapchainKHR,
     present_image_views: Vec<vk::ImageView>,
+    // semaphores
+    image_available_sem: vk::Semaphore,
+    rendering_finished_sem: vk::Semaphore,
     // debug
     debug_report_loader: DebugReport,
     debug_callback: vk::DebugReportCallbackEXT,
@@ -431,6 +434,19 @@ impl RenderState {
             })
             .collect();
 
+        // Semaphores
+        let sem_create_info = vk::SemaphoreCreateInfo {
+            s_type: vk::StructureType::SemaphoreCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+        };
+        let image_available_sem;
+        let rendering_finished_sem;
+        unsafe {
+            image_available_sem = device.create_semaphore(&sem_create_info, None).unwrap();
+            rendering_finished_sem = device.create_semaphore(&sem_create_info, None).unwrap();
+        }
+
         RenderState {
             instance: instance,
             pdevice: pdevice,
@@ -448,7 +464,9 @@ impl RenderState {
             swapchain_loader: swapchain_loader,
             swapchain: swapchain,
             present_image_views: present_image_views,
-
+            // semaphores
+            image_available_sem: image_available_sem,
+            rendering_finished_sem: rendering_finished_sem,
             // debug
             debug_callback: debug_callback,
             debug_report_loader: debug_report_loader,
@@ -463,6 +481,15 @@ impl Drop for RenderState {
 
         unsafe {
             self.device.device_wait_idle().unwrap();
+
+            self.device.destroy_semaphore(
+                self.rendering_finished_sem,
+                None,
+            );
+            self.device.destroy_semaphore(
+                self.image_available_sem,
+                None,
+            );
 
             for &image_view in self.present_image_views.iter() {
                 self.device.destroy_image_view(image_view, None);
@@ -554,8 +581,8 @@ impl Pipeline {
         };
         let renderpass_create_info = vk::RenderPassCreateInfo {
             s_type: vk::StructureType::RenderPassCreateInfo,
-            flags: Default::default(),
             p_next: ptr::null(),
+            flags: Default::default(),
             attachment_count: renderpass_attachments.len() as u32,
             p_attachments: renderpass_attachments.as_ptr(),
             subpass_count: 1,
@@ -647,8 +674,8 @@ impl Pipeline {
         };
         let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
             s_type: vk::StructureType::PipelineInputAssemblyStateCreateInfo,
-            flags: Default::default(),
             p_next: ptr::null(),
+            flags: Default::default(),
             primitive_restart_enable: 0,
             topology: vk::PrimitiveTopology::TriangleList,
         };
@@ -694,8 +721,8 @@ impl Pipeline {
         };
         let multisample_state_info = vk::PipelineMultisampleStateCreateInfo {
             s_type: vk::StructureType::PipelineMultisampleStateCreateInfo,
-            flags: Default::default(),
             p_next: ptr::null(),
+            flags: Default::default(),
             rasterization_samples: vk::SAMPLE_COUNT_1_BIT,
             sample_shading_enable: 0,
             min_sample_shading: 0.0,
@@ -820,6 +847,60 @@ impl Drop for Pipeline {
                 self.device.destroy_framebuffer(framebuffer, None);
             }
             self.device.destroy_render_pass(self.renderpass, None);
+        }
+    }
+}
+
+pub struct CommandBuffers {
+    commandpool: vk::CommandPool,
+    commandbuffers: Vec<vk::CommandBuffer>,
+    // Keep a pointer to the device for cleanup
+    device: Rc<Device<V1_0>>,
+}
+
+impl CommandBuffers {
+    pub fn new(rs: &RenderState, pipeline: &Pipeline) -> CommandBuffers {
+        let pool_create_info = vk::CommandPoolCreateInfo {
+            s_type: vk::StructureType::CommandPoolCreateInfo,
+            p_next: ptr::null(),
+            flags: vk::COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            queue_family_index: rs.queue_family_index,
+        };
+        let pool;
+        unsafe {
+            pool = rs.device
+                .create_command_pool(&pool_create_info, None)
+                .unwrap();
+        }
+        let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
+            s_type: vk::StructureType::CommandBufferAllocateInfo,
+            p_next: ptr::null(),
+            command_buffer_count: pipeline.framebuffers.len() as u32,
+            command_pool: pool,
+            level: vk::CommandBufferLevel::Primary,
+        };
+        let command_buffers;
+        unsafe {
+            command_buffers = rs.device
+                .allocate_command_buffers(&command_buffer_allocate_info)
+                .unwrap();
+        }
+
+        CommandBuffers {
+            commandpool: pool,
+            commandbuffers: command_buffers,
+            device: Rc::clone(&rs.device),
+        }
+    }
+}
+
+impl Drop for CommandBuffers {
+    fn drop(&mut self) {
+        // We cannot have the last reference to device at this point
+        debug_assert!(1 < Rc::strong_count(&self.device));
+
+        unsafe {
+            self.device.destroy_command_pool(self.commandpool, None);
         }
     }
 }
