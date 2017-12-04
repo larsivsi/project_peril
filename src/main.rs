@@ -10,15 +10,15 @@ mod object;
 mod renderer;
 mod scene;
 
+use ash::vk;
 use cgmath::Point3;
 use config::Config;
 use nurbs::{Order, NURBSpline};
 use object::Camera;
 use renderer::{CommandBuffers, Pipeline, RenderState};
 use scene::Scene;
+use std::ptr;
 use std::time::{Duration, SystemTime};
-//for debug/simulation
-use std::thread::sleep;
 
 fn main() {
     // init stuff
@@ -80,10 +80,37 @@ fn main() {
         }
 
         //call to render function goes here
-        // (now simulated with a sleep)
-        scene.draw();
-        sleep(Duration::from_millis(10));
+        let present_idx;
+        unsafe {
+            present_idx = renderstate
+                .swapchain_loader
+                .acquire_next_image_khr(
+                    renderstate.swapchain,
+                    std::u64::MAX,
+                    renderstate.image_available_sem,
+                    vk::Fence::null(),
+                )
+                .unwrap();
+        }
+        // Draw stuff:
+        renderer::draw(&renderstate, &pipeline, &cmd_buffers, present_idx as usize);
         //then swapbuffers etc.
+        let present_info = vk::PresentInfoKHR {
+            s_type: vk::StructureType::PresentInfoKhr,
+            p_next: ptr::null(),
+            wait_semaphore_count: 1,
+            p_wait_semaphores: &renderstate.rendering_finished_sem,
+            swapchain_count: 1,
+            p_swapchains: &renderstate.swapchain,
+            p_image_indices: &present_idx,
+            p_results: ptr::null_mut(),
+        };
+        unsafe {
+            renderstate
+                .swapchain_loader
+                .queue_present_khr(renderstate.present_queue, &present_info)
+                .unwrap();
+        }
         framecount += 1;
 
         if framecount % 100 == 0 {

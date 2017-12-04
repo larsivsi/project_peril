@@ -18,9 +18,10 @@ use winit::Window;
 pub struct RenderState {
     instance: Instance<V1_0>,
     pdevice: vk::PhysicalDevice,
-    queue_family_index: u32,
     pub device: Rc<Device<V1_0>>,
     device_memory_properties: vk::PhysicalDeviceMemoryProperties,
+    queue_family_index: u32,
+    pub present_queue: vk::Queue,
     // window stuff
     pub event_loop: EventsLoop,
     window: Window,
@@ -29,12 +30,12 @@ pub struct RenderState {
     surface_dimensions: vk::Extent2D,
     surface_format: vk::SurfaceFormatKHR,
     // swapchain
-    swapchain_loader: Swapchain,
-    swapchain: vk::SwapchainKHR,
+    pub swapchain_loader: Swapchain,
+    pub swapchain: vk::SwapchainKHR,
     present_image_views: Vec<vk::ImageView>,
     // semaphores
-    image_available_sem: vk::Semaphore,
-    rendering_finished_sem: vk::Semaphore,
+    pub image_available_sem: vk::Semaphore,
+    pub rendering_finished_sem: vk::Semaphore,
     // debug
     debug_report_loader: DebugReport,
     debug_callback: vk::DebugReportCallbackEXT,
@@ -313,11 +314,14 @@ impl RenderState {
             p_enabled_features: &features,
         };
         let device: Device<V1_0>;
+        let present_queue;
         unsafe {
             device = instance
                 .create_device(pdevice, &device_create_info, None)
                 .expect("Failed to create logical device");
+            present_queue = device.get_device_queue(queue_family_index, 0);
         }
+
         let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
 
         // Swapchain
@@ -450,9 +454,10 @@ impl RenderState {
         RenderState {
             instance: instance,
             pdevice: pdevice,
-            queue_family_index: queue_family_index,
             device: Rc::new(device),
             device_memory_properties: device_memory_properties,
+            queue_family_index: queue_family_index,
+            present_queue: present_queue,
             // window stuff
             event_loop: events_loop,
             window: window,
@@ -515,6 +520,8 @@ pub struct Pipeline {
     framebuffers: Vec<vk::Framebuffer>,
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
+    viewports: Vec<vk::Viewport>,
+    scissors: Vec<vk::Rect2D>,
     // Keep a pointer to the device for cleanup
     device: Rc<Device<V1_0>>,
 }
@@ -827,6 +834,8 @@ impl Pipeline {
             framebuffers: framebuffers,
             pipeline_layout: pipeline_layout,
             pipeline: graphics_pipelines[0],
+            viewports: viewports.to_vec(),
+            scissors: scissors.to_vec(),
             device: Rc::clone(&rs.device),
         }
     }
@@ -902,5 +911,100 @@ impl Drop for CommandBuffers {
         unsafe {
             self.device.destroy_command_pool(self.commandpool, None);
         }
+    }
+}
+
+pub fn draw(rs: &RenderState, pipeline: &Pipeline, cmd_bufs: &CommandBuffers, present_idx: usize) {
+    // Begin commandbuffer
+    let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
+        s_type: vk::StructureType::CommandBufferBeginInfo,
+        p_next: ptr::null(),
+        p_inheritance_info: ptr::null(),
+        flags: vk::COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+    };
+    let cmd_buf = cmd_bufs.commandbuffers[present_idx];
+    unsafe {
+        rs.device
+            .begin_command_buffer(cmd_buf, &cmd_buf_begin_info)
+            .expect("Begin commandbuffer");
+    }
+
+    // Begin renderpass
+    let clear_values =
+        [
+            vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 0.0, 0.0, 0.0])),
+        ];
+    let render_pass_begin_info = vk::RenderPassBeginInfo {
+        s_type: vk::StructureType::RenderPassBeginInfo,
+        p_next: ptr::null(),
+        render_pass: pipeline.renderpass,
+        framebuffer: pipeline.framebuffers[present_idx],
+        render_area: vk::Rect2D {
+            offset: vk::Offset2D { x: 0, y: 0 },
+            extent: rs.surface_dimensions.clone(),
+        },
+        clear_value_count: clear_values.len() as u32,
+        p_clear_values: clear_values.as_ptr(),
+    };
+    unsafe {
+        // Start the render pass
+        rs.device.cmd_begin_render_pass(
+            cmd_buf,
+            &render_pass_begin_info,
+            vk::SubpassContents::Inline,
+        );
+
+        // Bind pipeline
+        rs.device.cmd_bind_pipeline(
+            cmd_buf,
+            vk::PipelineBindPoint::Graphics,
+            pipeline.pipeline,
+        );
+
+        rs.device.cmd_set_viewport(cmd_buf, &pipeline.viewports);
+        rs.device.cmd_set_scissor(cmd_buf, &pipeline.scissors);
+
+        // Draw!
+        // (We fake three vertices here with one instance)
+        rs.device.cmd_draw(cmd_buf, 3, 1, 0, 0);
+
+        // End render pass and command buffer
+        rs.device.cmd_end_render_pass(cmd_buf);
+        rs.device.end_command_buffer(cmd_buf).expect(
+            "End commandbuffer",
+        );
+    }
+
+    // Send the work off to the GPU
+    let fence_create_info = vk::FenceCreateInfo {
+        s_type: vk::StructureType::FenceCreateInfo,
+        p_next: ptr::null(),
+        flags: vk::FenceCreateFlags::empty(),
+    };
+    let submit_fence;
+    unsafe {
+        submit_fence = rs.device.create_fence(&fence_create_info, None).expect(
+            "Create fence failed.",
+        );
+    }
+    let submit_info = vk::SubmitInfo {
+        s_type: vk::StructureType::SubmitInfo,
+        p_next: ptr::null(),
+        wait_semaphore_count: 1,
+        p_wait_semaphores: [rs.image_available_sem].as_ptr(),
+        p_wait_dst_stage_mask: [vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT].as_ptr(),
+        command_buffer_count: 1,
+        p_command_buffers: &cmd_buf,
+        signal_semaphore_count: 1,
+        p_signal_semaphores: [rs.rendering_finished_sem].as_ptr(),
+    };
+    unsafe {
+        rs.device
+            .queue_submit(rs.present_queue, &[submit_info], submit_fence)
+            .expect("queue submit failed.");
+        rs.device
+            .wait_for_fences(&[submit_fence], true, std::u64::MAX)
+            .expect("Wait for fence failed.");
+        rs.device.destroy_fence(submit_fence, None);
     }
 }
