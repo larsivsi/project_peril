@@ -74,7 +74,7 @@ impl DrawObject {
 
         // Create buffer for vertices
         let buffersize: vk::DeviceSize = (size_of::<Vertex>() * vertices.len()) as u64;
-        let (vert_buffer, vert_mem) = rs.create_vk_buffer(
+        let (vert_buffer, vert_mem) = rs.create_buffer(
             buffersize,
             vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
             vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -92,7 +92,7 @@ impl DrawObject {
 
         // Create buffer for indices
         let buffersize: vk::DeviceSize = (size_of::<u16>() * indices.len()) as u64;
-        let (idx_buffer, idx_mem) = rs.create_vk_buffer(
+        let (idx_buffer, idx_mem) = rs.create_buffer(
             buffersize,
             vk::BUFFER_USAGE_INDEX_BUFFER_BIT,
             vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |

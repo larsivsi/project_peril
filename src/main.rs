@@ -10,23 +10,21 @@ mod object;
 mod renderer;
 mod scene;
 
-use ash::vk;
+use ash::version::DeviceV1_0;
 use cgmath::Point3;
 use config::Config;
 use nurbs::{Order, NURBSpline};
 use object::Camera;
-use renderer::{CommandBuffers, Pipeline, RenderState};
+use renderer::{PresentState, RenderState};
 use scene::Scene;
-use std::ptr;
 use std::time::{Duration, SystemTime};
 
 fn main() {
     // init stuff
     let cfg = Config::read_config("options.cfg");
 
-    let mut renderstate = RenderState::init(cfg);
-    let pipeline = Pipeline::new(&renderstate);
-    let cmd_buffers = CommandBuffers::new(&renderstate, &pipeline);
+    let mut renderstate = RenderState::init(&cfg);
+    let mut presentstate = PresentState::init(&renderstate);
     let scene = Scene::new(&renderstate);
     let _camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
 
@@ -52,7 +50,6 @@ fn main() {
 
     // main loop
     let mut running = true;
-    let mut recreate_swapchain = false;
     let mut framecount: u64 = 0;
     // aim for 60fps = 16.66666... ms
     let delta_time = Duration::from_millis(17);
@@ -74,43 +71,26 @@ fn main() {
             elapsed_time += delta_time;
         }
 
-        if recreate_swapchain {
-            renderstate.recreate_swapchain();
-            recreate_swapchain = false;
-        }
-
         //call to render function goes here
-        let present_idx;
-        unsafe {
-            present_idx = renderstate
-                .swapchain_loader
-                .acquire_next_image_khr(
-                    renderstate.swapchain,
-                    std::u64::MAX,
-                    renderstate.image_available_sem,
-                    vk::Fence::null(),
-                )
-                .unwrap();
+        let cmd_buf;
+        let res = presentstate.begin_frame(&renderstate);
+        match res {
+            Some(buf) => {
+                cmd_buf = buf;
+            }
+            None => {
+                // Swapchain was outdated, but now one was created.
+                // Skip this frame.
+                continue;
+            }
         }
-        // Draw stuff:
-        renderer::draw(&renderstate, &pipeline, &cmd_buffers, present_idx as usize);
+        // Draw stuff
+        unsafe {
+            // just fake three vertices for now
+            renderstate.device.cmd_draw(cmd_buf, 3, 1, 0, 0);
+        }
         //then swapbuffers etc.
-        let present_info = vk::PresentInfoKHR {
-            s_type: vk::StructureType::PresentInfoKhr,
-            p_next: ptr::null(),
-            wait_semaphore_count: 1,
-            p_wait_semaphores: &renderstate.rendering_finished_sem,
-            swapchain_count: 1,
-            p_swapchains: &renderstate.swapchain,
-            p_image_indices: &present_idx,
-            p_results: ptr::null_mut(),
-        };
-        unsafe {
-            renderstate
-                .swapchain_loader
-                .queue_present_khr(renderstate.present_queue, &present_info)
-                .unwrap();
-        }
+        presentstate.end_frame_and_present(&renderstate);
         framecount += 1;
 
         if framecount % 100 == 0 {
@@ -124,9 +104,6 @@ fn main() {
 
         renderstate.event_loop.poll_events(|ev| match ev {
             winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
-            winit::Event::WindowEvent { event: winit::WindowEvent::Resized(_, _), .. } => {
-                recreate_swapchain = true
-            }
             _ => (),
         });
 

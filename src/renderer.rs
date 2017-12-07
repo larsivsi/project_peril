@@ -16,109 +16,25 @@ use winit::EventsLoop;
 use winit::Window;
 
 pub struct RenderState {
+    // Vulkan device
+    entry: Entry<V1_0>,
     instance: Instance<V1_0>,
+    debug_report_loader: DebugReport,
+    debug_callback: vk::DebugReportCallbackEXT,
     pdevice: vk::PhysicalDevice,
     pub device: Rc<Device<V1_0>>,
     device_memory_properties: vk::PhysicalDeviceMemoryProperties,
     queue_family_index: u32,
-    pub present_queue: vk::Queue,
-    // window stuff
+
+    // Window
     pub event_loop: EventsLoop,
     window: Window,
-    surface_loader: Surface,
-    surface: vk::SurfaceKHR,
-    surface_dimensions: vk::Extent2D,
-    surface_format: vk::SurfaceFormatKHR,
-    // swapchain
-    pub swapchain_loader: Swapchain,
-    pub swapchain: vk::SwapchainKHR,
-    present_image_views: Vec<vk::ImageView>,
-    // semaphores
-    pub image_available_sem: vk::Semaphore,
-    pub rendering_finished_sem: vk::Semaphore,
-    // debug
-    debug_report_loader: DebugReport,
-    debug_callback: vk::DebugReportCallbackEXT,
+
+    // Pools
+    commandpool: vk::CommandPool,
 }
 
 impl RenderState {
-    // Debug layer callback function
-    unsafe extern "system" fn vulkan_debug_callback(
-        _: vk::DebugReportFlagsEXT,
-        _: vk::DebugReportObjectTypeEXT,
-        _: vk::uint64_t,
-        _: vk::size_t,
-        _: vk::int32_t,
-        _: *const vk::c_char,
-        p_message: *const vk::c_char,
-        _: *mut vk::c_void,
-    ) -> u32 {
-        println!("{:?}", CStr::from_ptr(p_message));
-        1
-    }
-
-    // Finds suitable memory type based on device and requirements
-    fn find_memory_type(&self, mem_type_bits: u32, properties: vk::MemoryPropertyFlags) -> u32 {
-        for (idx, mem_type) in self.device_memory_properties
-            .memory_types
-            .iter()
-            .enumerate()
-        {
-            if mem_type_bits & (1 << idx) != 0 &&
-                (mem_type.property_flags & properties) == properties
-            {
-                return idx as u32;
-            }
-        }
-        panic!("Cannot find memory type!");
-    }
-
-    // Creates a vk::Buffer
-    pub fn create_vk_buffer(
-        &self,
-        size: vk::DeviceSize,
-        usage: vk::BufferUsageFlags,
-        properties: vk::MemoryPropertyFlags,
-    ) -> (vk::Buffer, vk::DeviceMemory) {
-        let bufferinfo = vk::BufferCreateInfo {
-            s_type: vk::StructureType::BufferCreateInfo,
-            p_next: ptr::null(),
-            flags: vk::BufferCreateFlags::empty(),
-            size: size,
-            usage: usage,
-            sharing_mode: vk::SharingMode::Exclusive,
-            queue_family_index_count: 0,
-            p_queue_family_indices: ptr::null(),
-        };
-        let buffer;
-        unsafe {
-            buffer = self.device.create_buffer(&bufferinfo, None).expect(
-                "Failed to create buffer",
-            );
-        }
-
-        let mem_req = self.device.get_buffer_memory_requirements(buffer);
-        let alloc_info = vk::MemoryAllocateInfo {
-            s_type: vk::StructureType::MemoryAllocateInfo,
-            p_next: ptr::null(),
-            allocation_size: mem_req.size,
-            memory_type_index: self.find_memory_type(mem_req.memory_type_bits, properties),
-        };
-        let memory;
-        unsafe {
-            memory = self.device.allocate_memory(&alloc_info, None).expect(
-                "Failed to allocate buffer memory",
-            );
-
-            self.device.bind_buffer_memory(buffer, memory, 0).expect(
-                "Failed to bind memory",
-            );
-        }
-
-        (buffer, memory)
-    }
-
-    // Names the extensions we need to create our surface
     fn extension_names() -> Vec<*const i8> {
         let mut extensions = vec![Surface::name().as_ptr(), XlibSurface::name().as_ptr()];
         #[cfg(debug_assertions)]
@@ -128,51 +44,7 @@ impl RenderState {
         extensions
     }
 
-    // Creates X11 surface
-    fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
-        entry: &E,
-        instance: &I,
-        window: &winit::Window,
-    ) -> Result<vk::SurfaceKHR, vk::Result> {
-        use winit::os::unix::WindowExt;
-        let x11_display = window.get_xlib_display().unwrap();
-        let x11_window = window.get_xlib_window().unwrap();
-        let x11_create_info = vk::XlibSurfaceCreateInfoKHR {
-            s_type: vk::StructureType::XlibSurfaceCreateInfoKhr,
-            p_next: ptr::null(),
-            flags: Default::default(),
-            window: x11_window as vk::Window,
-            dpy: x11_display as *mut vk::Display,
-        };
-        let xlib_surface_loader =
-            XlibSurface::new(entry, instance).expect("Unable to load xlib surface");
-        let result;
-        unsafe {
-            result = xlib_surface_loader.create_xlib_surface_khr(&x11_create_info, None);
-        }
-        result
-    }
-
-    // In case window changes dimensions (resized etc.)
-    pub fn recreate_swapchain(&mut self) {
-        //TODO
-    }
-
-    // Initializes the RenderState for Vulkan rendering
-    pub fn init(cfg: Config) -> RenderState {
-
-        // Window and event handler
-        let events_loop = winit::EventsLoop::new();
-        let window = winit::WindowBuilder::new()
-            .with_title(format!("{} {}", cfg.app_name, cfg.version_to_string()))
-            .with_dimensions(cfg.window_dimensions.0, cfg.window_dimensions.1)
-            .build(&events_loop)
-            .unwrap();
-
-        // Vulkan!
-        // ash entry point
-        let entry: Entry<V1_0> = Entry::new().unwrap();
-
+    fn create_instance(cfg: &Config, entry: &Entry<V1_0>) -> Instance<V1_0> {
         // Application info
         let app_name = CString::new(cfg.app_name).unwrap();
         let raw_name = app_name.as_ptr();
@@ -223,14 +95,35 @@ impl RenderState {
             pp_enabled_extension_names: extension_names_raw.as_ptr(),
             enabled_extension_count: extension_names_raw.len() as u32,
         };
-        let instance: Instance<V1_0>;
+        let instance;
         unsafe {
             instance = entry.create_instance(&create_info, None).expect(
                 "Instance creation error",
             );
         }
 
-        // Debug layer callback
+        instance
+    }
+
+    // Debug layer callback function
+    unsafe extern "system" fn vulkan_debug_callback(
+        _: vk::DebugReportFlagsEXT,
+        _: vk::DebugReportObjectTypeEXT,
+        _: vk::uint64_t,
+        _: vk::size_t,
+        _: vk::int32_t,
+        _: *const vk::c_char,
+        p_message: *const vk::c_char,
+        _: *mut vk::c_void,
+    ) -> u32 {
+        println!("{:?}", CStr::from_ptr(p_message));
+        1
+    }
+
+    fn setup_debug_callback(
+        entry: &Entry<V1_0>,
+        instance: &Instance<V1_0>,
+    ) -> (DebugReport, vk::DebugReportCallbackEXT) {
         let debug_info = vk::DebugReportCallbackCreateInfoEXT {
             s_type: vk::StructureType::DebugReportCallbackCreateInfoExt,
             p_next: ptr::null(),
@@ -239,8 +132,7 @@ impl RenderState {
             pfn_callback: RenderState::vulkan_debug_callback,
             p_user_data: ptr::null_mut(),
         };
-        let debug_report_loader =
-            DebugReport::new(&entry, &instance).expect("Unable to load debug report");
+        let debug_report_loader = DebugReport::new(entry, instance).unwrap();
         let debug_callback;
         unsafe {
             debug_callback = debug_report_loader
@@ -248,14 +140,12 @@ impl RenderState {
                 .unwrap();
         }
 
-        // Surface
-        let surface_loader =
-            Surface::new(&entry, &instance).expect("Unable to load the Surface extension");
-        let surface = RenderState::create_surface(&entry, &instance, &window).unwrap();
+        (debug_report_loader, debug_callback)
+    }
 
-        // Physical device
+    fn pick_physical_device(instance: &Instance<V1_0>) -> (vk::PhysicalDevice, u32) {
         let pdevices = instance.enumerate_physical_devices().expect(
-            "Physical device error",
+            "Failed to find GPU with Vulkan support",
         );
         let (pdevice, queue_family_index) = pdevices
             .iter()
@@ -265,15 +155,10 @@ impl RenderState {
                     .iter()
                     .enumerate()
                     .filter_map(|(index, ref info)| {
-                        let supports_graphic_and_surface =
-                                // Any GPU that can render to our surface will do
-                                info.queue_flags.subset(vk::QUEUE_GRAPHICS_BIT) &&
-                                    surface_loader.get_physical_device_surface_support_khr(
-                                        *pdevice,
-                                        index as u32,
-                                        surface,
-                                    );
-                        match supports_graphic_and_surface {
+                        let supports_graphics =
+                                // Any GPU that can render
+                                info.queue_flags.subset(vk::QUEUE_GRAPHICS_BIT);
+                        match supports_graphics {
                             true => Some((*pdevice, index)),
                             _ => None,
                         }
@@ -283,9 +168,15 @@ impl RenderState {
             .filter_map(|v| v)
             .nth(0)
             .expect("Couldn't find suitable device.");
-        let queue_family_index = queue_family_index as u32;
 
-        // Logical device
+        (pdevice, queue_family_index as u32)
+    }
+
+    fn create_logical_device(
+        instance: &Instance<V1_0>,
+        pdevice: vk::PhysicalDevice,
+        queue_family_index: u32,
+    ) -> Device<V1_0> {
         let queue_priorities = [1.0]; // One queue of priority 1.0
         let queue_info = vk::DeviceQueueCreateInfo {
             s_type: vk::StructureType::DeviceQueueCreateInfo,
@@ -314,51 +205,262 @@ impl RenderState {
             p_enabled_features: &features,
         };
         let device: Device<V1_0>;
-        let present_queue;
         unsafe {
             device = instance
                 .create_device(pdevice, &device_create_info, None)
                 .expect("Failed to create logical device");
-            present_queue = device.get_device_queue(queue_family_index, 0);
         }
 
-        let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
+        device
+    }
 
-        // Swapchain
-        let surface_formats = surface_loader
-            .get_physical_device_surface_formats_khr(pdevice, surface)
+    fn create_pools(device: &Device<V1_0>, queue_family_index: u32) -> (vk::CommandPool) {
+        let cmd_pool_create_info = vk::CommandPoolCreateInfo {
+            s_type: vk::StructureType::CommandPoolCreateInfo,
+            p_next: ptr::null(),
+            flags: vk::COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            queue_family_index: queue_family_index,
+        };
+        let commandpool;
+        unsafe {
+            commandpool = device
+                .create_command_pool(&cmd_pool_create_info, None)
+                .unwrap()
+        }
+
+        (commandpool)
+    }
+
+    pub fn init(cfg: &Config) -> RenderState {
+        // Window and event handler
+        let event_loop = winit::EventsLoop::new();
+        let window = winit::WindowBuilder::new()
+            .with_title(format!("{} {}", cfg.app_name, cfg.version_to_string()))
+            .with_dimensions(cfg.window_dimensions.0, cfg.window_dimensions.1)
+            .build(&event_loop)
             .unwrap();
-        let surface_format = surface_formats
+
+        // ash entry point
+        let entry: Entry<V1_0> = Entry::new().unwrap();
+
+        // Vulkan init
+        let instance = RenderState::create_instance(&cfg, &entry);
+        let (debug_report_loader, debug_callback) =
+            RenderState::setup_debug_callback(&entry, &instance);
+        let (pdevice, queue_family_index) = RenderState::pick_physical_device(&instance);
+        let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
+        let device = RenderState::create_logical_device(&instance, pdevice, queue_family_index);
+
+        // Other stuff
+        let commandpool = RenderState::create_pools(&device, queue_family_index);
+
+        // Return the RenderState
+        RenderState {
+            // Vulkan device
+            entry: entry,
+            instance: instance,
+            debug_report_loader: debug_report_loader,
+            debug_callback: debug_callback,
+            pdevice: pdevice,
+            device: Rc::new(device),
+            device_memory_properties: device_memory_properties,
+            queue_family_index: queue_family_index,
+
+            // Window
+            event_loop: event_loop,
+            window: window,
+
+            // Pools
+            commandpool: commandpool,
+        }
+    }
+
+    fn find_memory_type(&self, mem_type_bits: u32, properties: vk::MemoryPropertyFlags) -> u32 {
+        for (idx, mem_type) in self.device_memory_properties
+            .memory_types
             .iter()
-            .map(|sfmt| match sfmt.format {
-                vk::Format::Undefined => {
-                    vk::SurfaceFormatKHR {
-                        format: vk::Format::B8g8r8Unorm,
-                        color_space: sfmt.color_space,
-                    }
-                }
-                _ => sfmt.clone(),
-            })
-            .nth(0)
-            .expect("Unable to find suitable surface format.");
+            .enumerate()
+        {
+            if mem_type_bits & (1 << idx) != 0 &&
+                (mem_type.property_flags & properties) == properties
+            {
+                return idx as u32;
+            }
+        }
+        panic!("Cannot find memory type!");
+    }
+
+    pub fn create_buffer(
+        &self,
+        size: vk::DeviceSize,
+        usage: vk::BufferUsageFlags,
+        properties: vk::MemoryPropertyFlags,
+    ) -> (vk::Buffer, vk::DeviceMemory) {
+        let bufferinfo = vk::BufferCreateInfo {
+            s_type: vk::StructureType::BufferCreateInfo,
+            p_next: ptr::null(),
+            flags: vk::BufferCreateFlags::empty(),
+            size: size,
+            usage: usage,
+            sharing_mode: vk::SharingMode::Exclusive,
+            queue_family_index_count: 0,
+            p_queue_family_indices: ptr::null(),
+        };
+        let buffer;
+        unsafe {
+            buffer = self.device.create_buffer(&bufferinfo, None).expect(
+                "Failed to create buffer",
+            );
+        }
+
+        let mem_req = self.device.get_buffer_memory_requirements(buffer);
+        let alloc_info = vk::MemoryAllocateInfo {
+            s_type: vk::StructureType::MemoryAllocateInfo,
+            p_next: ptr::null(),
+            allocation_size: mem_req.size,
+            memory_type_index: self.find_memory_type(mem_req.memory_type_bits, properties),
+        };
+        let memory;
+        unsafe {
+            memory = self.device.allocate_memory(&alloc_info, None).expect(
+                "Failed to allocate buffer memory",
+            );
+
+            self.device.bind_buffer_memory(buffer, memory, 0).expect(
+                "Failed to bind memory",
+            );
+        }
+
+        (buffer, memory)
+    }
+
+    fn load_shader(&self, path: &str) -> vk::ShaderModule {
+        let spv_file = File::open(Path::new(path)).expect("Could not find spv file");
+        let shader_bytes: Vec<u8> = spv_file.bytes().filter_map(|byte| byte.ok()).collect();
+        let shader_info = vk::ShaderModuleCreateInfo {
+            s_type: vk::StructureType::ShaderModuleCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+            code_size: shader_bytes.len(),
+            p_code: shader_bytes.as_ptr() as *const u32,
+        };
+        let shader_module;
+        unsafe {
+            shader_module = self.device
+                .create_shader_module(&shader_info, None)
+                .expect("Shader module error");
+        }
+        shader_module
+    }
+}
+
+impl Drop for RenderState {
+    fn drop(&mut self) {
+        // We must have the only reference to device at this point
+        debug_assert!(1 == Rc::strong_count(&self.device));
+
+        unsafe {
+            // Always wait for device idle
+            self.device.device_wait_idle().unwrap();
+
+            self.device.destroy_command_pool(self.commandpool, None);
+            self.device.destroy_device(None);
+            self.debug_report_loader.destroy_debug_report_callback_ext(
+                self.debug_callback,
+                None,
+            );
+            self.instance.destroy_instance(None);
+        }
+    }
+}
+
+pub struct PresentState {
+    // Surface
+    surface_loader: Surface,
+    surface: vk::SurfaceKHR,
+    surface_format: vk::SurfaceFormatKHR,
+
+    // Present queue
+    present_queue: vk::Queue,
+    image_available_sem: vk::Semaphore,
+    rendering_finished_sem: vk::Semaphore,
+
+    swapchain_loader: Swapchain,
+
+    // Swapchain
+    swapchain: vk::SwapchainKHR,
+    //presentable images for the screen
+    present_image_views: Vec<vk::ImageView>,
+    renderpass: vk::RenderPass,
+    //one framebuffer per image
+    framebuffers: Vec<vk::Framebuffer>,
+    pipeline_layout: vk::PipelineLayout,
+    viewport: vk::Viewport,
+    scissor: vk::Rect2D,
+    pipeline: vk::Pipeline,
+    //one commandbuffer per image
+    commandbuffers: Vec<vk::CommandBuffer>,
+
+    // The current idx
+    current_present_idx: usize,
+
+    // Keep a pointer to the device for cleanup
+    device: Rc<Device<V1_0>>,
+}
+
+impl PresentState {
+    // Creates X11 surface
+    fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
+        entry: &E,
+        instance: &I,
+        window: &winit::Window,
+    ) -> Result<vk::SurfaceKHR, vk::Result> {
+        use winit::os::unix::WindowExt;
+        let x11_display = window.get_xlib_display().unwrap();
+        let x11_window = window.get_xlib_window().unwrap();
+        let x11_create_info = vk::XlibSurfaceCreateInfoKHR {
+            s_type: vk::StructureType::XlibSurfaceCreateInfoKhr,
+            p_next: ptr::null(),
+            flags: Default::default(),
+            window: x11_window as vk::Window,
+            dpy: x11_display as *mut vk::Display,
+        };
+        let xlib_surface_loader =
+            XlibSurface::new(entry, instance).expect("Unable to load xlib surface");
+        let result;
+        unsafe {
+            result = xlib_surface_loader.create_xlib_surface_khr(&x11_create_info, None);
+        }
+        result
+    }
+
+    //TODO Split in multiple functions
+    fn create_swapchain(
+        rs: &RenderState,
+        surface_loader: &Surface,
+        surface: &vk::SurfaceKHR,
+        surface_format: &vk::SurfaceFormatKHR,
+        old_swapchain: vk::SwapchainKHR,
+        swapchain_loader: &Swapchain,
+    ) -> (vk::SwapchainKHR,
+              Vec<vk::ImageView>,
+              vk::RenderPass,
+              Vec<vk::Framebuffer>,
+              vk::PipelineLayout,
+              vk::Viewport,
+              vk::Rect2D,
+              vk::Pipeline,
+              Vec<vk::CommandBuffer>) {
         let surface_capabilities = surface_loader
-            .get_physical_device_surface_capabilities_khr(pdevice, surface)
+            .get_physical_device_surface_capabilities_khr(rs.pdevice, *surface)
             .unwrap();
-        let mut desired_image_count = surface_capabilities.min_image_count + 1;
+        //TODO dual buffering for now
+        let mut desired_image_count = 2;
         if surface_capabilities.max_image_count > 0 &&
             desired_image_count > surface_capabilities.max_image_count
         {
             desired_image_count = surface_capabilities.max_image_count;
         }
-        let surface_resolution = match surface_capabilities.current_extent.width {
-            std::u32::MAX => {
-                vk::Extent2D {
-                    width: cfg.window_dimensions.0,
-                    height: cfg.window_dimensions.1,
-                }
-            }
-            _ => surface_capabilities.current_extent,
-        };
         let pre_transform = if surface_capabilities.supported_transforms.subset(
             vk::SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
         )
@@ -368,31 +470,29 @@ impl RenderState {
             surface_capabilities.current_transform
         };
         let present_modes = surface_loader
-            .get_physical_device_surface_present_modes_khr(pdevice, surface)
+            .get_physical_device_surface_present_modes_khr(rs.pdevice, *surface)
             .unwrap();
         let present_mode = present_modes
             .iter()
             .cloned()
             .find(|&mode| mode == vk::PresentModeKHR::Mailbox)
             .unwrap_or(vk::PresentModeKHR::Fifo);
-        let swapchain_loader =
-            Swapchain::new(&instance, &device).expect("Unable to load swapchain");
         let swapchain_create_info = vk::SwapchainCreateInfoKHR {
             s_type: vk::StructureType::SwapchainCreateInfoKhr,
             p_next: ptr::null(),
             flags: Default::default(),
-            surface: surface,
+            surface: *surface,
             min_image_count: desired_image_count,
             image_color_space: surface_format.color_space,
             image_format: surface_format.format,
-            image_extent: surface_resolution.clone(),
+            image_extent: surface_capabilities.current_extent.clone(),
             image_usage: vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             image_sharing_mode: vk::SharingMode::Exclusive,
             pre_transform: pre_transform,
             composite_alpha: vk::COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
             present_mode: present_mode,
             clipped: 1,
-            old_swapchain: vk::SwapchainKHR::null(),
+            old_swapchain: old_swapchain,
             image_array_layers: 1,
             p_queue_family_indices: ptr::null(),
             queue_family_index_count: 0,
@@ -433,123 +533,18 @@ impl RenderState {
                     image: image,
                 };
                 let result;
-                unsafe { result = device.create_image_view(&create_view_info, None).unwrap() }
+                unsafe {
+                    result = rs.device
+                        .create_image_view(&create_view_info, None)
+                        .unwrap()
+                }
                 result
             })
             .collect();
 
-        // Semaphores
-        let sem_create_info = vk::SemaphoreCreateInfo {
-            s_type: vk::StructureType::SemaphoreCreateInfo,
-            p_next: ptr::null(),
-            flags: Default::default(),
-        };
-        let image_available_sem;
-        let rendering_finished_sem;
-        unsafe {
-            image_available_sem = device.create_semaphore(&sem_create_info, None).unwrap();
-            rendering_finished_sem = device.create_semaphore(&sem_create_info, None).unwrap();
-        }
-
-        RenderState {
-            instance: instance,
-            pdevice: pdevice,
-            device: Rc::new(device),
-            device_memory_properties: device_memory_properties,
-            queue_family_index: queue_family_index,
-            present_queue: present_queue,
-            // window stuff
-            event_loop: events_loop,
-            window: window,
-            surface_loader: surface_loader,
-            surface: surface,
-            surface_dimensions: surface_resolution,
-            surface_format: surface_format,
-            // swapchain
-            swapchain_loader: swapchain_loader,
-            swapchain: swapchain,
-            present_image_views: present_image_views,
-            // semaphores
-            image_available_sem: image_available_sem,
-            rendering_finished_sem: rendering_finished_sem,
-            // debug
-            debug_callback: debug_callback,
-            debug_report_loader: debug_report_loader,
-        }
-    }
-}
-
-impl Drop for RenderState {
-    fn drop(&mut self) {
-        // We must have the only reference to device at this point
-        debug_assert!(1 == Rc::strong_count(&self.device));
-
-        unsafe {
-            self.device.device_wait_idle().unwrap();
-
-            self.device.destroy_semaphore(
-                self.rendering_finished_sem,
-                None,
-            );
-            self.device.destroy_semaphore(
-                self.image_available_sem,
-                None,
-            );
-
-            for &image_view in self.present_image_views.iter() {
-                self.device.destroy_image_view(image_view, None);
-            }
-
-            self.swapchain_loader.destroy_swapchain_khr(
-                self.swapchain,
-                None,
-            );
-            self.device.destroy_device(None);
-            self.surface_loader.destroy_surface_khr(self.surface, None);
-            self.debug_report_loader.destroy_debug_report_callback_ext(
-                self.debug_callback,
-                None,
-            );
-            self.instance.destroy_instance(None);
-        }
-    }
-}
-
-pub struct Pipeline {
-    renderpass: vk::RenderPass,
-    framebuffers: Vec<vk::Framebuffer>,
-    pipeline: vk::Pipeline,
-    pipeline_layout: vk::PipelineLayout,
-    viewports: Vec<vk::Viewport>,
-    scissors: Vec<vk::Rect2D>,
-    // Keep a pointer to the device for cleanup
-    device: Rc<Device<V1_0>>,
-}
-
-impl Pipeline {
-    fn load_shader(rs: &RenderState, path: &str) -> vk::ShaderModule {
-        let spv_file = File::open(Path::new(path)).expect("Could not find spv file");
-        let shader_bytes: Vec<u8> = spv_file.bytes().filter_map(|byte| byte.ok()).collect();
-        let shader_info = vk::ShaderModuleCreateInfo {
-            s_type: vk::StructureType::ShaderModuleCreateInfo,
-            p_next: ptr::null(),
-            flags: Default::default(),
-            code_size: shader_bytes.len(),
-            p_code: shader_bytes.as_ptr() as *const u32,
-        };
-        let shader_module;
-        unsafe {
-            shader_module = rs.device.create_shader_module(&shader_info, None).expect(
-                "Shader module error",
-            );
-        }
-        shader_module
-    }
-
-    pub fn new(rs: &RenderState) -> Pipeline {
         let renderpass_attachments = [
             vk::AttachmentDescription {
-                format: rs.surface_format.format,
+                format: surface_format.format,
                 flags: vk::AttachmentDescriptionFlags::empty(),
                 samples: vk::SAMPLE_COUNT_1_BIT,
                 load_op: vk::AttachmentLoadOp::Clear,
@@ -603,7 +598,7 @@ impl Pipeline {
                 .create_render_pass(&renderpass_create_info, None)
                 .unwrap();
         }
-        let framebuffers: Vec<vk::Framebuffer> = rs.present_image_views
+        let framebuffers: Vec<vk::Framebuffer> = present_image_views
             .iter()
             .map(|&present_image_view| {
                 let framebuffer_attachments = [present_image_view];
@@ -614,8 +609,8 @@ impl Pipeline {
                     render_pass: renderpass,
                     attachment_count: framebuffer_attachments.len() as u32,
                     p_attachments: framebuffer_attachments.as_ptr(),
-                    width: rs.surface_dimensions.width,
-                    height: rs.surface_dimensions.height,
+                    width: surface_capabilities.current_extent.width,
+                    height: surface_capabilities.current_extent.height,
                     layers: 1,
                 };
                 let framebuffer;
@@ -644,8 +639,8 @@ impl Pipeline {
                 .unwrap();
         }
 
-        let vertex_shader_module = Pipeline::load_shader(rs, "shaders/vertex.spv");
-        let fragment_shader_module = Pipeline::load_shader(rs, "shaders/fragment.spv");
+        let vertex_shader_module = RenderState::load_shader(rs, "shaders/vertex.spv");
+        let fragment_shader_module = RenderState::load_shader(rs, "shaders/fragment.spv");
 
         let shader_entry_name = CString::new("main").unwrap();
         let shader_stage_create_infos = [
@@ -686,30 +681,26 @@ impl Pipeline {
             primitive_restart_enable: 0,
             topology: vk::PrimitiveTopology::TriangleList,
         };
-        let viewports = [
-            vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: rs.surface_dimensions.width as f32,
-                height: rs.surface_dimensions.height as f32,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            },
-        ];
-        let scissors = [
-            vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: rs.surface_dimensions.clone(),
-            },
-        ];
+        let viewport = vk::Viewport {
+            x: 0.0,
+            y: 0.0,
+            width: surface_capabilities.current_extent.width as f32,
+            height: surface_capabilities.current_extent.height as f32,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        };
+        let scissor = vk::Rect2D {
+            offset: vk::Offset2D { x: 0, y: 0 },
+            extent: surface_capabilities.current_extent.clone(),
+        };
         let viewport_state_info = vk::PipelineViewportStateCreateInfo {
             s_type: vk::StructureType::PipelineViewportStateCreateInfo,
             p_next: ptr::null(),
             flags: Default::default(),
-            scissor_count: scissors.len() as u32,
-            p_scissors: scissors.as_ptr(),
-            viewport_count: viewports.len() as u32,
-            p_viewports: viewports.as_ptr(),
+            scissor_count: 1,
+            p_scissors: &scissor,
+            viewport_count: 1,
+            p_viewports: &viewport,
         };
         let rasterization_info = vk::PipelineRasterizationStateCreateInfo {
             s_type: vk::StructureType::PipelineRasterizationStateCreateInfo,
@@ -829,63 +820,11 @@ impl Pipeline {
             rs.device.destroy_shader_module(vertex_shader_module, None);
         }
 
-        Pipeline {
-            renderpass: renderpass,
-            framebuffers: framebuffers,
-            pipeline_layout: pipeline_layout,
-            pipeline: graphics_pipelines[0],
-            viewports: viewports.to_vec(),
-            scissors: scissors.to_vec(),
-            device: Rc::clone(&rs.device),
-        }
-    }
-}
-
-impl Drop for Pipeline {
-    fn drop(&mut self) {
-        // We cannot have the last reference to device at this point
-        debug_assert!(1 < Rc::strong_count(&self.device));
-
-        unsafe {
-            self.device.destroy_pipeline(self.pipeline, None);
-            self.device.destroy_pipeline_layout(
-                self.pipeline_layout,
-                None,
-            );
-            for &framebuffer in self.framebuffers.iter() {
-                self.device.destroy_framebuffer(framebuffer, None);
-            }
-            self.device.destroy_render_pass(self.renderpass, None);
-        }
-    }
-}
-
-pub struct CommandBuffers {
-    commandpool: vk::CommandPool,
-    commandbuffers: Vec<vk::CommandBuffer>,
-    // Keep a pointer to the device for cleanup
-    device: Rc<Device<V1_0>>,
-}
-
-impl CommandBuffers {
-    pub fn new(rs: &RenderState, pipeline: &Pipeline) -> CommandBuffers {
-        let pool_create_info = vk::CommandPoolCreateInfo {
-            s_type: vk::StructureType::CommandPoolCreateInfo,
-            p_next: ptr::null(),
-            flags: vk::COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            queue_family_index: rs.queue_family_index,
-        };
-        let pool;
-        unsafe {
-            pool = rs.device
-                .create_command_pool(&pool_create_info, None)
-                .unwrap();
-        }
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::CommandBufferAllocateInfo,
             p_next: ptr::null(),
-            command_buffer_count: pipeline.framebuffers.len() as u32,
-            command_pool: pool,
+            command_buffer_count: framebuffers.len() as u32,
+            command_pool: rs.commandpool,
             level: vk::CommandBufferLevel::Primary,
         };
         let command_buffers;
@@ -895,116 +834,329 @@ impl CommandBuffers {
                 .unwrap();
         }
 
-        CommandBuffers {
-            commandpool: pool,
+        // Return the new swapchain
+        (
+            swapchain,
+            present_image_views,
+            renderpass,
+            framebuffers,
+            pipeline_layout,
+            viewport,
+            scissor,
+            graphics_pipelines[0],
+            command_buffers,
+        )
+    }
+
+    pub fn init(rs: &RenderState) -> PresentState {
+        // Surface
+        let surface_loader =
+            Surface::new(&rs.entry, &rs.instance).expect("Unable to load the Surface extension");
+        let surface = PresentState::create_surface(&rs.entry, &rs.instance, &rs.window).unwrap();
+        debug_assert!(surface_loader.get_physical_device_surface_support_khr(
+            rs.pdevice,
+            rs.queue_family_index,
+            surface,
+        ));
+        let surface_formats = surface_loader
+            .get_physical_device_surface_formats_khr(rs.pdevice, surface)
+            .unwrap();
+        let surface_format = surface_formats
+            .iter()
+            .map(|sfmt| match sfmt.format {
+                vk::Format::Undefined => {
+                    vk::SurfaceFormatKHR {
+                        format: vk::Format::B8g8r8Unorm,
+                        color_space: sfmt.color_space,
+                    }
+                }
+                _ => sfmt.clone(),
+            })
+            .nth(0)
+            .expect("Unable to find suitable surface format.");
+
+        // Present queue
+        let present_queue;
+        unsafe {
+            present_queue = rs.device.get_device_queue(rs.queue_family_index, 0);
+        }
+        let sem_create_info = vk::SemaphoreCreateInfo {
+            s_type: vk::StructureType::SemaphoreCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+        };
+        let image_available_sem;
+        let rendering_finished_sem;
+        unsafe {
+            image_available_sem = rs.device.create_semaphore(&sem_create_info, None).unwrap();
+            rendering_finished_sem = rs.device.create_semaphore(&sem_create_info, None).unwrap();
+        }
+
+        let swapchain_loader =
+            Swapchain::new(&rs.instance, rs.device.as_ref()).expect("Unable to load swapchain");
+
+        let (swapchain,
+             present_image_views,
+             renderpass,
+             framebuffers,
+             pipeline_layout,
+             viewport,
+             scissor,
+             pipeline,
+             command_buffers) = PresentState::create_swapchain(
+            rs,
+            &surface_loader,
+            &surface,
+            &surface_format,
+            vk::SwapchainKHR::null(),
+            &swapchain_loader,
+        );
+
+        PresentState {
+            // Surface
+            surface_loader: surface_loader,
+            surface: surface,
+            surface_format: surface_format,
+
+            // Present queue
+            present_queue: present_queue,
+            image_available_sem: image_available_sem,
+            rendering_finished_sem: rendering_finished_sem,
+
+            swapchain_loader: swapchain_loader,
+
+            // Swapchain
+            swapchain: swapchain,
+            present_image_views: present_image_views,
+            renderpass: renderpass,
+            framebuffers: framebuffers,
+            pipeline_layout: pipeline_layout,
+            viewport: viewport,
+            scissor: scissor,
+            pipeline: pipeline,
+            //one commandbuffer per image
             commandbuffers: command_buffers,
+
+            // The current idx
+            current_present_idx: std::usize::MAX,
+
+            // Keep a pointer to the device for cleanup
             device: Rc::clone(&rs.device),
+        }
+    }
+
+    fn cleanup_swapchain(&mut self) {
+        unsafe {
+            // Always wait for device idle
+            self.device.device_wait_idle().unwrap();
+
+            for &image_view in self.present_image_views.iter() {
+                self.device.destroy_image_view(image_view, None);
+            }
+
+            self.device.destroy_pipeline(self.pipeline, None);
+            self.device.destroy_pipeline_layout(
+                self.pipeline_layout,
+                None,
+            );
+            for &framebuffer in self.framebuffers.iter() {
+                self.device.destroy_framebuffer(framebuffer, None);
+            }
+            self.device.destroy_render_pass(self.renderpass, None);
+
+            self.swapchain_loader.destroy_swapchain_khr(
+                self.swapchain,
+                None,
+            );
+        }
+    }
+
+    // In case window changes dimensions (resized etc.)
+    fn recreate_swapchain(&mut self, rs: &RenderState) {
+        self.cleanup_swapchain();
+
+        let (swapchain,
+             present_image_views,
+             renderpass,
+             framebuffers,
+             pipeline_layout,
+             viewport,
+             scissor,
+             pipeline,
+             command_buffers) = PresentState::create_swapchain(
+            rs,
+            &self.surface_loader,
+            &self.surface,
+            &self.surface_format,
+            vk::SwapchainKHR::null(),
+            &self.swapchain_loader,
+        );
+        self.swapchain = swapchain;
+        self.present_image_views = present_image_views;
+        self.renderpass = renderpass;
+        self.framebuffers = framebuffers;
+        self.pipeline_layout = pipeline_layout;
+        self.viewport = viewport;
+        self.scissor = scissor;
+        self.pipeline = pipeline;
+        self.commandbuffers = command_buffers;
+    }
+
+    pub fn begin_frame(&mut self, rs: &RenderState) -> Option<vk::CommandBuffer> {
+        let result;
+        unsafe {
+            result = self.swapchain_loader.acquire_next_image_khr(
+                self.swapchain,
+                std::u64::MAX,
+                self.image_available_sem,
+                vk::Fence::null(),
+            );
+        }
+
+        match result {
+            Ok(idx) => {
+                self.current_present_idx = idx as usize;
+            }
+            Err(vkres) => {
+                if vkres == vk::Result::ErrorOutOfDateKhr {
+                    self.recreate_swapchain(rs);
+                    return None;
+                }
+            }
+        }
+
+        // Begin commandbuffer
+        let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
+            s_type: vk::StructureType::CommandBufferBeginInfo,
+            p_next: ptr::null(),
+            p_inheritance_info: ptr::null(),
+            flags: vk::COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+        };
+        let cmd_buf = self.commandbuffers[self.current_present_idx];
+        unsafe {
+            rs.device
+                .begin_command_buffer(cmd_buf, &cmd_buf_begin_info)
+                .expect("Begin commandbuffer");
+        }
+
+        // Begin renderpass
+        let clear_values =
+            [
+                vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 0.0, 0.0, 1.0])),
+            ];
+
+        let render_pass_begin_info = vk::RenderPassBeginInfo {
+            s_type: vk::StructureType::RenderPassBeginInfo,
+            p_next: ptr::null(),
+            render_pass: self.renderpass,
+            framebuffer: self.framebuffers[self.current_present_idx],
+            render_area: self.scissor,
+            clear_value_count: clear_values.len() as u32,
+            p_clear_values: clear_values.as_ptr(),
+        };
+        unsafe {
+            // Start the render pass
+            rs.device.cmd_begin_render_pass(
+                cmd_buf,
+                &render_pass_begin_info,
+                vk::SubpassContents::Inline,
+            );
+
+            // Bind pipeline
+            rs.device.cmd_bind_pipeline(
+                cmd_buf,
+                vk::PipelineBindPoint::Graphics,
+                self.pipeline,
+            );
+
+            rs.device.cmd_set_viewport(cmd_buf, &[self.viewport]);
+            rs.device.cmd_set_scissor(cmd_buf, &[self.scissor]);
+        }
+
+        Some(cmd_buf)
+    }
+
+    pub fn end_frame_and_present(&self, rs: &RenderState) {
+        debug_assert!(self.current_present_idx < std::usize::MAX);
+
+        let cmd_buf = self.commandbuffers[self.current_present_idx];
+        unsafe {
+            // End render pass and command buffer
+            rs.device.cmd_end_render_pass(cmd_buf);
+            rs.device.end_command_buffer(cmd_buf).expect(
+                "End commandbuffer",
+            );
+        }
+
+        // Send the work off to the GPU
+        let fence_create_info = vk::FenceCreateInfo {
+            s_type: vk::StructureType::FenceCreateInfo,
+            p_next: ptr::null(),
+            flags: vk::FenceCreateFlags::empty(),
+        };
+        let submit_fence;
+        unsafe {
+            submit_fence = rs.device.create_fence(&fence_create_info, None).expect(
+                "Create fence failed.",
+            );
+        }
+        let submit_info = vk::SubmitInfo {
+            s_type: vk::StructureType::SubmitInfo,
+            p_next: ptr::null(),
+            wait_semaphore_count: 1,
+            p_wait_semaphores: [self.image_available_sem].as_ptr(),
+            p_wait_dst_stage_mask: [vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT].as_ptr(),
+            command_buffer_count: 1,
+            p_command_buffers: &cmd_buf,
+            signal_semaphore_count: 1,
+            p_signal_semaphores: [self.rendering_finished_sem].as_ptr(),
+        };
+        unsafe {
+            rs.device
+                .queue_submit(self.present_queue, &[submit_info], submit_fence)
+                .expect("queue submit failed.");
+            rs.device
+                .wait_for_fences(&[submit_fence], true, std::u64::MAX)
+                .expect("Wait for fence failed.");
+            rs.device.destroy_fence(submit_fence, None);
+        }
+
+        let present_info = vk::PresentInfoKHR {
+            s_type: vk::StructureType::PresentInfoKhr,
+            p_next: ptr::null(),
+            wait_semaphore_count: 1,
+            p_wait_semaphores: &self.rendering_finished_sem,
+            swapchain_count: 1,
+            p_swapchains: &self.swapchain,
+            p_image_indices: &(self.current_present_idx as u32),
+            p_results: ptr::null_mut(),
+        };
+        unsafe {
+            self.swapchain_loader
+                .queue_present_khr(self.present_queue, &present_info)
+                .unwrap();
         }
     }
 }
 
-impl Drop for CommandBuffers {
+impl Drop for PresentState {
     fn drop(&mut self) {
         // We cannot have the last reference to device at this point
         debug_assert!(1 < Rc::strong_count(&self.device));
 
+        // Already contains a device wait
+        self.cleanup_swapchain();
+
         unsafe {
-            self.device.destroy_command_pool(self.commandpool, None);
+            self.device.destroy_semaphore(
+                self.rendering_finished_sem,
+                None,
+            );
+            self.device.destroy_semaphore(
+                self.image_available_sem,
+                None,
+            );
+            self.surface_loader.destroy_surface_khr(self.surface, None);
         }
-    }
-}
-
-pub fn draw(rs: &RenderState, pipeline: &Pipeline, cmd_bufs: &CommandBuffers, present_idx: usize) {
-    // Begin commandbuffer
-    let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
-        s_type: vk::StructureType::CommandBufferBeginInfo,
-        p_next: ptr::null(),
-        p_inheritance_info: ptr::null(),
-        flags: vk::COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
-    };
-    let cmd_buf = cmd_bufs.commandbuffers[present_idx];
-    unsafe {
-        rs.device
-            .begin_command_buffer(cmd_buf, &cmd_buf_begin_info)
-            .expect("Begin commandbuffer");
-    }
-
-    // Begin renderpass
-    let clear_values =
-        [
-            vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 0.0, 0.0, 0.0])),
-        ];
-    let render_pass_begin_info = vk::RenderPassBeginInfo {
-        s_type: vk::StructureType::RenderPassBeginInfo,
-        p_next: ptr::null(),
-        render_pass: pipeline.renderpass,
-        framebuffer: pipeline.framebuffers[present_idx],
-        render_area: vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent: rs.surface_dimensions.clone(),
-        },
-        clear_value_count: clear_values.len() as u32,
-        p_clear_values: clear_values.as_ptr(),
-    };
-    unsafe {
-        // Start the render pass
-        rs.device.cmd_begin_render_pass(
-            cmd_buf,
-            &render_pass_begin_info,
-            vk::SubpassContents::Inline,
-        );
-
-        // Bind pipeline
-        rs.device.cmd_bind_pipeline(
-            cmd_buf,
-            vk::PipelineBindPoint::Graphics,
-            pipeline.pipeline,
-        );
-
-        rs.device.cmd_set_viewport(cmd_buf, &pipeline.viewports);
-        rs.device.cmd_set_scissor(cmd_buf, &pipeline.scissors);
-
-        // Draw!
-        // (We fake three vertices here with one instance)
-        rs.device.cmd_draw(cmd_buf, 3, 1, 0, 0);
-
-        // End render pass and command buffer
-        rs.device.cmd_end_render_pass(cmd_buf);
-        rs.device.end_command_buffer(cmd_buf).expect(
-            "End commandbuffer",
-        );
-    }
-
-    // Send the work off to the GPU
-    let fence_create_info = vk::FenceCreateInfo {
-        s_type: vk::StructureType::FenceCreateInfo,
-        p_next: ptr::null(),
-        flags: vk::FenceCreateFlags::empty(),
-    };
-    let submit_fence;
-    unsafe {
-        submit_fence = rs.device.create_fence(&fence_create_info, None).expect(
-            "Create fence failed.",
-        );
-    }
-    let submit_info = vk::SubmitInfo {
-        s_type: vk::StructureType::SubmitInfo,
-        p_next: ptr::null(),
-        wait_semaphore_count: 1,
-        p_wait_semaphores: [rs.image_available_sem].as_ptr(),
-        p_wait_dst_stage_mask: [vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT].as_ptr(),
-        command_buffer_count: 1,
-        p_command_buffers: &cmd_buf,
-        signal_semaphore_count: 1,
-        p_signal_semaphores: [rs.rendering_finished_sem].as_ptr(),
-    };
-    unsafe {
-        rs.device
-            .queue_submit(rs.present_queue, &[submit_info], submit_fence)
-            .expect("queue submit failed.");
-        rs.device
-            .wait_for_fences(&[submit_fence], true, std::u64::MAX)
-            .expect("Wait for fence failed.");
-        rs.device.destroy_fence(submit_fence, None);
     }
 }
