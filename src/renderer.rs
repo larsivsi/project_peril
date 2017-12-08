@@ -35,6 +35,7 @@ pub struct RenderState {
 }
 
 impl RenderState {
+    /// Lists the extensions required by the application.
     fn extension_names() -> Vec<*const i8> {
         let mut extensions = vec![Surface::name().as_ptr(), XlibSurface::name().as_ptr()];
         #[cfg(debug_assertions)]
@@ -44,6 +45,10 @@ impl RenderState {
         extensions
     }
 
+    /// Creates a Vulkan instance.
+    ///
+    /// * `cfg`    The application config.
+    /// * `entry`  The ash entrypoint.
     fn create_instance(cfg: &Config, entry: &Entry<V1_0>) -> Instance<V1_0> {
         // Application info
         let app_name = CString::new(cfg.app_name).unwrap();
@@ -105,7 +110,9 @@ impl RenderState {
         instance
     }
 
-    // Debug layer callback function
+    /// Debug layer callback function.
+    ///
+    /// This function is called from the debug layer if an issue is identified.
     unsafe extern "system" fn vulkan_debug_callback(
         _: vk::DebugReportFlagsEXT,
         _: vk::DebugReportObjectTypeEXT,
@@ -120,6 +127,10 @@ impl RenderState {
         1
     }
 
+    /// Sets up the debug report layer and callback.
+    ///
+    /// * `entry`     The ash entrypoint.
+    /// * `instance`  The Vulkan instance.
     fn setup_debug_callback(
         entry: &Entry<V1_0>,
         instance: &Instance<V1_0>,
@@ -143,6 +154,9 @@ impl RenderState {
         (debug_report_loader, debug_callback)
     }
 
+    /// Selects a physical device (and queue index) for the Vulkan instance.
+    ///
+    /// * `instance`  The Vulkan instance.
     fn pick_physical_device(instance: &Instance<V1_0>) -> (vk::PhysicalDevice, u32) {
         let pdevices = instance.enumerate_physical_devices().expect(
             "Failed to find GPU with Vulkan support",
@@ -172,6 +186,11 @@ impl RenderState {
         (pdevice, queue_family_index as u32)
     }
 
+    /// Creates a Vulkan device (logical) based on the instance and physical device.
+    ///
+    /// * `instance`            The Vulkan instance.
+    /// * `pdevice`             The Vulkan physical device.
+    /// * `queue_family_index`  The queue index for this physical device.
     fn create_logical_device(
         instance: &Instance<V1_0>,
         pdevice: vk::PhysicalDevice,
@@ -214,6 +233,10 @@ impl RenderState {
         device
     }
 
+    /// Creates various pools required by the RenderState.
+    ///
+    /// * `device`              The logical Vulkan device.
+    /// * `queue_family_index`  The queue index for this physical device.
     fn create_pools(device: &Device<V1_0>, queue_family_index: u32) -> (vk::CommandPool) {
         let cmd_pool_create_info = vk::CommandPoolCreateInfo {
             s_type: vk::StructureType::CommandPoolCreateInfo,
@@ -231,6 +254,9 @@ impl RenderState {
         (commandpool)
     }
 
+    /// Initializes the RenderState based in the passed Config.
+    ///
+    /// * `cfg`  The config for the RenderState.
     pub fn init(cfg: &Config) -> RenderState {
         // Window and event handler
         let event_loop = winit::EventsLoop::new();
@@ -275,6 +301,10 @@ impl RenderState {
         }
     }
 
+    /// Returns a suitable memory type for the requirements based in the physical Vulkan device.
+    ///
+    /// * `mem_type_bits`  A bitmask of the requested memory types.
+    /// * `properties`     The memory properties required for the requested memory.
     fn find_memory_type(&self, mem_type_bits: u32, properties: vk::MemoryPropertyFlags) -> u32 {
         for (idx, mem_type) in self.device_memory_properties
             .memory_types
@@ -290,6 +320,11 @@ impl RenderState {
         panic!("Cannot find memory type!");
     }
 
+    /// Creates a vk::Buffer based on the requirements.
+    ///
+    /// * `size`        The size of the resulting buffer.
+    /// * `usage`       Usage bits for the resulting buffer.
+    /// * `properties`  Memory properties required for the buffer.
     pub fn create_buffer(
         &self,
         size: vk::DeviceSize,
@@ -334,6 +369,11 @@ impl RenderState {
         (buffer, memory)
     }
 
+    /// Creates a vk::ShaderModule from the given path.
+    ///
+    /// Note: The path must point to a .spv file.
+    ///
+    /// * `path`  Path to the shader.
     fn load_shader(&self, path: &str) -> vk::ShaderModule {
         let spv_file = File::open(Path::new(path)).expect("Could not find spv file");
         let shader_bytes: Vec<u8> = spv_file.bytes().filter_map(|byte| byte.ok()).collect();
@@ -355,6 +395,10 @@ impl RenderState {
 }
 
 impl Drop for RenderState {
+    /// Drops the Renderstate. This destroys the pools, device and instance.
+    ///
+    /// It is the last ting to drop before ending the program, as any other Vulkan state must hav
+    /// been freed at this point.
     fn drop(&mut self) {
         // We must have the only reference to device at this point
         debug_assert!(1 == Rc::strong_count(&self.device));
@@ -409,7 +453,11 @@ pub struct PresentState {
 }
 
 impl PresentState {
-    // Creates X11 surface
+    /// Creates an X11 surface.
+    ///
+    /// * `entry`     The ash entrypoint.
+    /// * `instance`  The Vulkan instance.
+    /// * `window`    The window to create the surface for.
     fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
         entry: &E,
         instance: &I,
@@ -434,6 +482,17 @@ impl PresentState {
         result
     }
 
+    /// Creates a vk::Swapchain and a vk::Rect2D for the current RenderState and surface.
+    ///
+    /// Swapchain is used to queue and present stuff to the screen.
+    ///
+    /// * `rs`                The RenderState.
+    /// * `surface_loader`    The surface loader.
+    /// * `surface`           The surface for the swapchain.
+    /// * `surface_format`    The format of the surface.
+    /// * `old_swapchain`     The swapchain to re-use. Note that this must be a valid (i.e. not
+    ///                       destroyed) swapchain.
+    /// * `swapchain_loader`  The swapchain loader.
     fn create_swapchain(
         rs: &RenderState,
         surface_loader: &Surface,
@@ -445,7 +504,7 @@ impl PresentState {
         let surface_capabilities = surface_loader
             .get_physical_device_surface_capabilities_khr(rs.pdevice, *surface)
             .unwrap();
-        //TODO dual buffering for now
+        //TODO double-buffering for now
         let mut desired_image_count = 2;
         if surface_capabilities.max_image_count > 0 &&
             desired_image_count > surface_capabilities.max_image_count
@@ -504,6 +563,15 @@ impl PresentState {
         )
     }
 
+    /// Creates a Vec of vk::ImageViews for the presentable images in the swapchain.
+    ///
+    /// This will create two imageviews for double-buffering, three imageviews for
+    /// tripple-buffering etc.
+    ///
+    /// * `rs`                The RenderState.
+    /// * `surface_format`    The format of the surface.
+    /// * `swapchain_loader`  The swapchain loader.
+    /// * `swapchain`         The swapchain to create image views for.
     fn create_imageviews(
         rs: &RenderState,
         surface_format: &vk::SurfaceFormatKHR,
@@ -550,6 +618,12 @@ impl PresentState {
         present_image_views
     }
 
+    /// Creates a presentable renderpass.
+    ///
+    /// Produces a color-only renderpass, perfect for direct drawing.
+    ///
+    /// * `rs`              The RenderState.
+    /// * `surface_format`  The format of the surface.
     fn create_renderpass(
         rs: &RenderState,
         surface_format: &vk::SurfaceFormatKHR,
@@ -614,6 +688,13 @@ impl PresentState {
         renderpass
     }
 
+    /// Creates a pipeline for the given presentable renderpass.
+    ///
+    /// Very straigt forward pipeline: Loads some hard-coded shaders that will draw a triangle.
+    ///
+    /// * `rs`            The RenderState.
+    /// * `surface_size`  The size of the surface to render to.
+    /// * `renderpass`    The renderpass to produce the pipeline for (these have to match).
     fn create_pipeline(
         rs: &RenderState,
         surface_size: vk::Rect2D,
@@ -817,6 +898,13 @@ impl PresentState {
         (pipeline_layout, viewport, scissor, graphics_pipelines[0])
     }
 
+    /// Creates framebuffers for the presentable images, one per image.
+    ///
+    /// * `rs`                   The RenderState.
+    /// * `surface_size`         The size of the surface to render to.
+    /// * `present_image_views`  Imageviews to produce framebuffers for (one
+    ///                          framebuffer per imageview).
+    /// * `renderpass`           The renderpass to produce framebuffers for.
     fn create_framebuffers(
         rs: &RenderState,
         surface_size: vk::Rect2D,
@@ -851,6 +939,10 @@ impl PresentState {
         framebuffers
     }
 
+    /// Creates commandbuffers for the presentable images, one per image.
+    ///
+    /// * `rs`            The RenderState.
+    /// * `framebuffers`  Framebuffers for the presentable images.
     fn create_commandbuffers(
         rs: &RenderState,
         framebuffers: &Vec<vk::Framebuffer>,
@@ -872,6 +964,11 @@ impl PresentState {
         command_buffers
     }
 
+    /// Initializes the PresentState based on a RenderState
+    ///
+    /// This will set up the swapchain, renderpass, etc.
+    ///
+    /// * `rs`  The RenderState.
     pub fn init(rs: &RenderState) -> PresentState {
         // Surface
         let surface_loader =
@@ -969,6 +1066,9 @@ impl PresentState {
         }
     }
 
+    /// Releases all resources for the currently bound swapchain.
+    ///
+    /// The user is responsible for not calling this function without a swapchain.
     fn cleanup_swapchain(&mut self) {
         unsafe {
             // Always wait for device idle
@@ -997,7 +1097,11 @@ impl PresentState {
         }
     }
 
-    // In case window changes dimensions (resized etc.)
+    /// Releases the old and creates a new swapchain.
+    ///
+    /// This function should be called when the presentable surface is resized, etc.
+    ///
+    /// * `rs`  The RenderState.
     fn recreate_swapchain(&mut self, rs: &RenderState) {
         self.cleanup_swapchain();
 
@@ -1036,6 +1140,13 @@ impl PresentState {
         self.commandbuffers = command_buffers;
     }
 
+    /// Starts a frame for the current swapchain. The returned commandbuffer should be used for
+    /// rendering.
+    ///
+    /// On error (for example when the swapchain needs to be recreated), this function returns
+    /// None, meaning that the current frame should be skipped.
+    ///
+    /// * `rs`  The RenderState.
     pub fn begin_frame(&mut self, rs: &RenderState) -> Option<vk::CommandBuffer> {
         let result;
         unsafe {
@@ -1110,7 +1221,12 @@ impl PresentState {
         Some(cmd_buf)
     }
 
-    pub fn end_frame_and_present(&self, rs: &RenderState) {
+    /// Ends the current frame and presents it.
+    ///
+    /// begin_frame() must have been called before this function.
+    ///
+    /// * `rs`  The RenderState.
+    pub fn end_frame_and_present(&mut self, rs: &RenderState) {
         debug_assert!(self.current_present_idx < std::usize::MAX);
 
         let cmd_buf = self.commandbuffers[self.current_present_idx];
@@ -1170,10 +1286,14 @@ impl PresentState {
                 .queue_present_khr(self.present_queue, &present_info)
                 .unwrap();
         }
+
+        // Make sure we call begin_frame() before calling this function again
+        self.current_present_idx = std::usize::MAX;
     }
 }
 
 impl Drop for PresentState {
+    /// Drops the PresentState. This destroys the swapchain and surface.
     fn drop(&mut self) {
         // We cannot have the last reference to device at this point
         debug_assert!(1 < Rc::strong_count(&self.device));
