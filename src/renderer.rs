@@ -442,15 +442,7 @@ impl PresentState {
         surface_format: &vk::SurfaceFormatKHR,
         old_swapchain: vk::SwapchainKHR,
         swapchain_loader: &Swapchain,
-    ) -> (vk::SwapchainKHR,
-              Vec<vk::ImageView>,
-              vk::RenderPass,
-              Vec<vk::Framebuffer>,
-              vk::PipelineLayout,
-              vk::Viewport,
-              vk::Rect2D,
-              vk::Pipeline,
-              Vec<vk::CommandBuffer>) {
+    ) -> (vk::SwapchainKHR, vk::Rect2D) {
         let surface_capabilities = surface_loader
             .get_physical_device_surface_capabilities_khr(rs.pdevice, *surface)
             .unwrap();
@@ -504,7 +496,21 @@ impl PresentState {
                 .unwrap();
         }
 
-        // Present image views
+        (
+            swapchain,
+            vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: surface_capabilities.current_extent.clone(),
+            },
+        )
+    }
+
+    fn create_imageviews(
+        rs: &RenderState,
+        surface_format: &vk::SurfaceFormatKHR,
+        swapchain_loader: &Swapchain,
+        swapchain: vk::SwapchainKHR,
+    ) -> Vec<vk::ImageView> {
         let present_images = swapchain_loader
             .get_swapchain_images_khr(swapchain)
             .unwrap();
@@ -542,6 +548,13 @@ impl PresentState {
             })
             .collect();
 
+        present_image_views
+    }
+
+    fn create_renderpass(
+        rs: &RenderState,
+        surface_format: &vk::SurfaceFormatKHR,
+    ) -> vk::RenderPass {
         let renderpass_attachments = [
             vk::AttachmentDescription {
                 format: surface_format.format,
@@ -598,30 +611,15 @@ impl PresentState {
                 .create_render_pass(&renderpass_create_info, None)
                 .unwrap();
         }
-        let framebuffers: Vec<vk::Framebuffer> = present_image_views
-            .iter()
-            .map(|&present_image_view| {
-                let framebuffer_attachments = [present_image_view];
-                let frame_buffer_create_info = vk::FramebufferCreateInfo {
-                    s_type: vk::StructureType::FramebufferCreateInfo,
-                    p_next: ptr::null(),
-                    flags: Default::default(),
-                    render_pass: renderpass,
-                    attachment_count: framebuffer_attachments.len() as u32,
-                    p_attachments: framebuffer_attachments.as_ptr(),
-                    width: surface_capabilities.current_extent.width,
-                    height: surface_capabilities.current_extent.height,
-                    layers: 1,
-                };
-                let framebuffer;
-                unsafe {
-                    framebuffer = rs.device
-                        .create_framebuffer(&frame_buffer_create_info, None)
-                        .unwrap();
-                }
-                framebuffer
-            })
-            .collect();
+
+        renderpass
+    }
+
+    fn create_pipeline(
+        rs: &RenderState,
+        surface_size: vk::Rect2D,
+        renderpass: vk::RenderPass,
+    ) -> (vk::PipelineLayout, vk::Viewport, vk::Rect2D, vk::Pipeline) {
         let layout_create_info = vk::PipelineLayoutCreateInfo {
             s_type: vk::StructureType::PipelineLayoutCreateInfo,
             p_next: ptr::null(),
@@ -682,17 +680,14 @@ impl PresentState {
             topology: vk::PrimitiveTopology::TriangleList,
         };
         let viewport = vk::Viewport {
-            x: 0.0,
-            y: 0.0,
-            width: surface_capabilities.current_extent.width as f32,
-            height: surface_capabilities.current_extent.height as f32,
+            x: surface_size.offset.x as f32,
+            y: surface_size.offset.y as f32,
+            width: surface_size.extent.width as f32,
+            height: surface_size.extent.height as f32,
             min_depth: 0.0,
             max_depth: 1.0,
         };
-        let scissor = vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent: surface_capabilities.current_extent.clone(),
-        };
+        let scissor = surface_size.clone();
         let viewport_state_info = vk::PipelineViewportStateCreateInfo {
             s_type: vk::StructureType::PipelineViewportStateCreateInfo,
             p_next: ptr::null(),
@@ -820,6 +815,47 @@ impl PresentState {
             rs.device.destroy_shader_module(vertex_shader_module, None);
         }
 
+        (pipeline_layout, viewport, scissor, graphics_pipelines[0])
+    }
+
+    fn create_framebuffers(
+        rs: &RenderState,
+        surface_size: vk::Rect2D,
+        present_image_views: &Vec<vk::ImageView>,
+        renderpass: vk::RenderPass,
+    ) -> Vec<vk::Framebuffer> {
+        let framebuffers: Vec<vk::Framebuffer> = present_image_views
+            .iter()
+            .map(|&present_image_view| {
+                let framebuffer_attachments = [present_image_view];
+                let frame_buffer_create_info = vk::FramebufferCreateInfo {
+                    s_type: vk::StructureType::FramebufferCreateInfo,
+                    p_next: ptr::null(),
+                    flags: Default::default(),
+                    render_pass: renderpass,
+                    attachment_count: framebuffer_attachments.len() as u32,
+                    p_attachments: framebuffer_attachments.as_ptr(),
+                    width: surface_size.extent.width,
+                    height: surface_size.extent.height,
+                    layers: 1,
+                };
+                let framebuffer;
+                unsafe {
+                    framebuffer = rs.device
+                        .create_framebuffer(&frame_buffer_create_info, None)
+                        .unwrap();
+                }
+                framebuffer
+            })
+            .collect();
+
+        framebuffers
+    }
+
+    fn create_commandbuffers(
+        rs: &RenderState,
+        framebuffers: &Vec<vk::Framebuffer>,
+    ) -> Vec<vk::CommandBuffer> {
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::CommandBufferAllocateInfo,
             p_next: ptr::null(),
@@ -834,18 +870,7 @@ impl PresentState {
                 .unwrap();
         }
 
-        // Return the new swapchain
-        (
-            swapchain,
-            present_image_views,
-            renderpass,
-            framebuffers,
-            pipeline_layout,
-            viewport,
-            scissor,
-            graphics_pipelines[0],
-            command_buffers,
-        )
+        command_buffers
     }
 
     pub fn init(rs: &RenderState) -> PresentState {
@@ -895,15 +920,7 @@ impl PresentState {
         let swapchain_loader =
             Swapchain::new(&rs.instance, rs.device.as_ref()).expect("Unable to load swapchain");
 
-        let (swapchain,
-             present_image_views,
-             renderpass,
-             framebuffers,
-             pipeline_layout,
-             viewport,
-             scissor,
-             pipeline,
-             command_buffers) = PresentState::create_swapchain(
+        let (swapchain, surface_size) = PresentState::create_swapchain(
             rs,
             &surface_loader,
             &surface,
@@ -911,6 +928,14 @@ impl PresentState {
             vk::SwapchainKHR::null(),
             &swapchain_loader,
         );
+        let present_image_views =
+            PresentState::create_imageviews(rs, &surface_format, &swapchain_loader, swapchain);
+        let renderpass = PresentState::create_renderpass(rs, &surface_format);
+        let (pipeline_layout, viewport, scissor, pipeline) =
+            PresentState::create_pipeline(rs, surface_size, renderpass);
+        let framebuffers =
+            PresentState::create_framebuffers(rs, surface_size, &present_image_views, renderpass);
+        let command_buffers = PresentState::create_commandbuffers(rs, &framebuffers);
 
         PresentState {
             // Surface
@@ -950,8 +975,8 @@ impl PresentState {
             // Always wait for device idle
             self.device.device_wait_idle().unwrap();
 
-            for &image_view in self.present_image_views.iter() {
-                self.device.destroy_image_view(image_view, None);
+            for &framebuffer in self.framebuffers.iter() {
+                self.device.destroy_framebuffer(framebuffer, None);
             }
 
             self.device.destroy_pipeline(self.pipeline, None);
@@ -959,10 +984,12 @@ impl PresentState {
                 self.pipeline_layout,
                 None,
             );
-            for &framebuffer in self.framebuffers.iter() {
-                self.device.destroy_framebuffer(framebuffer, None);
-            }
+
             self.device.destroy_render_pass(self.renderpass, None);
+
+            for &image_view in self.present_image_views.iter() {
+                self.device.destroy_image_view(image_view, None);
+            }
 
             self.swapchain_loader.destroy_swapchain_khr(
                 self.swapchain,
@@ -975,15 +1002,7 @@ impl PresentState {
     fn recreate_swapchain(&mut self, rs: &RenderState) {
         self.cleanup_swapchain();
 
-        let (swapchain,
-             present_image_views,
-             renderpass,
-             framebuffers,
-             pipeline_layout,
-             viewport,
-             scissor,
-             pipeline,
-             command_buffers) = PresentState::create_swapchain(
+        let (swapchain, surface_size) = PresentState::create_swapchain(
             rs,
             &self.surface_loader,
             &self.surface,
@@ -992,13 +1011,29 @@ impl PresentState {
             &self.swapchain_loader,
         );
         self.swapchain = swapchain;
+        let present_image_views = PresentState::create_imageviews(
+            rs,
+            &self.surface_format,
+            &self.swapchain_loader,
+            swapchain,
+        );
         self.present_image_views = present_image_views;
+        let renderpass = PresentState::create_renderpass(rs, &self.surface_format);
         self.renderpass = renderpass;
-        self.framebuffers = framebuffers;
+        let (pipeline_layout, viewport, scissor, pipeline) =
+            PresentState::create_pipeline(rs, surface_size, renderpass);
         self.pipeline_layout = pipeline_layout;
         self.viewport = viewport;
         self.scissor = scissor;
         self.pipeline = pipeline;
+        let framebuffers = PresentState::create_framebuffers(
+            rs,
+            surface_size,
+            &self.present_image_views,
+            renderpass,
+        );
+        self.framebuffers = framebuffers;
+        let command_buffers = PresentState::create_commandbuffers(rs, &self.framebuffers);
         self.commandbuffers = command_buffers;
     }
 
