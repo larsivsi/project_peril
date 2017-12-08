@@ -434,7 +434,6 @@ impl PresentState {
         result
     }
 
-    //TODO Split in multiple functions
     fn create_swapchain(
         rs: &RenderState,
         surface_loader: &Surface,
