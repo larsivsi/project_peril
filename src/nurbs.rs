@@ -17,6 +17,12 @@ pub struct NURBSpline {
 }
 
 impl NURBSpline {
+    /// Initializes a new NURBSpline based on input control points.
+    ///
+    /// This includes generating a knot vector etc.
+    ///
+    /// * `order`          The order of the spline.
+    /// * `controlpoints`  Vector of control points.
     pub fn new(order: Order, controlpoints: Vec<Point3<f64>>) -> NURBSpline {
         debug_assert!(order as usize <= controlpoints.len());
         let knots_size = controlpoints.len() + order as usize;
@@ -31,14 +37,20 @@ impl NURBSpline {
         spline
     }
 
-    // Returns the evaluation limit for the NURBSpline.
+    /// Returns the evaluation limit for the NURBSpline.
+    ///
+    /// The spline cannot be evaluated at any point equal to or greater than this limit.
     pub fn eval_limit(&self) -> f64 {
         // Value at the end of knots vector is the exclusive limit for
         // what values one can evaluate the NURBS with.
         self.knots[self.knots.len() - 1]
     }
 
-    // Evaluates the NURBSpline at u
+    /// Evaluates the NURBSpline at the given value.
+    ///
+    /// This value has to be less than the evaluation limit for the spline.
+    ///
+    /// * `u`  The point to evaluate the spline at.
     pub fn evaluate_at(&self, u: f64) -> Point3<f64> {
         debug_assert!(u < self.eval_limit());
 
@@ -54,7 +66,15 @@ impl NURBSpline {
         result
     }
 
-    // Cox-de Boor recursion formula
+    /// Cox-de Boor recursion formula.
+    ///
+    /// This returns the contribution of the given control point index, order and value to
+    /// evaluate.
+    /// See https://www.cs.montana.edu/paxton/classes/aui/dslectures/CoxdeBoor.pdf for details.
+    ///
+    /// * `idx`    The control point index to evaluate.
+    /// * `order`  The order for the current recursion.
+    /// * `u`      The value to evaluate.
     fn coxdeboor(&self, idx: usize, order: usize, u: f64) -> f64 {
         debug_assert!(order > 0);
 
@@ -83,7 +103,9 @@ impl NURBSpline {
         return equation1 + equation2;
     }
 
-    // Generates an open uniform knot vector
+    /// Generates an open uniform knot vector.
+    ///
+    /// Refer to the pdf in the coxdeboor-documentation for details.
     fn generate_knots(&mut self) {
         let mut val = 0.0;
         let step = 1.0;

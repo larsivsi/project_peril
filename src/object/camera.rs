@@ -13,6 +13,7 @@ pub struct Camera {
 }
 
 impl Camera {
+    /// Updates the front, right and up-vectors based on the camera's pitch and yaw.
     fn update(&mut self) {
         self.front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
         self.front.y = self.pitch.to_radians().sin();
@@ -36,6 +37,9 @@ impl Position for Camera {
 }
 
 impl Camera {
+    /// Creates a new Camera struct
+    ///
+    /// * `position`  Initial position for the camera.
     pub fn new(position: Point3<f64>) -> Camera {
         let mut camera = Camera {
             position: position,

@@ -42,6 +42,12 @@ impl Position for DrawObject {
 }
 
 impl DrawObject {
+    /// Creates a new quad draw object.
+    ///
+    /// * `rs`        The current RenderState.
+    /// * `position`  Position for the new quad.
+    /// * `width`     Width of the new quad.
+    /// * `height`    Height of the new quad.
     pub fn new_quad(
         rs: &RenderState,
         position: Point3<f64>,
@@ -119,6 +125,7 @@ impl DrawObject {
 }
 
 impl Drop for DrawObject {
+    /// Drops the DrawObject by freeing the index and vertex buffers.
     fn drop(&mut self) {
         // We cannot have the last reference to device at this point
         debug_assert!(1 < Rc::strong_count(&self.device));

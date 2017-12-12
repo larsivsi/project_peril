@@ -15,6 +15,10 @@ pub struct Config {
 }
 
 impl Config {
+    /// Parses an option/value pair and updates the Config struct.
+    ///
+    /// * `option`  The option to parse.
+    /// * `value`   The value given for the option.
     fn parse_option(&mut self, option: &str, value: &str) {
         match option {
             "window_width" => {
@@ -38,6 +42,12 @@ impl Config {
 
     }
 
+    /// Generates a packed 32 bit version number based on the given major, minor and patch
+    /// versions.
+    ///
+    /// * `major`  Major version, must be less than 10 bit.
+    /// * `minor`  Minor version, must be lass than 10 bit.
+    /// * `patch`  Patch version, must be less than 12 bit.
     fn make_version(major: u32, minor: u32, patch: u32) -> u32 {
         debug_assert!(major <= 0x3FF); // 10 bit major
         debug_assert!(minor <= 0x3FF); // 10 bit minor
@@ -51,6 +61,7 @@ impl Config {
         ret
     }
 
+    /// Prints the current app version as a string.
     pub fn version_to_string(&self) -> String {
         let major = (self.app_version >> 24) & 0x3FF;
         let minor = (self.app_version >> 12) & 0x3FF;
@@ -59,6 +70,9 @@ impl Config {
         format!("v{}.{}.{}", major, minor, patch)
     }
 
+    /// Reads the config given by the filename and generates a Config struct.
+    ///
+    /// * `filename`  Path to the config file to read.
     pub fn read_config(filename: &str) -> Config {
         let mut file = File::open(filename).expect("Error opening config file");
 
