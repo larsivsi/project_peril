@@ -6,5 +6,6 @@ authors = ["Lars-Ivar Hesselberg Simonsen <larsivarhs@gmail.com>","Matthew Guise
 [dependencies]
 ash = "0.20.1"
 cgmath = "0.15.0"
+image = "0.18.0"
 regex = "0.2.2"
 winit = "0.8.3"

@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate ash;
 extern crate cgmath;
+extern crate image;
 extern crate regex;
 extern crate winit;
 
@@ -86,8 +87,8 @@ fn main() {
         }
         // Draw stuff
         unsafe {
-            // just fake three vertices for now
-            renderstate.device.cmd_draw(cmd_buf, 3, 1, 0, 0);
+            // just fake six vertices for now
+            renderstate.device.cmd_draw(cmd_buf, 6, 1, 0, 0);
         }
         //then swapbuffers etc.
         presentstate.end_frame_and_present(&renderstate);

@@ -4,6 +4,8 @@ use ash::{Device, Entry, Instance};
 use ash::vk;
 use ash::version::{V1_0, InstanceV1_0, DeviceV1_0, EntryV1_0};
 use ash::extensions::{DebugReport, Surface, Swapchain, XlibSurface};
+use ash::util::Align;
+use image;
 use std;
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -25,6 +27,7 @@ pub struct RenderState {
     pub device: Rc<Device<V1_0>>,
     device_memory_properties: vk::PhysicalDeviceMemoryProperties,
     queue_family_index: u32,
+    graphics_queue: vk::Queue,
 
     // Window
     pub event_loop: EventsLoop,
@@ -282,6 +285,10 @@ impl RenderState {
         let (pdevice, queue_family_index) = RenderState::pick_physical_device(&instance);
         let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
         let device = RenderState::create_logical_device(&instance, pdevice, queue_family_index);
+        let graphics_queue;
+        unsafe {
+            graphics_queue = device.get_device_queue(queue_family_index, 0);
+        }
 
         // Other stuff
         let commandpool = RenderState::create_pools(&device, queue_family_index);
@@ -297,6 +304,7 @@ impl RenderState {
             device: Rc::new(device),
             device_memory_properties: device_memory_properties,
             queue_family_index: queue_family_index,
+            graphics_queue: graphics_queue,
 
             // Window
             event_loop: event_loop,
@@ -324,6 +332,70 @@ impl RenderState {
             }
         }
         panic!("Cannot find memory type!");
+    }
+
+    fn begin_single_time_commands(&self) -> vk::CommandBuffer {
+        let cmd_buf_allocate_info = vk::CommandBufferAllocateInfo {
+            s_type: vk::StructureType::CommandBufferAllocateInfo,
+            p_next: ptr::null(),
+            command_buffer_count: 1,
+            command_pool: self.commandpool,
+            level: vk::CommandBufferLevel::Primary,
+        };
+
+        let cmd_buf;
+        unsafe {
+            cmd_buf = self.device
+                .allocate_command_buffers(&cmd_buf_allocate_info)
+                .unwrap()
+                [0];
+        }
+
+        let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
+            s_type: vk::StructureType::CommandBufferBeginInfo,
+            p_next: ptr::null(),
+            p_inheritance_info: ptr::null(),
+            flags: vk::COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        };
+        unsafe {
+            self.device
+                .begin_command_buffer(cmd_buf, &cmd_buf_begin_info)
+                .expect("Begin commandbuffer");
+        }
+
+        cmd_buf
+    }
+
+    fn end_single_time_commands(&self, cmd_buf: vk::CommandBuffer) {
+        unsafe {
+            self.device.end_command_buffer(cmd_buf).expect(
+                "End commandbuffer",
+            );
+        }
+
+        let submit_info = vk::SubmitInfo {
+            s_type: vk::StructureType::SubmitInfo,
+            p_next: ptr::null(),
+            wait_semaphore_count: 0,
+            p_wait_semaphores: ptr::null(),
+            p_wait_dst_stage_mask: ptr::null(),
+            command_buffer_count: 1,
+            p_command_buffers: &cmd_buf,
+            signal_semaphore_count: 0,
+            p_signal_semaphores: ptr::null(),
+        };
+        unsafe {
+            self.device
+                .queue_submit(self.graphics_queue, &[submit_info], vk::Fence::null())
+                .expect("queue submit failed.");
+            self.device.queue_wait_idle(self.graphics_queue).expect(
+                "queue wait failed.",
+            );
+            self.device.free_command_buffers(
+                self.commandpool,
+                &[cmd_buf],
+            );
+        }
     }
 
     /// Creates a vk::Buffer based on the requirements.
@@ -398,6 +470,230 @@ impl RenderState {
         }
         shader_module
     }
+
+    fn load_image(&self, path: &str) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
+        // Load the image data into a vk::Buffer
+        let image = image::open(path).unwrap().to_rgba();
+        let image_extent;
+        {
+            let image_dims = image.dimensions();
+            image_extent = vk::Extent3D {
+                width: image_dims.0,
+                height: image_dims.1,
+                depth: 1,
+            };
+        }
+        let image_data = image.into_raw();
+        let buffersize: vk::DeviceSize = (std::mem::size_of::<u8>() * image_data.len()) as u64;
+        let (image_buffer, image_memory) = self.create_buffer(
+            buffersize,
+            vk::BUFFER_USAGE_TRANSFER_SRC_BIT,
+            vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        );
+        unsafe {
+            let image_ptr = self.device
+                .map_memory(image_memory, 0, buffersize, vk::MemoryMapFlags::empty())
+                .expect("Failed to map index memory");
+            let mut image_slice =
+                Align::new(image_ptr, std::mem::align_of::<u8>() as u64, buffersize);
+            image_slice.copy_from_slice(&image_data);
+            self.device.unmap_memory(image_memory);
+        }
+
+        // Create a texture
+        let texture_create_info = vk::ImageCreateInfo {
+            s_type: vk::StructureType::ImageCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+            image_type: vk::ImageType::Type2d,
+            format: vk::Format::R8g8b8a8Unorm,
+            extent: image_extent,
+            mip_levels: 1,
+            array_layers: 1,
+            samples: vk::SAMPLE_COUNT_1_BIT,
+            tiling: vk::ImageTiling::Optimal,
+            usage: vk::IMAGE_USAGE_TRANSFER_DST_BIT | vk::IMAGE_USAGE_SAMPLED_BIT,
+            sharing_mode: vk::SharingMode::Exclusive,
+            queue_family_index_count: 0,
+            p_queue_family_indices: ptr::null(),
+            initial_layout: vk::ImageLayout::Undefined,
+        };
+        let texture_image;
+        unsafe {
+            texture_image = self.device
+                .create_image(&texture_create_info, None)
+                .unwrap();
+        }
+        let texture_memory_req = self.device.get_image_memory_requirements(texture_image);
+        let texture_allocate_info = vk::MemoryAllocateInfo {
+            s_type: vk::StructureType::MemoryAllocateInfo,
+            p_next: ptr::null(),
+            allocation_size: texture_memory_req.size,
+            memory_type_index: self.find_memory_type(
+                texture_memory_req.memory_type_bits,
+                vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            ),
+        };
+        let texture_memory;
+        unsafe {
+            texture_memory = self.device
+                .allocate_memory(&texture_allocate_info, None)
+                .unwrap();
+            self.device
+                .bind_image_memory(texture_image, texture_memory, 0)
+                .expect("Failed to bind memory");
+        }
+
+        // Transition image layout from UNDEFINED to DST_OPTIMAL
+        let cmd_buf = self.begin_single_time_commands();
+        let texture_barrier = vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::ImageMemoryBarrier,
+            p_next: ptr::null(),
+            src_access_mask: Default::default(),
+            dst_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
+            old_layout: vk::ImageLayout::Undefined,
+            new_layout: vk::ImageLayout::TransferDstOptimal,
+            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            image: texture_image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+        };
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                cmd_buf,
+                vk::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                vk::PIPELINE_STAGE_TRANSFER_BIT,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[texture_barrier],
+            );
+        }
+        // Copy buffer data to image
+        let buffer_copy_region = vk::BufferImageCopy {
+            buffer_offset: 0,
+            buffer_row_length: 0,
+            buffer_image_height: 0,
+            image_subresource: vk::ImageSubresourceLayers {
+                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                mip_level: 0,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            image_extent: image_extent,
+            image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
+        };
+        unsafe {
+            self.device.cmd_copy_buffer_to_image(
+                cmd_buf,
+                image_buffer,
+                texture_image,
+                vk::ImageLayout::TransferDstOptimal,
+                &[buffer_copy_region],
+            );
+        }
+        // Transition image layout from DST_OPTIMAL to SHADER_READ_ONLY_OPTIMAL
+        let texture_barrier = vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::ImageMemoryBarrier,
+            p_next: ptr::null(),
+            src_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
+            dst_access_mask: vk::ACCESS_SHADER_READ_BIT,
+            old_layout: vk::ImageLayout::TransferDstOptimal,
+            new_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
+            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            image: texture_image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+        };
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                cmd_buf,
+                vk::PIPELINE_STAGE_TRANSFER_BIT,
+                vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[texture_barrier],
+            );
+        }
+        self.end_single_time_commands(cmd_buf);
+
+        // Texture now holds the data, can delete image buffer and memory
+        unsafe {
+            self.device.destroy_buffer(image_buffer, None);
+            self.device.free_memory(image_memory, None);
+        }
+
+        // Create texture image view
+        let tex_image_view_info = vk::ImageViewCreateInfo {
+            s_type: vk::StructureType::ImageViewCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+            view_type: vk::ImageViewType::Type2d,
+            format: texture_create_info.format,
+            components: vk::ComponentMapping {
+                r: vk::ComponentSwizzle::R,
+                g: vk::ComponentSwizzle::G,
+                b: vk::ComponentSwizzle::B,
+                a: vk::ComponentSwizzle::A,
+            },
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            image: texture_image,
+        };
+        let texture_view;
+        unsafe {
+            texture_view = self.device
+                .create_image_view(&tex_image_view_info, None)
+                .unwrap();
+        }
+
+        // Create sampler
+        let sampler_info = vk::SamplerCreateInfo {
+            s_type: vk::StructureType::SamplerCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+            mag_filter: vk::Filter::Linear,
+            min_filter: vk::Filter::Linear,
+            mipmap_mode: vk::SamplerMipmapMode::Linear,
+            address_mode_u: vk::SamplerAddressMode::MirroredRepeat,
+            address_mode_v: vk::SamplerAddressMode::MirroredRepeat,
+            address_mode_w: vk::SamplerAddressMode::MirroredRepeat,
+            mip_lod_bias: 0.0,
+            min_lod: 0.0,
+            max_lod: 0.0,
+            anisotropy_enable: 0,
+            max_anisotropy: 1.0,
+            border_color: vk::BorderColor::FloatOpaqueWhite,
+            compare_enable: 0,
+            compare_op: vk::CompareOp::Never,
+            unnormalized_coordinates: 0,
+        };
+        let sampler;
+        unsafe {
+            sampler = self.device.create_sampler(&sampler_info, None).unwrap();
+        }
+
+        (texture_image, texture_memory, texture_view, sampler)
+    }
 }
 
 impl Drop for RenderState {
@@ -440,25 +736,32 @@ pub struct PresentState {
     surface: vk::SurfaceKHR,
     surface_format: vk::SurfaceFormatKHR,
 
-    // Present queue
-    present_queue: vk::Queue,
+    // Semaphores
     image_available_sem: vk::Semaphore,
     rendering_finished_sem: vk::Semaphore,
 
     swapchain_loader: Swapchain,
+
+    // Texture
+    texture_image: vk::Image,
+    texture_mem: vk::DeviceMemory,
+    texture_view: vk::ImageView,
+    texture_sampler: vk::Sampler,
 
     // Swapchain
     swapchain: vk::SwapchainKHR,
     //presentable images for the screen
     present_image_views: Vec<vk::ImageView>,
     renderpass: vk::RenderPass,
-    //one framebuffer per image
-    framebuffers: Vec<vk::Framebuffer>,
+    descriptor_pool: vk::DescriptorPool,
+    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
+    descriptor_sets: Vec<vk::DescriptorSet>,
     pipeline_layout: vk::PipelineLayout,
     viewport: vk::Viewport,
     scissor: vk::Rect2D,
     pipeline: vk::Pipeline,
-    //one commandbuffer per image
+    //one framebuffer/commandbuffer per image
+    framebuffers: Vec<vk::Framebuffer>,
     commandbuffers: Vec<vk::CommandBuffer>,
 
     // The current idx
@@ -520,13 +823,16 @@ impl PresentState {
         let surface_capabilities = surface_loader
             .get_physical_device_surface_capabilities_khr(rs.pdevice, *surface)
             .unwrap();
+
         //TODO double-buffering for now
         let mut desired_image_count = 2;
+        debug_assert!(desired_image_count >= surface_capabilities.min_image_count);
         if surface_capabilities.max_image_count > 0 &&
             desired_image_count > surface_capabilities.max_image_count
         {
             desired_image_count = surface_capabilities.max_image_count;
         }
+
         let pre_transform = if surface_capabilities.supported_transforms.subset(
             vk::SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
         )
@@ -535,6 +841,7 @@ impl PresentState {
         } else {
             surface_capabilities.current_transform
         };
+
         let present_modes = surface_loader
             .get_physical_device_surface_present_modes_khr(rs.pdevice, *surface)
             .unwrap();
@@ -644,6 +951,7 @@ impl PresentState {
         rs: &RenderState,
         surface_format: &vk::SurfaceFormatKHR,
     ) -> vk::RenderPass {
+        // One attachment, color only. Will produce the presentable image.
         let renderpass_attachments = [
             vk::AttachmentDescription {
                 format: surface_format.format,
@@ -666,10 +974,10 @@ impl PresentState {
             src_subpass: vk::VK_SUBPASS_EXTERNAL,
             dst_subpass: Default::default(),
             src_stage_mask: vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            dst_stage_mask: vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             src_access_mask: Default::default(),
             dst_access_mask: vk::ACCESS_COLOR_ATTACHMENT_READ_BIT |
                 vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            dst_stage_mask: vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         };
         let subpass = vk::SubpassDescription {
             color_attachment_count: 1,
@@ -715,13 +1023,102 @@ impl PresentState {
         rs: &RenderState,
         surface_size: vk::Rect2D,
         renderpass: vk::RenderPass,
-    ) -> (vk::PipelineLayout, vk::Viewport, vk::Rect2D, vk::Pipeline) {
+        texture_view: vk::ImageView,
+        texture_sampler: vk::Sampler,
+    ) -> (vk::DescriptorPool,
+              Vec<vk::DescriptorSetLayout>,
+              Vec<vk::DescriptorSet>,
+              vk::PipelineLayout,
+              vk::Viewport,
+              vk::Rect2D,
+              vk::Pipeline) {
+        // Descriptors
+        let descriptor_sizes = [
+            vk::DescriptorPoolSize {
+                typ: vk::DescriptorType::CombinedImageSampler,
+                descriptor_count: 1,
+            },
+        ];
+        let descriptor_pool_info = vk::DescriptorPoolCreateInfo {
+            s_type: vk::StructureType::DescriptorPoolCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+            pool_size_count: descriptor_sizes.len() as u32,
+            p_pool_sizes: descriptor_sizes.as_ptr(),
+            max_sets: 1,
+        };
+        let descriptor_pool;
+        unsafe {
+            descriptor_pool = rs.device
+                .create_descriptor_pool(&descriptor_pool_info, None)
+                .unwrap();
+        }
+        let desc_layout_bindings = [
+            vk::DescriptorSetLayoutBinding {
+                binding: 0,
+                descriptor_type: vk::DescriptorType::CombinedImageSampler,
+                descriptor_count: 1,
+                stage_flags: vk::SHADER_STAGE_FRAGMENT_BIT,
+                p_immutable_samplers: ptr::null(),
+            },
+        ];
+        let descriptor_info = vk::DescriptorSetLayoutCreateInfo {
+            s_type: vk::StructureType::DescriptorSetLayoutCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+            binding_count: desc_layout_bindings.len() as u32,
+            p_bindings: desc_layout_bindings.as_ptr(),
+        };
+        let descriptor_set_layouts;
+        unsafe {
+            descriptor_set_layouts = [
+                rs.device
+                    .create_descriptor_set_layout(&descriptor_info, None)
+                    .unwrap(),
+            ];
+        }
+        let desc_alloc_info = vk::DescriptorSetAllocateInfo {
+            s_type: vk::StructureType::DescriptorSetAllocateInfo,
+            p_next: ptr::null(),
+            descriptor_pool: descriptor_pool,
+            descriptor_set_count: descriptor_set_layouts.len() as u32,
+            p_set_layouts: descriptor_set_layouts.as_ptr(),
+        };
+        let descriptor_sets;
+        unsafe {
+            descriptor_sets = rs.device
+                .allocate_descriptor_sets(&desc_alloc_info)
+                .unwrap();
+        }
+        let tex_descriptor = vk::DescriptorImageInfo {
+            image_layout: vk::ImageLayout::General,
+            image_view: texture_view,
+            sampler: texture_sampler,
+        };
+        let write_desc_sets = [
+            vk::WriteDescriptorSet {
+                s_type: vk::StructureType::WriteDescriptorSet,
+                p_next: ptr::null(),
+                dst_set: descriptor_sets[0],
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::CombinedImageSampler,
+                p_image_info: &tex_descriptor,
+                p_buffer_info: ptr::null(),
+                p_texel_buffer_view: ptr::null(),
+            },
+        ];
+        unsafe {
+            rs.device.update_descriptor_sets(&write_desc_sets, &[]);
+        }
+
         let layout_create_info = vk::PipelineLayoutCreateInfo {
             s_type: vk::StructureType::PipelineLayoutCreateInfo,
             p_next: ptr::null(),
             flags: Default::default(),
-            set_layout_count: 0,
-            p_set_layouts: ptr::null(),
+            set_layout_count: descriptor_set_layouts.len() as u32,
+            p_set_layouts: descriptor_set_layouts.as_ptr(),
             push_constant_range_count: 0,
             p_push_constant_ranges: ptr::null(),
         };
@@ -733,8 +1130,8 @@ impl PresentState {
                 .unwrap();
         }
 
-        let vertex_shader_module = RenderState::load_shader(rs, "shaders/vertex.spv");
-        let fragment_shader_module = RenderState::load_shader(rs, "shaders/fragment.spv");
+        let vertex_shader_module = rs.load_shader("shaders/final_pass_vert.spv");
+        let fragment_shader_module = rs.load_shader("shaders/final_pass_frag.spv");
 
         let shader_entry_name = CString::new("main").unwrap();
         let shader_stage_create_infos = [
@@ -911,7 +1308,15 @@ impl PresentState {
             rs.device.destroy_shader_module(vertex_shader_module, None);
         }
 
-        (pipeline_layout, viewport, scissor, graphics_pipelines[0])
+        (
+            descriptor_pool,
+            descriptor_set_layouts.to_vec(),
+            descriptor_sets,
+            pipeline_layout,
+            viewport,
+            scissor,
+            graphics_pipelines[0],
+        )
     }
 
     /// Creates framebuffers for the presentable images, one per image.
@@ -1012,11 +1417,6 @@ impl PresentState {
             .nth(0)
             .expect("Unable to find suitable surface format.");
 
-        // Present queue
-        let present_queue;
-        unsafe {
-            present_queue = rs.device.get_device_queue(rs.queue_family_index, 0);
-        }
         let sem_create_info = vk::SemaphoreCreateInfo {
             s_type: vk::StructureType::SemaphoreCreateInfo,
             p_next: ptr::null(),
@@ -1032,6 +1432,9 @@ impl PresentState {
         let swapchain_loader =
             Swapchain::new(&rs.instance, rs.device.as_ref()).expect("Unable to load swapchain");
 
+        let (texture_image, texture_mem, texture_view, texture_sampler) =
+            rs.load_image("assets/project_peril_logo.png");
+
         let (swapchain, surface_size) = PresentState::create_swapchain(
             rs,
             &surface_loader,
@@ -1043,8 +1446,19 @@ impl PresentState {
         let present_image_views =
             PresentState::create_imageviews(rs, &surface_format, &swapchain_loader, swapchain);
         let renderpass = PresentState::create_renderpass(rs, &surface_format);
-        let (pipeline_layout, viewport, scissor, pipeline) =
-            PresentState::create_pipeline(rs, surface_size, renderpass);
+        let (descriptor_pool,
+             descriptor_set_layouts,
+             descriptor_sets,
+             pipeline_layout,
+             viewport,
+             scissor,
+             pipeline) = PresentState::create_pipeline(
+            rs,
+            surface_size,
+            renderpass,
+            texture_view,
+            texture_sampler,
+        );
         let framebuffers =
             PresentState::create_framebuffers(rs, surface_size, &present_image_views, renderpass);
         let command_buffers = PresentState::create_commandbuffers(rs, &framebuffers);
@@ -1055,23 +1469,31 @@ impl PresentState {
             surface: surface,
             surface_format: surface_format,
 
-            // Present queue
-            present_queue: present_queue,
+            // Semaphores
             image_available_sem: image_available_sem,
             rendering_finished_sem: rendering_finished_sem,
 
             swapchain_loader: swapchain_loader,
 
+            // Texture
+            texture_image: texture_image,
+            texture_mem: texture_mem,
+            texture_view: texture_view,
+            texture_sampler: texture_sampler,
+
             // Swapchain
             swapchain: swapchain,
             present_image_views: present_image_views,
             renderpass: renderpass,
-            framebuffers: framebuffers,
+            descriptor_pool: descriptor_pool,
+            descriptor_set_layouts: descriptor_set_layouts,
+            descriptor_sets: descriptor_sets,
             pipeline_layout: pipeline_layout,
             viewport: viewport,
             scissor: scissor,
             pipeline: pipeline,
-            //one commandbuffer per image
+            //one framebuffer/commandbuffer per image
+            framebuffers: framebuffers,
             commandbuffers: command_buffers,
 
             // The current idx
@@ -1097,6 +1519,15 @@ impl PresentState {
             self.device.destroy_pipeline(self.pipeline, None);
             self.device.destroy_pipeline_layout(
                 self.pipeline_layout,
+                None,
+            );
+
+            for &dset_layout in self.descriptor_set_layouts.iter() {
+                self.device.destroy_descriptor_set_layout(dset_layout, None);
+            }
+
+            self.device.destroy_descriptor_pool(
+                self.descriptor_pool,
                 None,
             );
 
@@ -1139,8 +1570,22 @@ impl PresentState {
         self.present_image_views = present_image_views;
         let renderpass = PresentState::create_renderpass(rs, &self.surface_format);
         self.renderpass = renderpass;
-        let (pipeline_layout, viewport, scissor, pipeline) =
-            PresentState::create_pipeline(rs, surface_size, renderpass);
+        let (descriptor_pool,
+             descriptor_set_layouts,
+             descriptor_sets,
+             pipeline_layout,
+             viewport,
+             scissor,
+             pipeline) = PresentState::create_pipeline(
+            rs,
+            surface_size,
+            renderpass,
+            self.texture_view,
+            self.texture_sampler,
+        );
+        self.descriptor_pool = descriptor_pool;
+        self.descriptor_set_layouts = descriptor_set_layouts;
+        self.descriptor_sets = descriptor_sets;
         self.pipeline_layout = pipeline_layout;
         self.viewport = viewport;
         self.scissor = scissor;
@@ -1223,6 +1668,15 @@ impl PresentState {
                 vk::SubpassContents::Inline,
             );
 
+            rs.device.cmd_bind_descriptor_sets(
+                cmd_buf,
+                vk::PipelineBindPoint::Graphics,
+                self.pipeline_layout,
+                0,
+                &self.descriptor_sets[..],
+                &[],
+            );
+
             // Bind pipeline
             rs.device.cmd_bind_pipeline(
                 cmd_buf,
@@ -1279,7 +1733,7 @@ impl PresentState {
         };
         unsafe {
             rs.device
-                .queue_submit(self.present_queue, &[submit_info], submit_fence)
+                .queue_submit(rs.graphics_queue, &[submit_info], submit_fence)
                 .expect("queue submit failed.");
             rs.device
                 .wait_for_fences(&[submit_fence], true, std::u64::MAX)
@@ -1299,7 +1753,7 @@ impl PresentState {
         };
         unsafe {
             self.swapchain_loader
-                .queue_present_khr(self.present_queue, &present_info)
+                .queue_present_khr(rs.graphics_queue, &present_info)
                 .unwrap();
         }
 
@@ -1318,6 +1772,11 @@ impl Drop for PresentState {
         self.cleanup_swapchain();
 
         unsafe {
+            self.device.destroy_sampler(self.texture_sampler, None);
+            self.device.destroy_image_view(self.texture_view, None);
+            self.device.destroy_image(self.texture_image, None);
+            self.device.free_memory(self.texture_mem, None);
+
             self.device.destroy_semaphore(
                 self.rendering_finished_sem,
                 None,
