@@ -41,7 +41,7 @@ impl RenderState {
     /// Lists the extensions required by the application.
     fn extension_names() -> Vec<*const i8> {
         let mut extensions = vec![Surface::name().as_ptr(), XlibSurface::name().as_ptr()];
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debug_layer")]
         {
             extensions.push(DebugReport::name().as_ptr());
         }
@@ -69,8 +69,8 @@ impl RenderState {
         // Layers
         let mut layer_names_raw: Vec<*const i8> = Vec::new();
         let requested_layers = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
-        // Only enable debug layers in debug builds
-        #[cfg(debug_assertions)]
+        // Only enable debug layers if requested
+        #[cfg(feature = "debug_layer")]
         {
             println!("Debug layers:");
             let available_layers = entry.enumerate_instance_layer_properties().unwrap();
@@ -276,7 +276,7 @@ impl RenderState {
         let instance = RenderState::create_instance(&cfg, &entry);
         let mut debug_report_loader = None;
         let mut debug_callback = None;
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debug_layer")]
         {
             let (loader, callback) = RenderState::setup_debug_callback(&entry, &instance);
             debug_report_loader = Some(loader);
@@ -711,7 +711,7 @@ impl Drop for RenderState {
 
             self.device.destroy_command_pool(self.commandpool, None);
             self.device.destroy_device(None);
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debug_layer")]
             {
                 match self.debug_report_loader {
                     Some(ref loader) => {
@@ -1395,7 +1395,7 @@ impl PresentState {
         let surface_loader =
             Surface::new(&rs.entry, &rs.instance).expect("Unable to load the Surface extension");
         let surface = PresentState::create_surface(&rs.entry, &rs.instance, &rs.window).unwrap();
-        debug_assert!(surface_loader.get_physical_device_surface_support_khr(
+        assert!(surface_loader.get_physical_device_surface_support_khr(
             rs.pdevice,
             rs.queue_family_index,
             surface,

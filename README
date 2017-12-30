@@ -12,6 +12,9 @@ $ ./target/(debug|release)/project_peril
 Compile and run!:
 $ cargo run [--release]
 
+To enable debug layer, specify --features debug_layer in the cargo build command:
+$ cargo run --release --features debug_layer
+
 Compile glsl to spv:
 Get glslangValidator from https://cvs.khronos.org/svn/repos/ogl/trunk/ecosystem/public/sdk/tools/glslang/Install/
 Add it to your PATH

@@ -3,6 +3,9 @@ name = "project_peril"
 version = "0.1.1"
 authors = ["Lars-Ivar Hesselberg Simonsen <larsivarhs@gmail.com>","Matthew Guise <reaverrikku@gmail.com>"]
 
+[features]
+debug_layer = [] # enables debug layer
+
 [dependencies]
 ash = "0.20.1"
 cgmath = "0.15.0"
