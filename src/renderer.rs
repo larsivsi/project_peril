@@ -1724,12 +1724,12 @@ impl PresentState {
             s_type: vk::StructureType::SubmitInfo,
             p_next: ptr::null(),
             wait_semaphore_count: 1,
-            p_wait_semaphores: [self.image_available_sem].as_ptr(),
-            p_wait_dst_stage_mask: [vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT].as_ptr(),
+            p_wait_semaphores: &self.image_available_sem,
+            p_wait_dst_stage_mask: &vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             command_buffer_count: 1,
             p_command_buffers: &cmd_buf,
             signal_semaphore_count: 1,
-            p_signal_semaphores: [self.rendering_finished_sem].as_ptr(),
+            p_signal_semaphores: &self.rendering_finished_sem,
         };
         unsafe {
             rs.device
