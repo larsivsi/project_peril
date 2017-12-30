@@ -19,8 +19,8 @@ pub struct RenderState {
     // Vulkan device
     entry: Entry<V1_0>,
     instance: Instance<V1_0>,
-    debug_report_loader: DebugReport,
-    debug_callback: vk::DebugReportCallbackEXT,
+    debug_report_loader: Option<DebugReport>,
+    debug_callback: Option<vk::DebugReportCallbackEXT>,
     pdevice: vk::PhysicalDevice,
     pub device: Rc<Device<V1_0>>,
     device_memory_properties: vk::PhysicalDeviceMemoryProperties,
@@ -271,8 +271,14 @@ impl RenderState {
 
         // Vulkan init
         let instance = RenderState::create_instance(&cfg, &entry);
-        let (debug_report_loader, debug_callback) =
-            RenderState::setup_debug_callback(&entry, &instance);
+        let mut debug_report_loader = None;
+        let mut debug_callback = None;
+        #[cfg(debug_assertions)]
+        {
+            let (loader, callback) = RenderState::setup_debug_callback(&entry, &instance);
+            debug_report_loader = Some(loader);
+            debug_callback = Some(callback);
+        }
         let (pdevice, queue_family_index) = RenderState::pick_physical_device(&instance);
         let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
         let device = RenderState::create_logical_device(&instance, pdevice, queue_family_index);
@@ -409,10 +415,20 @@ impl Drop for RenderState {
 
             self.device.destroy_command_pool(self.commandpool, None);
             self.device.destroy_device(None);
-            self.debug_report_loader.destroy_debug_report_callback_ext(
-                self.debug_callback,
-                None,
-            );
+            #[cfg(debug_assertions)]
+            {
+                match self.debug_report_loader {
+                    Some(ref loader) => {
+                        match self.debug_callback {
+                            Some(callback) => {
+                                loader.destroy_debug_report_callback_ext(callback, None)
+                            }
+                            None => panic!("Debug callback is None!"),
+                        }
+                    }
+                    None => panic!("Debug report loader is None!"),
+                }
+            }
             self.instance.destroy_instance(None);
         }
     }
