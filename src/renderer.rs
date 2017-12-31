@@ -10,6 +10,7 @@ use std;
 use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::prelude::*;
+use std::mem::{align_of, size_of};
 use std::path::Path;
 use std::ptr;
 use std::rc::Rc;
@@ -334,6 +335,7 @@ impl RenderState {
         panic!("Cannot find memory type!");
     }
 
+    /// Begins a commandbuffer that can be used for small GPU operations.
     fn begin_single_time_commands(&self) -> vk::CommandBuffer {
         let cmd_buf_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::CommandBufferAllocateInfo,
@@ -366,6 +368,9 @@ impl RenderState {
         cmd_buf
     }
 
+    /// Ends the small GPU operation commandbuffer and sends the commands to the GPU.
+    ///
+    /// * `cmd_buf`  The command buffer returned from begin_single_time_commands.
     fn end_single_time_commands(&self, cmd_buf: vk::CommandBuffer) {
         unsafe {
             self.device.end_command_buffer(cmd_buf).expect(
@@ -400,20 +405,25 @@ impl RenderState {
 
     /// Creates a vk::Buffer based on the requirements.
     ///
-    /// * `size`        The size of the resulting buffer.
-    /// * `usage`       Usage bits for the resulting buffer.
-    /// * `properties`  Memory properties required for the buffer.
-    pub fn create_buffer(
+    /// * `usage`           Usage bits for the resulting buffer.
+    /// * `properties`      Memory properties required for the buffer.
+    /// * `upload_data`     Pointer to an array of data to fill the buffer with.
+    /// * `optimal_layout`  Whether the resulting buffer should have GPU optimal layout or not.
+    pub fn create_buffer<T: Copy>(
         &self,
-        size: vk::DeviceSize,
         usage: vk::BufferUsageFlags,
         properties: vk::MemoryPropertyFlags,
+        upload_data: &[T],
+        _optimal_layout: bool,
     ) -> (vk::Buffer, vk::DeviceMemory) {
+
+        let buffersize: vk::DeviceSize = (size_of::<T>() * upload_data.len()) as u64;
+
         let bufferinfo = vk::BufferCreateInfo {
             s_type: vk::StructureType::BufferCreateInfo,
             p_next: ptr::null(),
             flags: vk::BufferCreateFlags::empty(),
-            size: size,
+            size: buffersize,
             usage: usage,
             sharing_mode: vk::SharingMode::Exclusive,
             queue_family_index_count: 0,
@@ -442,6 +452,15 @@ impl RenderState {
             self.device.bind_buffer_memory(buffer, memory, 0).expect(
                 "Failed to bind memory",
             );
+        }
+
+        unsafe {
+            let mem_ptr = self.device
+                .map_memory(memory, 0, buffersize, vk::MemoryMapFlags::empty())
+                .expect("Failed to map index memory");
+            let mut mem_align = Align::new(mem_ptr, align_of::<T>() as u64, buffersize);
+            mem_align.copy_from_slice(upload_data);
+            self.device.unmap_memory(memory);
         }
 
         (buffer, memory)
@@ -743,22 +762,13 @@ impl RenderState {
             };
         }
         let image_data = image.into_raw();
-        let buffersize: vk::DeviceSize = (std::mem::size_of::<u8>() * image_data.len()) as u64;
         let (image_buffer, image_memory) = self.create_buffer(
-            buffersize,
             vk::BUFFER_USAGE_TRANSFER_SRC_BIT,
             vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &image_data,
+            false,
         );
-        unsafe {
-            let image_ptr = self.device
-                .map_memory(image_memory, 0, buffersize, vk::MemoryMapFlags::empty())
-                .expect("Failed to map index memory");
-            let mut image_slice =
-                Align::new(image_ptr, std::mem::align_of::<u8>() as u64, buffersize);
-            image_slice.copy_from_slice(&image_data);
-            self.device.unmap_memory(image_memory);
-        }
 
         // Create a texture from the buffer data
         let (texture_image, texture_mem, texture_view, texture_sampler) = self.create_texture(
