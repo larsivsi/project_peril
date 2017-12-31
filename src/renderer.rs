@@ -405,20 +405,15 @@ impl RenderState {
 
     /// Creates a vk::Buffer based on the requirements.
     ///
-    /// * `usage`           Usage bits for the resulting buffer.
-    /// * `properties`      Memory properties required for the buffer.
-    /// * `upload_data`     Pointer to an array of data to fill the buffer with.
-    /// * `optimal_layout`  Whether the resulting buffer should have GPU optimal layout or not.
-    pub fn create_buffer<T: Copy>(
+    /// * `usage`       Usage bits for the resulting buffer.
+    /// * `properties`  Memory properties required for the buffer.
+    /// * `buffersize`  Size of the resulting buffer.
+    fn create_buffer(
         &self,
         usage: vk::BufferUsageFlags,
         properties: vk::MemoryPropertyFlags,
-        upload_data: &[T],
-        _optimal_layout: bool,
+        buffersize: vk::DeviceSize,
     ) -> (vk::Buffer, vk::DeviceMemory) {
-
-        let buffersize: vk::DeviceSize = (size_of::<T>() * upload_data.len()) as u64;
-
         let bufferinfo = vk::BufferCreateInfo {
             s_type: vk::StructureType::BufferCreateInfo,
             p_next: ptr::null(),
@@ -429,6 +424,7 @@ impl RenderState {
             queue_family_index_count: 0,
             p_queue_family_indices: ptr::null(),
         };
+
         let buffer;
         unsafe {
             buffer = self.device.create_buffer(&bufferinfo, None).expect(
@@ -454,6 +450,56 @@ impl RenderState {
             );
         }
 
+        (buffer, memory)
+    }
+
+    /// Creates a vk::Buffer based on the requirements and fills it with the passed data.
+    ///
+    /// * `usage`           Usage bits for the resulting buffer.
+    /// * `properties`      Memory properties required for the buffer.
+    /// * `upload_data`     Pointer to an array of data to fill the buffer with.
+    /// * `optimal_layout`  Whether the resulting buffer should have GPU optimal layout or not.
+    pub fn create_buffer_and_upload<T: Copy>(
+        &self,
+        usage: vk::BufferUsageFlags,
+        properties: vk::MemoryPropertyFlags,
+        upload_data: &[T],
+        optimal_layout: bool,
+    ) -> (vk::Buffer, vk::DeviceMemory) {
+        let mut buffer;
+        let mut memory;
+        let buffersize: vk::DeviceSize = (size_of::<T>() * upload_data.len()) as u64;
+
+        // Create a temporary staging buffer
+        if optimal_layout {
+            debug_assert!(
+                (properties & vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ==
+                    vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            );
+
+            let (buf, mem) = self.create_buffer(
+                vk::BUFFER_USAGE_TRANSFER_SRC_BIT,
+                vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                    vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                buffersize,
+            );
+            buffer = buf;
+            memory = mem;
+        // Create the actual buffer
+        } else {
+            debug_assert!(
+                (properties &
+                     (vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                          vk::MEMORY_PROPERTY_HOST_COHERENT_BIT)) ==
+                    (vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk::MEMORY_PROPERTY_HOST_COHERENT_BIT)
+            );
+
+            let (buf, mem) = self.create_buffer(usage, properties, buffersize);
+            buffer = buf;
+            memory = mem;
+        }
+
+        // Upload data to the buffer we just created
         unsafe {
             let mem_ptr = self.device
                 .map_memory(memory, 0, buffersize, vk::MemoryMapFlags::empty())
@@ -461,6 +507,45 @@ impl RenderState {
             let mut mem_align = Align::new(mem_ptr, align_of::<T>() as u64, buffersize);
             mem_align.copy_from_slice(upload_data);
             self.device.unmap_memory(memory);
+        }
+
+        // For optimal buffers: create a new buffer with the optimal layout and copy the staging
+        // buffer into it
+        if optimal_layout {
+            let staging_buffer = buffer;
+            let staging_memory = memory;
+
+            // Create final buffer
+            let (buf, mem) = self.create_buffer(
+                vk::BUFFER_USAGE_TRANSFER_DST_BIT | usage,
+                properties,
+                buffersize,
+            );
+            buffer = buf;
+            memory = mem;
+
+            // Copy contents
+            let cmd_buf = self.begin_single_time_commands();
+            let buffer_copy_region = vk::BufferCopy {
+                size: buffersize,
+                src_offset: 0,
+                dst_offset: 0,
+            };
+            unsafe {
+                self.device.cmd_copy_buffer(
+                    cmd_buf,
+                    staging_buffer,
+                    buffer,
+                    &[buffer_copy_region],
+                );
+            }
+            self.end_single_time_commands(cmd_buf);
+
+            // Free staging buffer
+            unsafe {
+                self.device.destroy_buffer(staging_buffer, None);
+                self.device.free_memory(staging_memory, None);
+            }
         }
 
         (buffer, memory)
@@ -762,7 +847,7 @@ impl RenderState {
             };
         }
         let image_data = image.into_raw();
-        let (image_buffer, image_memory) = self.create_buffer(
+        let (image_buffer, image_memory) = self.create_buffer_and_upload(
             vk::BUFFER_USAGE_TRANSFER_SRC_BIT,
             vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,

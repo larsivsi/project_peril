@@ -77,21 +77,19 @@ impl DrawObject {
         let indices = [0u16, 1, 3, 0, 3, 2];
 
         // Create buffer for vertices
-        let (vert_buffer, vert_mem) = rs.create_buffer(
+        let (vert_buffer, vert_mem) = rs.create_buffer_and_upload(
             vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             &vertices,
-            false,
+            true,
         );
 
         // Create buffer for indices
-        let (idx_buffer, idx_mem) = rs.create_buffer(
+        let (idx_buffer, idx_mem) = rs.create_buffer_and_upload(
             vk::BUFFER_USAGE_INDEX_BUFFER_BIT,
-            vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             &indices,
-            false,
+            true,
         );
 
         DrawObject {
