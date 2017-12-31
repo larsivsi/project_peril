@@ -471,49 +471,44 @@ impl RenderState {
         shader_module
     }
 
-    fn load_image(&self, path: &str) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
-        // Load the image data into a vk::Buffer
-        let image = image::open(path).unwrap().to_rgba();
-        let image_extent;
-        {
-            let image_dims = image.dimensions();
-            image_extent = vk::Extent3D {
-                width: image_dims.0,
-                height: image_dims.1,
-                depth: 1,
-            };
-        }
-        let image_data = image.into_raw();
-        let buffersize: vk::DeviceSize = (std::mem::size_of::<u8>() * image_data.len()) as u64;
-        let (image_buffer, image_memory) = self.create_buffer(
-            buffersize,
-            vk::BUFFER_USAGE_TRANSFER_SRC_BIT,
-            vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        );
-        unsafe {
-            let image_ptr = self.device
-                .map_memory(image_memory, 0, buffersize, vk::MemoryMapFlags::empty())
-                .expect("Failed to map index memory");
-            let mut image_slice =
-                Align::new(image_ptr, std::mem::align_of::<u8>() as u64, buffersize);
-            image_slice.copy_from_slice(&image_data);
-            self.device.unmap_memory(image_memory);
+    /// Creates a texture, view and sampler based on the passed options.
+    ///
+    /// A vk::Buffer can optionally be passed to fill the texture with initial data.
+    ///
+    /// * `texture_dimensions`  The size of the texture.
+    /// * `texture_type`        The type of the texture.
+    /// * `texture_view_type`   The type of the image view for the texture.
+    /// * `texture_format`      The format of the texture
+    /// * `texture_usage`       How the texture will be used.
+    /// * `texture_layout`      The final layout for the texture.
+    /// * `upload_buffer`       Optional: Buffer containing the initial values for the texture.
+    fn create_texture(
+        &self,
+        texture_dimensions: vk::Extent3D,
+        texture_type: vk::ImageType,
+        texture_view_type: vk::ImageViewType,
+        texture_format: vk::Format,
+        mut texture_usage: vk::ImageUsageFlags,
+        texture_layout: vk::ImageLayout,
+        upload_buffer: Option<vk::Buffer>,
+    ) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
+        // In case we need to upload to the texture, mark it for transfer dst
+        if upload_buffer.is_some() {
+            texture_usage |= vk::IMAGE_USAGE_TRANSFER_DST_BIT;
         }
 
-        // Create a texture
         let texture_create_info = vk::ImageCreateInfo {
             s_type: vk::StructureType::ImageCreateInfo,
             p_next: ptr::null(),
             flags: Default::default(),
-            image_type: vk::ImageType::Type2d,
-            format: vk::Format::R8g8b8a8Unorm,
-            extent: image_extent,
+            image_type: texture_type,
+            format: texture_format,
+            extent: texture_dimensions,
             mip_levels: 1,
             array_layers: 1,
             samples: vk::SAMPLE_COUNT_1_BIT,
             tiling: vk::ImageTiling::Optimal,
-            usage: vk::IMAGE_USAGE_TRANSFER_DST_BIT | vk::IMAGE_USAGE_SAMPLED_BIT,
+            usage: texture_usage,
             sharing_mode: vk::SharingMode::Exclusive,
             queue_family_index_count: 0,
             p_queue_family_indices: ptr::null(),
@@ -525,6 +520,7 @@ impl RenderState {
                 .create_image(&texture_create_info, None)
                 .unwrap();
         }
+
         let texture_memory_req = self.device.get_image_memory_requirements(texture_image);
         let texture_allocate_info = vk::MemoryAllocateInfo {
             s_type: vk::StructureType::MemoryAllocateInfo,
@@ -545,104 +541,138 @@ impl RenderState {
                 .expect("Failed to bind memory");
         }
 
-        // Transition image layout from UNDEFINED to DST_OPTIMAL
+        // Transition the Image and potentially upload
         let cmd_buf = self.begin_single_time_commands();
-        let texture_barrier = vk::ImageMemoryBarrier {
-            s_type: vk::StructureType::ImageMemoryBarrier,
-            p_next: ptr::null(),
-            src_access_mask: Default::default(),
-            dst_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
-            old_layout: vk::ImageLayout::Undefined,
-            new_layout: vk::ImageLayout::TransferDstOptimal,
-            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            image: texture_image,
-            subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-        };
-        unsafe {
-            self.device.cmd_pipeline_barrier(
-                cmd_buf,
-                vk::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                vk::PIPELINE_STAGE_TRANSFER_BIT,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &[texture_barrier],
-            );
-        }
-        // Copy buffer data to image
-        let buffer_copy_region = vk::BufferImageCopy {
-            buffer_offset: 0,
-            buffer_row_length: 0,
-            buffer_image_height: 0,
-            image_subresource: vk::ImageSubresourceLayers {
-                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
-                mip_level: 0,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-            image_extent: image_extent,
-            image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
-        };
-        unsafe {
-            self.device.cmd_copy_buffer_to_image(
-                cmd_buf,
-                image_buffer,
-                texture_image,
-                vk::ImageLayout::TransferDstOptimal,
-                &[buffer_copy_region],
-            );
-        }
-        // Transition image layout from DST_OPTIMAL to SHADER_READ_ONLY_OPTIMAL
-        let texture_barrier = vk::ImageMemoryBarrier {
-            s_type: vk::StructureType::ImageMemoryBarrier,
-            p_next: ptr::null(),
-            src_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
-            dst_access_mask: vk::ACCESS_SHADER_READ_BIT,
-            old_layout: vk::ImageLayout::TransferDstOptimal,
-            new_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
-            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            image: texture_image,
-            subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-        };
-        unsafe {
-            self.device.cmd_pipeline_barrier(
-                cmd_buf,
-                vk::PIPELINE_STAGE_TRANSFER_BIT,
-                vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &[texture_barrier],
-            );
+        match upload_buffer {
+            // In case we need to upload some texture data
+            Some(image_upload_buffer) => {
+                // First transition the Image to TransferDstOptimal
+                let texture_barrier = vk::ImageMemoryBarrier {
+                    s_type: vk::StructureType::ImageMemoryBarrier,
+                    p_next: ptr::null(),
+                    src_access_mask: Default::default(),
+                    dst_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
+                    old_layout: vk::ImageLayout::Undefined,
+                    new_layout: vk::ImageLayout::TransferDstOptimal,
+                    src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+                    dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+                    image: texture_image,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                };
+                unsafe {
+                    self.device.cmd_pipeline_barrier(
+                        cmd_buf,
+                        vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        vk::PIPELINE_STAGE_TRANSFER_BIT,
+                        vk::DependencyFlags::empty(),
+                        &[],
+                        &[],
+                        &[texture_barrier],
+                    );
+                }
+                // Copy buffer data to image
+                let buffer_copy_region = vk::BufferImageCopy {
+                    buffer_offset: 0,
+                    buffer_row_length: 0,
+                    buffer_image_height: 0,
+                    image_subresource: vk::ImageSubresourceLayers {
+                        aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                        mip_level: 0,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    image_extent: texture_dimensions,
+                    image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
+                };
+                unsafe {
+                    self.device.cmd_copy_buffer_to_image(
+                        cmd_buf,
+                        image_upload_buffer,
+                        texture_image,
+                        vk::ImageLayout::TransferDstOptimal,
+                        &[buffer_copy_region],
+                    );
+                }
+                // Finally transition the Image to the correct layout
+                let texture_barrier = vk::ImageMemoryBarrier {
+                    s_type: vk::StructureType::ImageMemoryBarrier,
+                    p_next: ptr::null(),
+                    src_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
+                    dst_access_mask: vk::ACCESS_SHADER_READ_BIT,
+                    old_layout: vk::ImageLayout::TransferDstOptimal,
+                    new_layout: texture_layout,
+                    src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+                    dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+                    image: texture_image,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                };
+                unsafe {
+                    self.device.cmd_pipeline_barrier(
+                        cmd_buf,
+                        vk::PIPELINE_STAGE_TRANSFER_BIT,
+                        vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                        vk::DependencyFlags::empty(),
+                        &[],
+                        &[],
+                        &[texture_barrier],
+                    );
+                }
+
+            }
+            // Else, just transition the Image
+            _ => {
+                let texture_barrier = vk::ImageMemoryBarrier {
+                    s_type: vk::StructureType::ImageMemoryBarrier,
+                    p_next: ptr::null(),
+                    src_access_mask: Default::default(),
+                    dst_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
+                    old_layout: vk::ImageLayout::Undefined,
+                    new_layout: texture_layout,
+                    src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+                    dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+                    image: texture_image,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                };
+                unsafe {
+                    self.device.cmd_pipeline_barrier(
+                        cmd_buf,
+                        vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                        vk::DependencyFlags::empty(),
+                        &[],
+                        &[],
+                        &[texture_barrier],
+                    );
+                }
+
+            }
         }
         self.end_single_time_commands(cmd_buf);
-
-        // Texture now holds the data, can delete image buffer and memory
-        unsafe {
-            self.device.destroy_buffer(image_buffer, None);
-            self.device.free_memory(image_memory, None);
-        }
 
         // Create texture image view
         let tex_image_view_info = vk::ImageViewCreateInfo {
             s_type: vk::StructureType::ImageViewCreateInfo,
             p_next: ptr::null(),
             flags: Default::default(),
-            view_type: vk::ImageViewType::Type2d,
+            view_type: texture_view_type,
             format: texture_create_info.format,
             components: vk::ComponentMapping {
                 r: vk::ComponentSwizzle::R,
@@ -693,6 +723,61 @@ impl RenderState {
         }
 
         (texture_image, texture_memory, texture_view, sampler)
+    }
+
+    /// Loads the image given by the path into read only texture.
+    ///
+    /// Note: The caller is responsible for cleaning up the returned vulkan types.
+    ///
+    /// * `path`  Path to the image.
+    fn load_image(&self, path: &str) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
+        // Load the image data into a vk::Buffer
+        let image = image::open(path).unwrap().to_rgba();
+        let image_extent;
+        {
+            let image_dims = image.dimensions();
+            image_extent = vk::Extent3D {
+                width: image_dims.0,
+                height: image_dims.1,
+                depth: 1,
+            };
+        }
+        let image_data = image.into_raw();
+        let buffersize: vk::DeviceSize = (std::mem::size_of::<u8>() * image_data.len()) as u64;
+        let (image_buffer, image_memory) = self.create_buffer(
+            buffersize,
+            vk::BUFFER_USAGE_TRANSFER_SRC_BIT,
+            vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        );
+        unsafe {
+            let image_ptr = self.device
+                .map_memory(image_memory, 0, buffersize, vk::MemoryMapFlags::empty())
+                .expect("Failed to map index memory");
+            let mut image_slice =
+                Align::new(image_ptr, std::mem::align_of::<u8>() as u64, buffersize);
+            image_slice.copy_from_slice(&image_data);
+            self.device.unmap_memory(image_memory);
+        }
+
+        // Create a texture from the buffer data
+        let (texture_image, texture_mem, texture_view, texture_sampler) = self.create_texture(
+            image_extent,
+            vk::ImageType::Type2d,
+            vk::ImageViewType::Type2d,
+            vk::Format::R8g8b8a8Unorm,
+            vk::IMAGE_USAGE_SAMPLED_BIT,
+            vk::ImageLayout::ShaderReadOnlyOptimal,
+            Some(image_buffer),
+        );
+
+        // Texture now holds the data, can delete image buffer and memory
+        unsafe {
+            self.device.destroy_buffer(image_buffer, None);
+            self.device.free_memory(image_memory, None);
+        }
+
+        (texture_image, texture_mem, texture_view, texture_sampler)
     }
 }
 
