@@ -10,6 +10,7 @@ mod nurbs;
 mod object;
 mod renderer;
 mod scene;
+mod logger;
 
 use ash::version::DeviceV1_0;
 use cgmath::Point3;
@@ -20,7 +21,11 @@ use renderer::{PresentState, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 
+use logger::{Logger, LogLevel};
+
 fn main() {
+    let logger = Logger::init(LogLevel::Trace);
+    logger.print("This is a message");
     // init stuff
     let cfg = Config::read_config("options.cfg");
 
