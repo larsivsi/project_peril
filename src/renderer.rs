@@ -1969,3 +1969,110 @@ impl Drop for PresentState {
         }
     }
 }
+
+pub struct MainRenderPass {
+    renderpass: vk::RenderPass,
+    descriptor_pool: vk::DescriptorPool,
+    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
+    descriptor_sets: Vec<vk::DescriptorSet>,
+    pipeline_layout: vk::PipelineLayout,
+    viewport: vk::Viewport,
+    scissor: vk::Rect2D,
+    pipeline: vk::Pipeline,
+    //one framebuffer/commandbuffer per image
+    framebuffers: Vec<vk::Framebuffer>,
+    commandbuffers: Vec<vk::CommandBuffer>,
+
+    // Keep a pointer to the device for cleanup
+    device: Rc<Device<V1_0>>,
+}
+
+impl MainRenderPass{
+    pub fn begin_frame(&mut self, rs: &RenderState) -> Option<vk::CommandBuffer> {
+        let result;
+        unsafe {
+            result = self.swapchain_loader.acquire_next_image_khr(
+                self.swapchain,
+                std::u64::MAX,
+                self.image_available_sem,
+                vk::Fence::null(),
+            );
+        }
+
+        match result {
+            Ok(idx) => {
+                self.current_present_idx = idx as usize;
+            }
+            Err(vkres) => {
+                if vkres == vk::Result::ErrorOutOfDateKhr {
+                    self.recreate_swapchain(rs);
+                    return None;
+                }
+            }
+        }
+
+        // Begin commandbuffer
+        let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
+            s_type: vk::StructureType::CommandBufferBeginInfo,
+            p_next: ptr::null(),
+            p_inheritance_info: ptr::null(),
+            flags: vk::COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+        };
+        let cmd_buf = self.commandbuffers[self.current_present_idx];
+        unsafe {
+            rs.device
+                .begin_command_buffer(cmd_buf, &cmd_buf_begin_info)
+                .expect("Begin commandbuffer");
+        }
+
+        // Begin renderpass
+        let clear_values =
+            [
+                vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 0.0, 0.0, 1.0])),
+            ];
+
+        let render_pass_begin_info = vk::RenderPassBeginInfo {
+            s_type: vk::StructureType::RenderPassBeginInfo,
+            p_next: ptr::null(),
+            render_pass: self.renderpass,
+            framebuffer: self.framebuffers[self.current_present_idx],
+            render_area: self.scissor,
+            clear_value_count: clear_values.len() as u32,
+            p_clear_values: clear_values.as_ptr(),
+        };
+        unsafe {
+            // Start the render pass
+            rs.device.cmd_begin_render_pass(
+                cmd_buf,
+                &render_pass_begin_info,
+                vk::SubpassContents::Inline,
+            );
+
+            rs.device.cmd_bind_descriptor_sets(
+                cmd_buf,
+                vk::PipelineBindPoint::Graphics,
+                self.pipeline_layout,
+                0,
+                &self.descriptor_sets[..],
+                &[],
+            );
+
+            // Bind pipeline
+            rs.device.cmd_bind_pipeline(
+                cmd_buf,
+                vk::PipelineBindPoint::Graphics,
+                self.pipeline,
+            );
+
+            rs.device.cmd_set_viewport(cmd_buf, &[self.viewport]);
+            rs.device.cmd_set_scissor(cmd_buf, &[self.scissor]);
+        }
+
+        Some(cmd_buf)
+    }
+
+}
+
+impl Drop for MainRenderPass{
+    fn drop(&mut self){}
+}

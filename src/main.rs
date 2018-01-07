@@ -72,6 +72,8 @@ fn main() {
             elapsed_time += delta_time;
         }
 
+        //Main RenderPass goes here
+
         //call to render function goes here
         let cmd_buf;
         let res = presentstate.begin_frame(&renderstate);
