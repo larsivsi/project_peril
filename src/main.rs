@@ -24,8 +24,15 @@ use std::time::{Duration, SystemTime};
 use logger::{Logger, LogLevel};
 
 fn main() {
-    let logger = Logger::init(LogLevel::Trace);
-    logger.print("This is a message");
+    let mut logger = Logger::init("MainLogger", LogLevel::Info);
+    logger.set_log_level(LogLevel::Info);
+    #[cfg(feature = "debug_layer")]
+    {
+        logger.set_log_level(LogLevel::Debug);
+    }
+
+    logger.debug("Run main");
+    
     // init stuff
     let cfg = Config::read_config("options.cfg");
 
@@ -116,4 +123,5 @@ fn main() {
     }
 
     //cleanup
+    logger.debug("Cleanup");
 }
