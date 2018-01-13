@@ -1,5 +1,5 @@
 use cgmath::prelude::*;
-use cgmath::{Point3, Vector3};
+use cgmath::{Point3, Vector3, Matrix4};
 use object::Position;
 
 pub struct Camera {
@@ -24,19 +24,7 @@ impl Camera {
         self.up = self.right.cross(self.front);
         self.up.normalize();
     }
-}
 
-impl Position for Camera {
-    fn get_position(&self) -> Point3<f64> {
-        self.position
-    }
-
-    fn set_position(&mut self, position: Point3<f64>) {
-        self.position = position;
-    }
-}
-
-impl Camera {
     /// Creates a new Camera struct
     ///
     /// * `position`  Initial position for the camera.
@@ -68,5 +56,19 @@ impl Camera {
         };
         camera.update();
         camera
+    }
+
+    pub fn generate_view_matrix(&self) -> Matrix4<f64> {
+        Matrix4::look_at_dir(self.position, self.front, self.up)
+    }
+}
+
+impl Position for Camera {
+    fn get_position(&self) -> Point3<f64> {
+        self.position
+    }
+
+    fn set_position(&mut self, position: Point3<f64>) {
+        self.position = position;
     }
 }

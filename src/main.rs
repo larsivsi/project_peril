@@ -27,7 +27,8 @@ fn main() {
     let mut renderstate = RenderState::init(&cfg);
     let mut presentstate = PresentState::init(&renderstate);
     let _scene = Scene::new(&renderstate);
-    let _camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
+    let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
+    let _view_matrix = camera.generate_view_matrix();
 
     let points = vec![
         Point3::new(1.0, 0.0, 0.0),
