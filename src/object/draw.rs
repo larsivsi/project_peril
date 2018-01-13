@@ -7,6 +7,7 @@ use renderer::RenderState;
 use std::rc::Rc;
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)] //not going to change vertices after creation
 struct Vertex {
     pos: [f32; 4],
     normal: [f32; 4],

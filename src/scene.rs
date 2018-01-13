@@ -17,6 +17,7 @@ impl Scene {
         scene
     }
 
+    #[allow(dead_code)] //will be utilized in the future
     pub fn draw(&self) {
         for object in self.objects.iter() {
             object.draw();

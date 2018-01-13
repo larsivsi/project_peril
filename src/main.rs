@@ -26,7 +26,7 @@ fn main() {
 
     let mut renderstate = RenderState::init(&cfg);
     let mut presentstate = PresentState::init(&renderstate);
-    let scene = Scene::new(&renderstate);
+    let _scene = Scene::new(&renderstate);
     let _camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
 
     let points = vec![
@@ -45,7 +45,7 @@ fn main() {
     let spline = NURBSpline::new(Order::CUBIC, points);
 
     while u < spline.eval_limit() {
-        let point = spline.evaluate_at(u);
+        let _point = spline.evaluate_at(u);
         u += step;
     }
 
