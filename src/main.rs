@@ -16,7 +16,7 @@ use cgmath::Point3;
 use config::Config;
 use nurbs::{Order, NURBSpline};
 use object::Camera;
-use renderer::{PresentState, RenderState};
+use renderer::{PresentState, RenderState, MainRenderPass};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 
@@ -25,7 +25,8 @@ fn main() {
     let cfg = Config::read_config("options.cfg");
 
     let mut renderstate = RenderState::init(&cfg);
-    let mut presentstate = PresentState::init(&renderstate);
+    let mut mainrender = MainRenderPass::init(&renderstate);
+    let mut presentstate = PresentState::init(&renderstate, &mainrender);
     let scene = Scene::new(&renderstate);
     let _camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
 
@@ -73,10 +74,23 @@ fn main() {
         }
 
         //Main RenderPass goes here
+        let main_cmd_buf;
+        let res_main = mainrender.begin_frame(&renderstate);
+        match res_main {
+            Some(buf) => {
+                main_cmd_buf = buf;
+            }
+            None => {
+                // Swapchain was outdated, but now one was created.
+                // Skip this frame.
+                continue;
+            }
+        }
+        mainrender.end_frame_and_present(&renderstate);
 
         //call to render function goes here
         let cmd_buf;
-        let res = presentstate.begin_frame(&renderstate);
+        let res = presentstate.begin_frame(&renderstate, &mainrender);
         match res {
             Some(buf) => {
                 cmd_buf = buf;

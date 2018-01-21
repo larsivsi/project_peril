@@ -923,10 +923,10 @@ pub struct PresentState {
     swapchain_loader: Swapchain,
 
     // Texture
-    texture_image: vk::Image,
-    texture_mem: vk::DeviceMemory,
-    texture_view: vk::ImageView,
-    texture_sampler: vk::Sampler,
+    //texture_image: vk::Image,
+    //texture_mem: vk::DeviceMemory,
+    //texture_view: vk::ImageView,
+    //texture_sampler: vk::Sampler,
 
     // Swapchain
     swapchain: vk::SwapchainKHR,
@@ -1570,7 +1570,7 @@ impl PresentState {
     /// This will set up the swapchain, renderpass, etc.
     ///
     /// * `rs`  The RenderState.
-    pub fn init(rs: &RenderState) -> PresentState {
+    pub fn init(rs: &RenderState, mainrender: &MainRenderPass) -> PresentState {
         // Surface
         let surface_loader =
             Surface::new(&rs.entry, &rs.instance).expect("Unable to load the Surface extension");
@@ -1612,9 +1612,6 @@ impl PresentState {
         let swapchain_loader =
             Swapchain::new(&rs.instance, rs.device.as_ref()).expect("Unable to load swapchain");
 
-        let (texture_image, texture_mem, texture_view, texture_sampler) =
-            rs.load_image("assets/project_peril_logo.png");
-
         let (swapchain, surface_size) = PresentState::create_swapchain(
             rs,
             &surface_loader,
@@ -1636,8 +1633,8 @@ impl PresentState {
             rs,
             surface_size,
             renderpass,
-            texture_view,
-            texture_sampler,
+            mainrender.render_image_view,
+            mainrender.render_sampler,
         );
         let framebuffers =
             PresentState::create_framebuffers(rs, surface_size, &present_image_views, renderpass);
@@ -1656,10 +1653,10 @@ impl PresentState {
             swapchain_loader: swapchain_loader,
 
             // Texture
-            texture_image: texture_image,
-            texture_mem: texture_mem,
-            texture_view: texture_view,
-            texture_sampler: texture_sampler,
+            //texture_image: texture_image,
+            //texture_mem: texture_mem,
+            //texture_view: texture_view,
+            //texture_sampler: texture_sampler,
 
             // Swapchain
             swapchain: swapchain,
@@ -1729,7 +1726,7 @@ impl PresentState {
     /// This function should be called when the presentable surface is resized, etc.
     ///
     /// * `rs`  The RenderState.
-    fn recreate_swapchain(&mut self, rs: &RenderState) {
+    fn recreate_swapchain(&mut self, rs: &RenderState, mr: &MainRenderPass) {
         self.cleanup_swapchain();
 
         let (swapchain, surface_size) = PresentState::create_swapchain(
@@ -1760,8 +1757,8 @@ impl PresentState {
             rs,
             surface_size,
             renderpass,
-            self.texture_view,
-            self.texture_sampler,
+            mr.render_image_view,
+            mr.render_sampler,
         );
         self.descriptor_pool = descriptor_pool;
         self.descriptor_set_layouts = descriptor_set_layouts;
@@ -1788,7 +1785,7 @@ impl PresentState {
     /// None, meaning that the current frame should be skipped.
     ///
     /// * `rs`  The RenderState.
-    pub fn begin_frame(&mut self, rs: &RenderState) -> Option<vk::CommandBuffer> {
+    pub fn begin_frame(&mut self, rs: &RenderState, mr: &MainRenderPass) -> Option<vk::CommandBuffer> {
         let result;
         unsafe {
             result = self.swapchain_loader.acquire_next_image_khr(
@@ -1805,7 +1802,7 @@ impl PresentState {
             }
             Err(vkres) => {
                 if vkres == vk::Result::ErrorOutOfDateKhr {
-                    self.recreate_swapchain(rs);
+                    self.recreate_swapchain(rs, mr);
                     return None;
                 }
             }
@@ -1958,10 +1955,6 @@ impl Drop for PresentState {
         self.cleanup_swapchain();
 
         unsafe {
-            self.device.destroy_sampler(self.texture_sampler, None);
-            self.device.destroy_image_view(self.texture_view, None);
-            self.device.destroy_image(self.texture_image, None);
-            self.device.free_memory(self.texture_mem, None);
 
             self.device.destroy_semaphore(
                 self.rendering_finished_sem,
@@ -1992,6 +1985,8 @@ pub struct MainRenderPass {
     //ImageView to render to.
     render_image: vk::Image,
     render_image_view: vk::ImageView,
+    render_mem: vk::DeviceMemory,
+    render_sampler: vk::Sampler,
 
     // Keep a pointer to the device for cleanup
     device: Rc<Device<V1_0>>,
@@ -1999,19 +1994,28 @@ pub struct MainRenderPass {
 
 impl MainRenderPass{
 
-    fn create_renderimages(rs: &RenderState, surface_size: vk::Rect2D)
-        -> (vk::Image, vk::ImageView){
+    fn create_renderimages(rs: &RenderState)
+        -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler){
+        let image_extent;
+        {
+            let image_dims = (100, 100);
+            image_extent = vk::Extent3D {
+                width: image_dims.0,
+                height: image_dims.1,
+                depth: 1,
+            };
+        }
         let (image, image_mem, image_view, image_sampler) = rs.create_texture(
-            surface_size.extent,
+            image_extent,
             vk::ImageType::Type2d,
             vk::ImageViewType::Type2d,
             vk::Format::R8g8b8a8Unorm,
-            vk::IMAGE_USAGE_SAMPLED_BIT,
-            vk::ImageLayout::ShaderReadOnlyOptimal,
+            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            vk::ImageLayout::ColorAttachmentOptimal,
             None,
         );
 
-        (image, image_view)
+        (image, image_mem, image_view, image_sampler)
     }
 
     /// Creates a main renderpass.
@@ -2400,34 +2404,30 @@ impl MainRenderPass{
     fn create_framebuffer(
         rs: &RenderState,
         surface_size: vk::Rect2D,
-        present_image_views: &Vec<vk::ImageView>,
+        image_view: vk::ImageView,
         renderpass: vk::RenderPass,
     ) -> Vec<vk::Framebuffer> {
-        let framebuffers: Vec<vk::Framebuffer> = present_image_views
-            .iter()
-            .map(|&present_image_view| {
-                let framebuffer_attachments = [present_image_view];
-                let frame_buffer_create_info = vk::FramebufferCreateInfo {
-                    s_type: vk::StructureType::FramebufferCreateInfo,
-                    p_next: ptr::null(),
-                    flags: Default::default(),
-                    render_pass: renderpass,
-                    attachment_count: framebuffer_attachments.len() as u32,
-                    p_attachments: framebuffer_attachments.as_ptr(),
-                    width: surface_size.extent.width,
-                    height: surface_size.extent.height,
-                    layers: 1,
-                };
-                let framebuffer;
-                unsafe {
-                    framebuffer = rs.device
-                        .create_framebuffer(&frame_buffer_create_info, None)
-                        .unwrap();
-                }
-                framebuffer
-            })
-            .collect();
+        let mut framebuffers: Vec<vk::Framebuffer> = Vec::new(); 
 
+        let framebuffer_attachments = [image_view];
+        let frame_buffer_create_info = vk::FramebufferCreateInfo {
+            s_type: vk::StructureType::FramebufferCreateInfo,
+            p_next: ptr::null(),
+            flags: Default::default(),
+            render_pass: renderpass,
+            attachment_count: framebuffer_attachments.len() as u32,
+            p_attachments: framebuffer_attachments.as_ptr(),
+            width: surface_size.extent.width,
+            height: surface_size.extent.height,
+            layers: 1,
+        };
+        let framebuffer;
+        unsafe {
+            framebuffer = rs.device
+                .create_framebuffer(&frame_buffer_create_info, None)
+                .unwrap();
+            framebuffers.push(framebuffer);
+        }
         framebuffers
     }
 
@@ -2500,7 +2500,9 @@ impl MainRenderPass{
                 extent: vk::Extent2D { width: 400, height: 600}
         };
 
-        let (render_image, render_image_view) = MainRenderPass::create_renderimages(rs, &surface_format);
+        //Create image to render to.
+        let (render_image, render_mem, render_image_view, render_sampler) =
+            MainRenderPass::create_renderimages(rs);
 
         let renderpass = MainRenderPass::create_renderpass(rs, &surface_format);
         let (descriptor_pool,
@@ -2517,7 +2519,7 @@ impl MainRenderPass{
             texture_sampler,
         );
         let framebuffers =
-            MainRenderPass::create_framebuffer(rs, surface_size, &render_image, renderpass);
+            MainRenderPass::create_framebuffer(rs, surface_size, render_image_view, renderpass);
         let command_buffers = MainRenderPass::create_commandbuffer(rs, &framebuffers);
 
         MainRenderPass {
@@ -2536,6 +2538,8 @@ impl MainRenderPass{
             //ImageView to render to.
             render_image: render_image,
             render_image_view: render_image_view,
+            render_mem: render_mem,
+            render_sampler: render_sampler,
 
             // Keep a pointer to the device for cleanup
             device: Rc::clone(&rs.device),
@@ -2562,7 +2566,7 @@ impl MainRenderPass{
         // Begin renderpass
         let clear_values =
             [
-                vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 0.0, 0.0, 1.0])),
+                vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 1.0, 0.0, 1.0])),
             ];
 
         let render_pass_begin_info = vk::RenderPassBeginInfo {
@@ -2619,5 +2623,12 @@ impl MainRenderPass{
 }
 
 impl Drop for MainRenderPass{
-    fn drop(&mut self){}
+    fn drop(&mut self){
+        unsafe{
+            self.device.destroy_sampler(self.render_sampler, None);
+            self.device.destroy_image_view(self.render_image_view, None);
+            self.device.destroy_image(self.render_image, None);
+            self.device.free_memory(self.render_mem, None);
+        }
+    }
 }
