@@ -1994,11 +1994,11 @@ pub struct MainRenderPass {
 
 impl MainRenderPass{
 
-    fn create_renderimages(rs: &RenderState)
+    fn create_renderimages(rs: &RenderState, surface_format: &vk::SurfaceFormatKHR)
         -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler){
         let image_extent;
         {
-            let image_dims = (100, 100);
+            let image_dims = (400, 600);
             image_extent = vk::Extent3D {
                 width: image_dims.0,
                 height: image_dims.1,
@@ -2009,8 +2009,8 @@ impl MainRenderPass{
             image_extent,
             vk::ImageType::Type2d,
             vk::ImageViewType::Type2d,
-            vk::Format::R8g8b8a8Unorm,
-            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            surface_format.format,
+            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT | vk::IMAGE_USAGE_TRANSFER_SRC_BIT,
             vk::ImageLayout::ColorAttachmentOptimal,
             None,
         );
@@ -2037,7 +2037,7 @@ impl MainRenderPass{
                 stencil_load_op: vk::AttachmentLoadOp::DontCare,
                 stencil_store_op: vk::AttachmentStoreOp::DontCare,
                 initial_layout: vk::ImageLayout::Undefined,
-                final_layout: vk::ImageLayout::PresentSrcKhr,
+                final_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
             },
         ];
         let color_attachment_ref = vk::AttachmentReference {
@@ -2502,7 +2502,7 @@ impl MainRenderPass{
 
         //Create image to render to.
         let (render_image, render_mem, render_image_view, render_sampler) =
-            MainRenderPass::create_renderimages(rs);
+            MainRenderPass::create_renderimages(rs, &surface_format);
 
         let renderpass = MainRenderPass::create_renderpass(rs, &surface_format);
         let (descriptor_pool,
