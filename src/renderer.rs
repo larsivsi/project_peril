@@ -1785,7 +1785,11 @@ impl PresentState {
     /// None, meaning that the current frame should be skipped.
     ///
     /// * `rs`  The RenderState.
-    pub fn begin_frame(&mut self, rs: &RenderState, mr: &MainRenderPass) -> Option<vk::CommandBuffer> {
+    pub fn begin_frame(
+        &mut self,
+        rs: &RenderState,
+        mr: &MainRenderPass,
+    ) -> Option<vk::CommandBuffer> {
         let result;
         unsafe {
             result = self.swapchain_loader.acquire_next_image_khr(
@@ -1990,15 +1994,22 @@ pub struct MainRenderPass {
 
     // Keep a pointer to the device for cleanup
     device: Rc<Device<V1_0>>,
+
+    texture_image: vk::Image,
+    texture_image_view: vk::ImageView,
+    texture_mem: vk::DeviceMemory,
+    texture_sampler: vk::Sampler,
 }
 
-impl MainRenderPass{
-
-    fn create_renderimages(rs: &RenderState, surface_format: &vk::SurfaceFormatKHR)
-        -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler){
+impl MainRenderPass {
+    fn create_renderimages(
+        rs: &RenderState,
+        surface_format: &vk::SurfaceFormatKHR,
+        render_size: &vk::Rect2D,
+    ) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
         let image_extent;
         {
-            let image_dims = (400, 600);
+            let image_dims = (render_size.extent.width, render_size.extent.height);
             image_extent = vk::Extent3D {
                 width: image_dims.0,
                 height: image_dims.1,
@@ -2010,7 +2021,8 @@ impl MainRenderPass{
             vk::ImageType::Type2d,
             vk::ImageViewType::Type2d,
             surface_format.format,
-            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT | vk::IMAGE_USAGE_TRANSFER_SRC_BIT,
+            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT |
+                vk::IMAGE_USAGE_TRANSFER_SRC_BIT,
             vk::ImageLayout::ColorAttachmentOptimal,
             None,
         );
@@ -2407,7 +2419,7 @@ impl MainRenderPass{
         image_view: vk::ImageView,
         renderpass: vk::RenderPass,
     ) -> Vec<vk::Framebuffer> {
-        let mut framebuffers: Vec<vk::Framebuffer> = Vec::new(); 
+        let mut framebuffers: Vec<vk::Framebuffer> = Vec::new();
 
         let framebuffer_attachments = [image_view];
         let frame_buffer_create_info = vk::FramebufferCreateInfo {
@@ -2462,7 +2474,7 @@ impl MainRenderPass{
     /// This will set up the renderpass, etc.
     ///
     /// * `rs`  The RenderState.
-    pub fn init(rs: &RenderState) -> MainRenderPass {
+    pub fn init(rs: &RenderState, cfg: &Config) -> MainRenderPass {
         // Surface
         // TODO: Maybe find a way to get this another way. Currently Straight copy from
         // PresentState
@@ -2494,15 +2506,17 @@ impl MainRenderPass{
         let (texture_image, texture_mem, texture_view, texture_sampler) =
             rs.load_image("assets/project_peril_logo.png");
 
-        //TODO: This is stupid. Need to pass propper values somehow.
-        let surface_size = vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: vk::Extent2D { width: 400, height: 600}
+        let render_size = vk::Rect2D {
+            offset: vk::Offset2D { x: 0, y: 0 },
+            extent: vk::Extent2D {
+                width: cfg.render_dimensions.0,
+                height: cfg.render_dimensions.1,
+            },
         };
 
         //Create image to render to.
         let (render_image, render_mem, render_image_view, render_sampler) =
-            MainRenderPass::create_renderimages(rs, &surface_format);
+            MainRenderPass::create_renderimages(rs, &surface_format, &render_size);
 
         let renderpass = MainRenderPass::create_renderpass(rs, &surface_format);
         let (descriptor_pool,
@@ -2513,13 +2527,13 @@ impl MainRenderPass{
              scissor,
              pipeline) = MainRenderPass::create_pipeline(
             rs,
-            surface_size,
+            render_size,
             renderpass,
             texture_view,
             texture_sampler,
         );
         let framebuffers =
-            MainRenderPass::create_framebuffer(rs, surface_size, render_image_view, renderpass);
+            MainRenderPass::create_framebuffer(rs, render_size, render_image_view, renderpass);
         let command_buffers = MainRenderPass::create_commandbuffer(rs, &framebuffers);
 
         MainRenderPass {
@@ -2543,6 +2557,13 @@ impl MainRenderPass{
 
             // Keep a pointer to the device for cleanup
             device: Rc::clone(&rs.device),
+
+            //TODO: remove later
+            //ImageView to render to.
+            texture_image: texture_image,
+            texture_image_view: texture_view,
+            texture_mem: texture_mem,
+            texture_sampler: texture_sampler,
         }
     }
     ///Begin main render pass
@@ -2622,13 +2643,43 @@ impl MainRenderPass{
     }
 }
 
-impl Drop for MainRenderPass{
-    fn drop(&mut self){
-        unsafe{
+impl Drop for MainRenderPass {
+    fn drop(&mut self) {
+        unsafe {
             self.device.destroy_sampler(self.render_sampler, None);
             self.device.destroy_image_view(self.render_image_view, None);
             self.device.destroy_image(self.render_image, None);
             self.device.free_memory(self.render_mem, None);
+
+            self.device.destroy_sampler(self.texture_sampler, None);
+            self.device.destroy_image_view(
+                self.texture_image_view,
+                None,
+            );
+            self.device.destroy_image(self.texture_image, None);
+            self.device.free_memory(self.texture_mem, None);
+
+
+            for &framebuffer in self.framebuffers.iter() {
+                self.device.destroy_framebuffer(framebuffer, None);
+            }
+
+            self.device.destroy_pipeline(self.pipeline, None);
+            self.device.destroy_pipeline_layout(
+                self.pipeline_layout,
+                None,
+            );
+
+            for &dset_layout in self.descriptor_set_layouts.iter() {
+                self.device.destroy_descriptor_set_layout(dset_layout, None);
+            }
+
+            self.device.destroy_descriptor_pool(
+                self.descriptor_pool,
+                None,
+            );
+
+            self.device.destroy_render_pass(self.renderpass, None);
         }
     }
 }

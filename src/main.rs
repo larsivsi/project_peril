@@ -25,7 +25,7 @@ fn main() {
     let cfg = Config::read_config("options.cfg");
 
     let mut renderstate = RenderState::init(&cfg);
-    let mut mainrender = MainRenderPass::init(&renderstate);
+    let mut mainrender = MainRenderPass::init(&renderstate, &cfg);
     let mut presentstate = PresentState::init(&renderstate, &mainrender);
     let scene = Scene::new(&renderstate);
     let _camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
@@ -85,6 +85,9 @@ fn main() {
                 // Skip this frame.
                 continue;
             }
+        }
+        unsafe {
+            renderstate.device.cmd_draw(main_cmd_buf, 6, 1, 0, 0);
         }
         mainrender.end_frame_and_present(&renderstate);
 
