@@ -14,9 +14,9 @@ mod scene;
 use ash::version::DeviceV1_0;
 use cgmath::Point3;
 use config::Config;
-use nurbs::{Order, NURBSpline};
+use nurbs::{NURBSpline, Order};
 use object::Camera;
-use renderer::{PresentState, RenderState, MainRenderPass};
+use renderer::{MainRenderPass, PresentState, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 
@@ -61,9 +61,9 @@ fn main() {
 
     while running {
         let new_time = SystemTime::now();
-        let frame_time = new_time.duration_since(current_time).expect(
-            "duration_since failed :(",
-        );
+        let frame_time = new_time
+            .duration_since(current_time)
+            .expect("duration_since failed :(");
         current_time = new_time;
         accumulator += frame_time;
 
@@ -123,10 +123,12 @@ fn main() {
         }
 
         renderstate.event_loop.poll_events(|ev| match ev {
-            winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
+            winit::Event::WindowEvent {
+                event: winit::WindowEvent::Closed,
+                ..
+            } => running = false,
             _ => (),
         });
-
     }
 
     //cleanup

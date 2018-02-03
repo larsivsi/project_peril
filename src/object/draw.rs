@@ -1,6 +1,6 @@
 use ash::vk;
 use ash::Device;
-use ash::version::{V1_0, DeviceV1_0};
+use ash::version::{DeviceV1_0, V1_0};
 use cgmath::Point3;
 use object::{Drawable, Position};
 use renderer::RenderState;

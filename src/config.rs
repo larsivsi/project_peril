@@ -39,7 +39,6 @@ impl Config {
             }
             _ => println!("Invalid option: {} with value: {}", option, value),
         }
-
     }
 
     /// Generates a packed 32 bit version number based on the given major, minor and patch
@@ -77,9 +76,8 @@ impl Config {
         let mut file = File::open(filename).expect("Error opening config file");
 
         let mut contents = String::new();
-        file.read_to_string(&mut contents).expect(
-            "Error reading config file",
-        );
+        file.read_to_string(&mut contents)
+            .expect("Error reading config file");
 
         let mut cfg = Config {
             app_name: APP_NAME,
