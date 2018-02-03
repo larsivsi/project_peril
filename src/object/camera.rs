@@ -1,5 +1,5 @@
 use cgmath::prelude::*;
-use cgmath::{Point3, Vector3, Matrix4};
+use cgmath::{Matrix4, Point3, Vector3};
 use object::Position;
 
 pub struct Camera {
