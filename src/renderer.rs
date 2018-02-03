@@ -2607,6 +2607,40 @@ impl MainRenderPass {
                 .end_command_buffer(cmd_buf)
                 .expect("End commandbuffer");
         }
+
+        // TODO: this is very hacky, but it makes stuff show up at least!
+        // Send the work off to the GPU
+        let fence_create_info = vk::FenceCreateInfo {
+            s_type: vk::StructureType::FenceCreateInfo,
+            p_next: ptr::null(),
+            flags: vk::FenceCreateFlags::empty(),
+        };
+        let submit_fence;
+        unsafe {
+            submit_fence = rs.device
+                .create_fence(&fence_create_info, None)
+                .expect("Create fence failed.");
+        }
+        let submit_info = vk::SubmitInfo {
+            s_type: vk::StructureType::SubmitInfo,
+            p_next: ptr::null(),
+            wait_semaphore_count: 0,
+            p_wait_semaphores: ptr::null(),
+            p_wait_dst_stage_mask: &vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            command_buffer_count: 1,
+            p_command_buffers: &cmd_buf,
+            signal_semaphore_count: 0,
+            p_signal_semaphores: ptr::null(),
+        };
+        unsafe {
+            rs.device
+                .queue_submit(rs.graphics_queue, &[submit_info], submit_fence)
+                .expect("queue submit failed.");
+            rs.device
+                .wait_for_fences(&[submit_fence], true, std::u64::MAX)
+                .expect("Wait for fence failed.");
+            rs.device.destroy_fence(submit_fence, None);
+        }
     }
 }
 
