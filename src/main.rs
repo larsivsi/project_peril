@@ -16,7 +16,7 @@ use cgmath::Point3;
 use config::Config;
 use nurbs::{NURBSpline, Order};
 use object::Camera;
-use renderer::{MainRenderPass, PresentState, RenderState};
+use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
 
@@ -25,8 +25,8 @@ fn main() {
     let cfg = Config::read_config("options.cfg");
 
     let mut renderstate = RenderState::init(&cfg);
-    let mut mainrender = MainRenderPass::init(&renderstate, &cfg);
-    let mut presentstate = PresentState::init(&renderstate, &mainrender);
+    let mut mainrender = MainPass::init(&renderstate, &cfg);
+    let mut presentstate = PresentPass::init(&renderstate, &mainrender);
     let _scene = Scene::new(&renderstate);
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
     let _view_matrix = camera.generate_view_matrix();
