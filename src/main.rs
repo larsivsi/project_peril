@@ -111,7 +111,7 @@ fn main() {
             renderstate.device.cmd_draw(cmd_buf, 6, 1, 0, 0);
         }
         //then swapbuffers etc.
-        presentstate.end_frame_and_present(&renderstate);
+        presentstate.end_frame_and_present(&renderstate, &mainrender);
         framecount += 1;
 
         if framecount % 100 == 0 {

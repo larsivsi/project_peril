@@ -569,13 +569,15 @@ impl RenderState {
     ///
     /// A vk::Buffer can optionally be passed to fill the texture with initial data.
     ///
-    /// * `texture_dimensions`  The size of the texture.
-    /// * `texture_type`        The type of the texture.
-    /// * `texture_view_type`   The type of the image view for the texture.
-    /// * `texture_format`      The format of the texture
-    /// * `texture_usage`       How the texture will be used.
-    /// * `texture_layout`      The final layout for the texture.
-    /// * `upload_buffer`       Optional: Buffer containing the initial values for the texture.
+    /// * `texture_dimensions`   The size of the texture.
+    /// * `texture_type`         The type of the texture.
+    /// * `texture_view_type`    The type of the image view for the texture.
+    /// * `texture_format`       The format of the texture
+    /// * `texture_usage`        How the texture will be used.
+    /// * `texture_access_mask`  How the texture will be accessed.
+    /// * `texture_stage`        The pipeline stage for the texture.
+    /// * `texture_layout`       The final layout for the texture.
+    /// * `upload_buffer`        Optional: Buffer containing the initial values for the texture.
     fn create_texture(
         &self,
         texture_dimensions: vk::Extent3D,
@@ -583,6 +585,8 @@ impl RenderState {
         texture_view_type: vk::ImageViewType,
         texture_format: vk::Format,
         mut texture_usage: vk::ImageUsageFlags,
+        texture_access_mask: vk::AccessFlags,
+        texture_stage: vk::PipelineStageFlags,
         texture_layout: vk::ImageLayout,
         upload_buffer: Option<vk::Buffer>,
     ) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
@@ -698,7 +702,7 @@ impl RenderState {
                     s_type: vk::StructureType::ImageMemoryBarrier,
                     p_next: ptr::null(),
                     src_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
-                    dst_access_mask: vk::ACCESS_SHADER_READ_BIT,
+                    dst_access_mask: texture_access_mask,
                     old_layout: vk::ImageLayout::TransferDstOptimal,
                     new_layout: texture_layout,
                     src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
@@ -716,7 +720,7 @@ impl RenderState {
                     self.device.cmd_pipeline_barrier(
                         cmd_buf,
                         vk::PIPELINE_STAGE_TRANSFER_BIT,
-                        vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                        texture_stage,
                         vk::DependencyFlags::empty(),
                         &[],
                         &[],
@@ -730,7 +734,7 @@ impl RenderState {
                     s_type: vk::StructureType::ImageMemoryBarrier,
                     p_next: ptr::null(),
                     src_access_mask: Default::default(),
-                    dst_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
+                    dst_access_mask: texture_access_mask,
                     old_layout: vk::ImageLayout::Undefined,
                     new_layout: texture_layout,
                     src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
@@ -748,7 +752,7 @@ impl RenderState {
                     self.device.cmd_pipeline_barrier(
                         cmd_buf,
                         vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                        vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                        texture_stage,
                         vk::DependencyFlags::empty(),
                         &[],
                         &[],
@@ -849,6 +853,8 @@ impl RenderState {
             vk::ImageViewType::Type2d,
             vk::Format::R8g8b8a8Unorm,
             vk::IMAGE_USAGE_SAMPLED_BIT,
+            vk::ACCESS_SHADER_READ_BIT,
+            vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             vk::ImageLayout::ShaderReadOnlyOptimal,
             Some(image_buffer),
         );
@@ -903,12 +909,6 @@ pub struct PresentState {
     rendering_finished_sem: vk::Semaphore,
 
     swapchain_loader: Swapchain,
-
-    // Texture
-    //texture_image: vk::Image,
-    //texture_mem: vk::DeviceMemory,
-    //texture_view: vk::ImageView,
-    //texture_sampler: vk::Sampler,
 
     // Swapchain
     swapchain: vk::SwapchainKHR,
@@ -1131,16 +1131,6 @@ impl PresentState {
             attachment: 0,
             layout: vk::ImageLayout::ColorAttachmentOptimal,
         };
-        let dependency = vk::SubpassDependency {
-            dependency_flags: Default::default(),
-            src_subpass: vk::VK_SUBPASS_EXTERNAL,
-            dst_subpass: Default::default(),
-            src_stage_mask: vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            dst_stage_mask: vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            src_access_mask: Default::default(),
-            dst_access_mask: vk::ACCESS_COLOR_ATTACHMENT_READ_BIT
-                | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        };
         let subpass = vk::SubpassDescription {
             color_attachment_count: 1,
             p_color_attachments: &color_attachment_ref,
@@ -1161,8 +1151,8 @@ impl PresentState {
             p_attachments: renderpass_attachments.as_ptr(),
             subpass_count: 1,
             p_subpasses: &subpass,
-            dependency_count: 1,
-            p_dependencies: &dependency,
+            dependency_count: 0,
+            p_dependencies: ptr::null(),
         };
         let renderpass;
         unsafe {
@@ -1634,12 +1624,6 @@ impl PresentState {
 
             swapchain_loader: swapchain_loader,
 
-            // Texture
-            //texture_image: texture_image,
-            //texture_mem: texture_mem,
-            //texture_view: texture_view,
-            //texture_sampler: texture_sampler,
-
             // Swapchain
             swapchain: swapchain,
             present_image_views: present_image_views,
@@ -1788,12 +1772,6 @@ impl PresentState {
             },
         }
 
-
-
-
-
-
-
         // Begin commandbuffer
         let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
             s_type: vk::StructureType::CommandBufferBeginInfo,
@@ -1855,13 +1833,46 @@ impl PresentState {
     /// begin_frame() must have been called before this function.
     ///
     /// * `rs`  The RenderState.
-    pub fn end_frame_and_present(&mut self, rs: &RenderState) {
+    pub fn end_frame_and_present(&mut self, rs: &RenderState, mp: &MainRenderPass) {
         debug_assert!(self.current_present_idx < std::usize::MAX);
 
         let cmd_buf = self.commandbuffers[self.current_present_idx];
         unsafe {
             // End render pass and command buffer
             rs.device.cmd_end_render_pass(cmd_buf);
+        }
+
+        // Transition the mainpass output back to a renderable image
+        let image_barrier = vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::ImageMemoryBarrier,
+            p_next: ptr::null(),
+            src_access_mask: vk::ACCESS_SHADER_READ_BIT,
+            dst_access_mask: vk::ACCESS_COLOR_ATTACHMENT_READ_BIT
+                | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            old_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
+            new_layout: vk::ImageLayout::ColorAttachmentOptimal,
+            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            image: mp.render_image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+        };
+        unsafe {
+            rs.device.cmd_pipeline_barrier(
+                cmd_buf,
+                vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[image_barrier],
+            );
+
             rs.device
                 .end_command_buffer(cmd_buf)
                 .expect("End commandbuffer");
@@ -1988,8 +1999,9 @@ impl MainRenderPass {
             vk::ImageType::Type2d,
             vk::ImageViewType::Type2d,
             surface_format.format,
-            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT
-                | vk::IMAGE_USAGE_TRANSFER_SRC_BIT,
+            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT,
+            vk::ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             vk::ImageLayout::ColorAttachmentOptimal,
             None,
         );
@@ -2015,23 +2027,13 @@ impl MainRenderPass {
                 store_op: vk::AttachmentStoreOp::Store,
                 stencil_load_op: vk::AttachmentLoadOp::DontCare,
                 stencil_store_op: vk::AttachmentStoreOp::DontCare,
-                initial_layout: vk::ImageLayout::Undefined,
+                initial_layout: vk::ImageLayout::ColorAttachmentOptimal,
                 final_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
             },
         ];
         let color_attachment_ref = vk::AttachmentReference {
             attachment: 0,
             layout: vk::ImageLayout::ColorAttachmentOptimal,
-        };
-        let dependency = vk::SubpassDependency {
-            dependency_flags: Default::default(),
-            src_subpass: vk::VK_SUBPASS_EXTERNAL,
-            dst_subpass: Default::default(),
-            src_stage_mask: vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            dst_stage_mask: vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            src_access_mask: Default::default(),
-            dst_access_mask: vk::ACCESS_COLOR_ATTACHMENT_READ_BIT
-                | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         };
         let subpass = vk::SubpassDescription {
             color_attachment_count: 1,
@@ -2053,8 +2055,8 @@ impl MainRenderPass {
             p_attachments: renderpass_attachments.as_ptr(),
             subpass_count: 1,
             p_subpasses: &subpass,
-            dependency_count: 1,
-            p_dependencies: &dependency,
+            dependency_count: 0,
+            p_dependencies: ptr::null(),
         };
         let renderpass;
         unsafe {
@@ -2565,6 +2567,7 @@ impl MainRenderPass {
             clear_value_count: clear_values.len() as u32,
             p_clear_values: clear_values.as_ptr(),
         };
+
         unsafe {
             // Start the render pass
             rs.device.cmd_begin_render_pass(
@@ -2596,33 +2599,55 @@ impl MainRenderPass {
     ///End the main render frame and returns an Image.
     pub fn end_frame_and_present(&mut self, rs: &RenderState) {
         let cmd_buf = self.commandbuffers[0];
+
         unsafe {
             // End render pass and command buffer
             rs.device.cmd_end_render_pass(cmd_buf);
+        }
+
+        // Transition the mainpass output to a samplable image
+        let image_barrier = vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::ImageMemoryBarrier,
+            p_next: ptr::null(),
+            src_access_mask: vk::ACCESS_COLOR_ATTACHMENT_READ_BIT
+                | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            dst_access_mask: vk::ACCESS_SHADER_READ_BIT,
+            old_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
+            new_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
+            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            image: self.render_image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+        };
+        unsafe {
+            rs.device.cmd_pipeline_barrier(
+                cmd_buf,
+                vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[image_barrier],
+            );
+
             rs.device
                 .end_command_buffer(cmd_buf)
                 .expect("End commandbuffer");
         }
 
-        // TODO: this is very hacky, but it makes stuff show up at least!
         // Send the work off to the GPU
-        let fence_create_info = vk::FenceCreateInfo {
-            s_type: vk::StructureType::FenceCreateInfo,
-            p_next: ptr::null(),
-            flags: vk::FenceCreateFlags::empty(),
-        };
-        let submit_fence;
-        unsafe {
-            submit_fence = rs.device
-                .create_fence(&fence_create_info, None)
-                .expect("Create fence failed.");
-        }
         let submit_info = vk::SubmitInfo {
             s_type: vk::StructureType::SubmitInfo,
             p_next: ptr::null(),
             wait_semaphore_count: 0,
             p_wait_semaphores: ptr::null(),
-            p_wait_dst_stage_mask: &vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            p_wait_dst_stage_mask: ptr::null(),
             command_buffer_count: 1,
             p_command_buffers: &cmd_buf,
             signal_semaphore_count: 0,
@@ -2630,19 +2655,21 @@ impl MainRenderPass {
         };
         unsafe {
             rs.device
-                .queue_submit(rs.graphics_queue, &[submit_info], submit_fence)
+                .queue_submit(rs.graphics_queue, &[submit_info], vk::Fence::null())
                 .expect("queue submit failed.");
-            rs.device
-                .wait_for_fences(&[submit_fence], true, std::u64::MAX)
-                .expect("Wait for fence failed.");
-            rs.device.destroy_fence(submit_fence, None);
         }
     }
 }
 
 impl Drop for MainRenderPass {
     fn drop(&mut self) {
+        // We cannot have the last reference to device at this point
+        debug_assert!(1 < Rc::strong_count(&self.device));
+
         unsafe {
+            // Always wait for device idle
+            self.device.device_wait_idle().unwrap();
+
             self.device.destroy_sampler(self.render_sampler, None);
             self.device.destroy_image_view(self.render_image_view, None);
             self.device.destroy_image(self.render_image, None);
