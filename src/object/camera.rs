@@ -26,8 +26,6 @@ impl Camera {
     }
 
     /// Creates a new Camera struct
-    ///
-    /// * `position`  Initial position for the camera.
     pub fn new(position: Point3<f64>) -> Camera {
         let mut camera = Camera {
             position: position,

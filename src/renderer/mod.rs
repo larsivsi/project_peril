@@ -61,9 +61,6 @@ impl RenderState {
     }
 
     /// Creates a Vulkan instance.
-    ///
-    /// * `cfg`    The application config.
-    /// * `entry`  The ash entrypoint.
     fn create_instance(cfg: &Config, entry: &Entry<V1_0>) -> Instance<V1_0> {
         // Application info
         let app_name = CString::new(cfg.app_name).unwrap();
@@ -142,9 +139,6 @@ impl RenderState {
     }
 
     /// Sets up the debug report layer and callback.
-    ///
-    /// * `entry`     The ash entrypoint.
-    /// * `instance`  The Vulkan instance.
     fn setup_debug_callback(
         entry: &Entry<V1_0>,
         instance: &Instance<V1_0>,
@@ -169,8 +163,6 @@ impl RenderState {
     }
 
     /// Selects a physical device (and queue index) for the Vulkan instance.
-    ///
-    /// * `instance`  The Vulkan instance.
     fn pick_physical_device(instance: &Instance<V1_0>) -> (vk::PhysicalDevice, u32) {
         let pdevices = instance
             .enumerate_physical_devices()
@@ -201,10 +193,6 @@ impl RenderState {
     }
 
     /// Creates a Vulkan device (logical) based on the instance and physical device.
-    ///
-    /// * `instance`            The Vulkan instance.
-    /// * `pdevice`             The Vulkan physical device.
-    /// * `queue_family_index`  The queue index for this physical device.
     fn create_logical_device(
         instance: &Instance<V1_0>,
         pdevice: vk::PhysicalDevice,
@@ -248,9 +236,6 @@ impl RenderState {
     }
 
     /// Creates various pools required by the RenderState.
-    ///
-    /// * `device`              The logical Vulkan device.
-    /// * `queue_family_index`  The queue index for this physical device.
     fn create_pools(device: &Device<V1_0>, queue_family_index: u32) -> (vk::CommandPool) {
         let cmd_pool_create_info = vk::CommandPoolCreateInfo {
             s_type: vk::StructureType::CommandPoolCreateInfo,
@@ -269,8 +254,6 @@ impl RenderState {
     }
 
     /// Initializes the RenderState based in the passed Config.
-    ///
-    /// * `cfg`  The config for the RenderState.
     pub fn init(cfg: &Config) -> RenderState {
         // Window and event handler
         let event_loop = winit::EventsLoop::new();
@@ -326,9 +309,6 @@ impl RenderState {
     }
 
     /// Returns a suitable memory type for the requirements based in the physical Vulkan device.
-    ///
-    /// * `mem_type_bits`  A bitmask of the requested memory types.
-    /// * `properties`     The memory properties required for the requested memory.
     fn find_memory_type(&self, mem_type_bits: u32, properties: vk::MemoryPropertyFlags) -> u32 {
         for (idx, mem_type) in self.device_memory_properties
             .memory_types
@@ -377,8 +357,6 @@ impl RenderState {
     }
 
     /// Ends the small GPU operation commandbuffer and sends the commands to the GPU.
-    ///
-    /// * `cmd_buf`  The command buffer returned from begin_single_time_commands.
     fn end_single_time_commands(&self, cmd_buf: vk::CommandBuffer) {
         unsafe {
             self.device
@@ -410,10 +388,6 @@ impl RenderState {
     }
 
     /// Creates a vk::Buffer based on the requirements.
-    ///
-    /// * `usage`       Usage bits for the resulting buffer.
-    /// * `properties`  Memory properties required for the buffer.
-    /// * `buffersize`  Size of the resulting buffer.
     fn create_buffer(
         &self,
         usage: vk::BufferUsageFlags,
@@ -460,11 +434,6 @@ impl RenderState {
     }
 
     /// Creates a vk::Buffer based on the requirements and fills it with the passed data.
-    ///
-    /// * `usage`           Usage bits for the resulting buffer.
-    /// * `properties`      Memory properties required for the buffer.
-    /// * `upload_data`     Pointer to an array of data to fill the buffer with.
-    /// * `optimal_layout`  Whether the resulting buffer should have GPU optimal layout or not.
     pub fn create_buffer_and_upload<T: Copy>(
         &self,
         usage: vk::BufferUsageFlags,
@@ -556,8 +525,6 @@ impl RenderState {
     /// Creates a vk::ShaderModule from the given path.
     ///
     /// Note: The path must point to a .spv file.
-    ///
-    /// * `path`  Path to the shader.
     fn load_shader(&self, path: &str) -> vk::ShaderModule {
         let spv_file = File::open(Path::new(path)).expect("Could not find spv file");
         let shader_bytes: Vec<u8> = spv_file.bytes().filter_map(|byte| byte.ok()).collect();
@@ -580,16 +547,6 @@ impl RenderState {
     /// Creates a texture, view and sampler based on the passed options.
     ///
     /// A vk::Buffer can optionally be passed to fill the texture with initial data.
-    ///
-    /// * `texture_dimensions`   The size of the texture.
-    /// * `texture_type`         The type of the texture.
-    /// * `texture_view_type`    The type of the image view for the texture.
-    /// * `texture_format`       The format of the texture
-    /// * `texture_usage`        How the texture will be used.
-    /// * `initial_access_mask`  Initial access mask for the texture.
-    /// * `initial_stage`        Initial pipeline stage for the texture.
-    /// * `initial_layout`       Initial layout for the texture.
-    /// * `upload_buffer`        Optional: Buffer containing the initial values for the texture.
     fn create_texture(
         &self,
         texture_dimensions: vk::Extent3D,
@@ -841,8 +798,6 @@ impl RenderState {
     /// Loads the image given by the path into read only texture.
     ///
     /// Note: The caller is responsible for cleaning up the returned vulkan types.
-    ///
-    /// * `path`  Path to the image.
     fn load_image(&self, path: &str) -> Texture {
         // Load the image data into a vk::Buffer
         let image = image::open(path).unwrap().to_rgba();

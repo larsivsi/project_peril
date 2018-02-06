@@ -20,9 +20,6 @@ impl NURBSpline {
     /// Initializes a new NURBSpline based on input control points.
     ///
     /// This includes generating a knot vector etc.
-    ///
-    /// * `order`          The order of the spline.
-    /// * `controlpoints`  Vector of control points.
     pub fn new(order: Order, controlpoints: Vec<Point3<f64>>) -> NURBSpline {
         debug_assert!(order as usize <= controlpoints.len());
         let knots_size = controlpoints.len() + order as usize;
@@ -49,8 +46,6 @@ impl NURBSpline {
     /// Evaluates the NURBSpline at the given value.
     ///
     /// This value has to be less than the evaluation limit for the spline.
-    ///
-    /// * `u`  The point to evaluate the spline at.
     pub fn evaluate_at(&self, u: f64) -> Point3<f64> {
         debug_assert!(u < self.eval_limit());
 
@@ -71,10 +66,6 @@ impl NURBSpline {
     /// This returns the contribution of the given control point index, order and value to
     /// evaluate.
     /// See https://www.cs.montana.edu/paxton/classes/aui/dslectures/CoxdeBoor.pdf for details.
-    ///
-    /// * `idx`    The control point index to evaluate.
-    /// * `order`  The order for the current recursion.
-    /// * `u`      The value to evaluate.
     fn coxdeboor(&self, idx: usize, order: usize, u: f64) -> f64 {
         debug_assert!(order > 0);
 

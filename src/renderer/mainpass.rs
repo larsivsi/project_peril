@@ -34,9 +34,6 @@ pub struct MainPass {
 
 impl MainPass {
     /// Creates a main renderpass.
-    ///
-    /// * `rs`              The RenderState.
-    /// * `surface_format`  The format of the surface.
     fn create_renderpass(rs: &RenderState, render_format: vk::Format) -> vk::RenderPass {
         // One attachment, color only. Will produce the presentable image.
         let renderpass_attachments = [
@@ -92,10 +89,6 @@ impl MainPass {
     /// Creates a pipeline for the renderpass.
     ///
     /// Very straigt forward pipeline: Loads some hard-coded shaders that will draw a triangle.
-    ///
-    /// * `rs`            The RenderState.
-    /// * `surface_size`  The size of the surface to render to.
-    /// * `renderpass`    The renderpass to produce the pipeline for (these have to match).
     fn create_pipeline(
         rs: &RenderState,
         render_size: vk::Extent3D,
@@ -403,12 +396,6 @@ impl MainPass {
     }
 
     /// Creates framebuffers for the presentable images, one per image.
-    ///
-    /// * `rs`                   The RenderState.
-    /// * `surface_size`         The size of the surface to render to.
-    /// * `present_image_views`  Imageviews to produce framebuffers for (one
-    ///                          framebuffer per imageview).
-    /// * `renderpass`           The renderpass to produce framebuffers for.
     fn create_framebuffer(
         rs: &RenderState,
         render_size: vk::Extent3D,
@@ -437,8 +424,6 @@ impl MainPass {
     }
 
     /// Creates commandbuffer.
-    ///
-    /// * `rs`            The RenderState.
     fn create_commandbuffer(rs: &RenderState) -> vk::CommandBuffer {
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::CommandBufferAllocateInfo,
@@ -461,8 +446,6 @@ impl MainPass {
     /// Initializes the MainPass based on a RenderState
     ///
     /// This will set up the renderpass, etc.
-    ///
-    /// * `rs`  The RenderState.
     pub fn init(rs: &RenderState, cfg: &Config) -> MainPass {
         let texture = rs.load_image("assets/project_peril_logo.png");
 

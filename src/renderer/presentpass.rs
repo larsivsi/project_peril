@@ -48,10 +48,6 @@ pub struct PresentPass {
 
 impl PresentPass {
     /// Creates an X11 surface.
-    ///
-    /// * `entry`     The ash entrypoint.
-    /// * `instance`  The Vulkan instance.
-    /// * `window`    The window to create the surface for.
     fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
         entry: &E,
         instance: &I,
@@ -79,14 +75,6 @@ impl PresentPass {
     /// Creates a vk::Swapchain and a vk::Rect2D for the current RenderState and surface.
     ///
     /// Swapchain is used to queue and present stuff to the screen.
-    ///
-    /// * `rs`                The RenderState.
-    /// * `surface_loader`    The surface loader.
-    /// * `surface`           The surface for the swapchain.
-    /// * `surface_format`    The format of the surface.
-    /// * `old_swapchain`     The swapchain to re-use. Note that this must be a valid (i.e. not
-    ///                       destroyed) swapchain.
-    /// * `swapchain_loader`  The swapchain loader.
     fn create_swapchain(
         rs: &RenderState,
         surface_loader: &Surface,
@@ -165,11 +153,6 @@ impl PresentPass {
     ///
     /// This will create two imageviews for double-buffering, three imageviews for
     /// tripple-buffering etc.
-    ///
-    /// * `rs`                The RenderState.
-    /// * `surface_format`    The format of the surface.
-    /// * `swapchain_loader`  The swapchain loader.
-    /// * `swapchain`         The swapchain to create image views for.
     fn create_imageviews(
         rs: &RenderState,
         surface_format: &vk::SurfaceFormatKHR,
@@ -219,9 +202,6 @@ impl PresentPass {
     /// Creates a presentable renderpass.
     ///
     /// Produces a color-only renderpass, perfect for direct drawing.
-    ///
-    /// * `rs`              The RenderState.
-    /// * `surface_format`  The format of the surface.
     fn create_renderpass(
         rs: &RenderState,
         surface_format: &vk::SurfaceFormatKHR,
@@ -280,10 +260,6 @@ impl PresentPass {
     /// Creates a pipeline for the given presentable renderpass.
     ///
     /// Very straigt forward pipeline: Loads some hard-coded shaders that will draw a triangle.
-    ///
-    /// * `rs`            The RenderState.
-    /// * `surface_size`  The size of the surface to render to.
-    /// * `renderpass`    The renderpass to produce the pipeline for (these have to match).
     fn create_pipeline(
         rs: &RenderState,
         surface_size: vk::Rect2D,
@@ -585,12 +561,6 @@ impl PresentPass {
     }
 
     /// Creates framebuffers for the presentable images, one per image.
-    ///
-    /// * `rs`                   The RenderState.
-    /// * `surface_size`         The size of the surface to render to.
-    /// * `present_image_views`  Imageviews to produce framebuffers for (one
-    ///                          framebuffer per imageview).
-    /// * `renderpass`           The renderpass to produce framebuffers for.
     fn create_framebuffers(
         rs: &RenderState,
         surface_size: vk::Rect2D,
@@ -626,9 +596,6 @@ impl PresentPass {
     }
 
     /// Creates commandbuffers for the presentable images, one per image.
-    ///
-    /// * `rs`            The RenderState.
-    /// * `framebuffers`  Framebuffers for the presentable images.
     fn create_commandbuffers(
         rs: &RenderState,
         framebuffers: &Vec<vk::Framebuffer>,
@@ -653,8 +620,6 @@ impl PresentPass {
     /// Initializes the PresentPass based on a RenderState
     ///
     /// This will set up the swapchain, renderpass, etc.
-    ///
-    /// * `rs`  The RenderState.
     pub fn init(rs: &RenderState, mainrender: &MainPass) -> PresentPass {
         // Surface
         let surface_loader =
@@ -797,8 +762,6 @@ impl PresentPass {
     /// Releases the old and creates a new swapchain.
     ///
     /// This function should be called when the presentable surface is resized, etc.
-    ///
-    /// * `rs`  The RenderState.
     fn recreate_swapchain(&mut self, rs: &RenderState, mr: &MainPass) {
         self.cleanup_swapchain();
 
@@ -858,8 +821,6 @@ impl PresentPass {
     ///
     /// On error (for example when the swapchain needs to be recreated), this function returns
     /// None, meaning that the current frame should be skipped.
-    ///
-    /// * `rs`  The RenderState.
     pub fn begin_frame(&mut self, rs: &RenderState, mr: &MainPass) -> Option<vk::CommandBuffer> {
         let result;
         unsafe {
@@ -940,8 +901,6 @@ impl PresentPass {
     /// Ends the current frame and presents it.
     ///
     /// begin_frame() must have been called before this function.
-    ///
-    /// * `rs`  The RenderState.
     pub fn end_frame_and_present(&mut self, rs: &RenderState, mp: &MainPass) {
         debug_assert!(self.current_present_idx < std::usize::MAX);
 

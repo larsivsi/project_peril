@@ -42,11 +42,6 @@ impl Position for DrawObject {
 
 impl DrawObject {
     /// Creates a new quad draw object.
-    ///
-    /// * `rs`        The current RenderState.
-    /// * `position`  Position for the new quad.
-    /// * `width`     Width of the new quad.
-    /// * `height`    Height of the new quad.
     pub fn new_quad(
         rs: &RenderState,
         position: Point3<f64>,
