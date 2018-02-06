@@ -52,8 +52,7 @@ impl PresentPass {
     /// * `entry`     The ash entrypoint.
     /// * `instance`  The Vulkan instance.
     /// * `window`    The window to create the surface for.
-    //TODO: this should _not_ be public
-    pub fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
+    fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
         entry: &E,
         instance: &I,
         window: &winit::Window,
@@ -719,8 +718,8 @@ impl PresentPass {
             rs,
             surface_size,
             renderpass,
-            mainrender.render_image_view,
-            mainrender.render_sampler,
+            mainrender.render_image.view,
+            mainrender.render_image.sampler,
         );
         let framebuffers =
             PresentPass::create_framebuffers(rs, surface_size, &present_image_views, renderpass);
@@ -833,8 +832,8 @@ impl PresentPass {
             rs,
             surface_size,
             renderpass,
-            mr.render_image_view,
-            mr.render_sampler,
+            mr.render_image.view,
+            mr.render_image.sampler,
         );
         self.descriptor_pool = descriptor_pool;
         self.descriptor_set_layouts = descriptor_set_layouts;
@@ -963,7 +962,7 @@ impl PresentPass {
             new_layout: vk::ImageLayout::ColorAttachmentOptimal,
             src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
             dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            image: mp.render_image,
+            image: mp.render_image.image,
             subresource_range: vk::ImageSubresourceRange {
                 aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
                 base_mip_level: 0,

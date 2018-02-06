@@ -75,22 +75,11 @@ fn main() {
         }
 
         //Main RenderPass goes here
-        let main_cmd_buf;
-        let res_main = mainrender.begin_frame(&renderstate);
-        match res_main {
-            Some(buf) => {
-                main_cmd_buf = buf;
-            }
-            None => {
-                // Swapchain was outdated, but now one was created.
-                // Skip this frame.
-                continue;
-            }
-        }
+        let main_cmd_buf = mainrender.begin_frame(&renderstate);
         unsafe {
             renderstate.device.cmd_draw(main_cmd_buf, 6, 1, 0, 0);
         }
-        mainrender.end_frame_and_present(&renderstate);
+        mainrender.end_frame(&renderstate);
 
         //call to render function goes here
         let cmd_buf;

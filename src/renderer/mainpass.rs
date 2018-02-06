@@ -1,13 +1,11 @@
 use ash::vk;
 use ash::Device;
-use ash::extensions::Surface;
 use ash::version::{DeviceV1_0, V1_0};
 use std::ffi::CString;
 use std::ptr;
 use std::rc::Rc;
 
-use renderer::RenderState;
-use renderer::PresentPass;
+use renderer::{RenderState, Texture};
 
 use config::Config;
 
@@ -21,66 +19,29 @@ pub struct MainPass {
     scissor: vk::Rect2D,
     pipeline: vk::Pipeline,
     //one framebuffer/commandbuffer per image
-    framebuffers: Vec<vk::Framebuffer>,
-    commandbuffers: Vec<vk::CommandBuffer>,
+    framebuffer: vk::Framebuffer,
+    commandbuffer: vk::CommandBuffer,
 
-    //ImageView to render to.
-    pub render_image: vk::Image,
-    pub render_image_view: vk::ImageView,
-    render_mem: vk::DeviceMemory,
-    pub render_sampler: vk::Sampler,
+    // Image to render to.
+    pub render_image: Texture,
+
+    //TODO this doesn't need to live here
+    texture: Texture,
 
     // Keep a pointer to the device for cleanup
     device: Rc<Device<V1_0>>,
-
-    texture_image: vk::Image,
-    texture_image_view: vk::ImageView,
-    texture_mem: vk::DeviceMemory,
-    texture_sampler: vk::Sampler,
 }
 
 impl MainPass {
-    fn create_renderimages(
-        rs: &RenderState,
-        surface_format: &vk::SurfaceFormatKHR,
-        render_size: &vk::Rect2D,
-    ) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
-        let image_extent;
-        {
-            let image_dims = (render_size.extent.width, render_size.extent.height);
-            image_extent = vk::Extent3D {
-                width: image_dims.0,
-                height: image_dims.1,
-                depth: 1,
-            };
-        }
-        let (image, image_mem, image_view, image_sampler) = rs.create_texture(
-            image_extent,
-            vk::ImageType::Type2d,
-            vk::ImageViewType::Type2d,
-            surface_format.format,
-            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT,
-            vk::ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            vk::ImageLayout::ColorAttachmentOptimal,
-            None,
-        );
-
-        (image, image_mem, image_view, image_sampler)
-    }
-
     /// Creates a main renderpass.
     ///
     /// * `rs`              The RenderState.
     /// * `surface_format`  The format of the surface.
-    fn create_renderpass(
-        rs: &RenderState,
-        surface_format: &vk::SurfaceFormatKHR,
-    ) -> vk::RenderPass {
+    fn create_renderpass(rs: &RenderState, render_format: vk::Format) -> vk::RenderPass {
         // One attachment, color only. Will produce the presentable image.
         let renderpass_attachments = [
             vk::AttachmentDescription {
-                format: surface_format.format,
+                format: render_format,
                 flags: vk::AttachmentDescriptionFlags::empty(),
                 samples: vk::SAMPLE_COUNT_1_BIT,
                 load_op: vk::AttachmentLoadOp::Clear,
@@ -137,7 +98,7 @@ impl MainPass {
     /// * `renderpass`    The renderpass to produce the pipeline for (these have to match).
     fn create_pipeline(
         rs: &RenderState,
-        surface_size: vk::Rect2D,
+        render_size: vk::Extent3D,
         renderpass: vk::RenderPass,
         texture_view: vk::ImageView,
         texture_sampler: vk::Sampler,
@@ -291,14 +252,20 @@ impl MainPass {
             topology: vk::PrimitiveTopology::TriangleList,
         };
         let viewport = vk::Viewport {
-            x: surface_size.offset.x as f32,
-            y: surface_size.offset.y as f32,
-            width: surface_size.extent.width as f32,
-            height: surface_size.extent.height as f32,
+            x: 0.0,
+            y: 0.0,
+            width: render_size.width as f32,
+            height: render_size.height as f32,
             min_depth: 0.0,
             max_depth: 1.0,
         };
-        let scissor = surface_size.clone();
+        let scissor = vk::Rect2D {
+            offset: vk::Offset2D { x: 0, y: 0 },
+            extent: vk::Extent2D {
+                width: render_size.width,
+                height: render_size.height,
+            },
+        };
         let viewport_state_info = vk::PipelineViewportStateCreateInfo {
             s_type: vk::StructureType::PipelineViewportStateCreateInfo,
             p_next: ptr::null(),
@@ -444,12 +411,10 @@ impl MainPass {
     /// * `renderpass`           The renderpass to produce framebuffers for.
     fn create_framebuffer(
         rs: &RenderState,
-        surface_size: vk::Rect2D,
+        render_size: vk::Extent3D,
         image_view: vk::ImageView,
         renderpass: vk::RenderPass,
-    ) -> Vec<vk::Framebuffer> {
-        let mut framebuffers: Vec<vk::Framebuffer> = Vec::new();
-
+    ) -> vk::Framebuffer {
         let framebuffer_attachments = [image_view];
         let frame_buffer_create_info = vk::FramebufferCreateInfo {
             s_type: vk::StructureType::FramebufferCreateInfo,
@@ -458,8 +423,8 @@ impl MainPass {
             render_pass: renderpass,
             attachment_count: framebuffer_attachments.len() as u32,
             p_attachments: framebuffer_attachments.as_ptr(),
-            width: surface_size.extent.width,
-            height: surface_size.extent.height,
+            width: render_size.width,
+            height: render_size.height,
             layers: 1,
         };
         let framebuffer;
@@ -467,34 +432,29 @@ impl MainPass {
             framebuffer = rs.device
                 .create_framebuffer(&frame_buffer_create_info, None)
                 .unwrap();
-            framebuffers.push(framebuffer);
         }
-        framebuffers
+        framebuffer
     }
 
-    /// Creates commandbuffers for the presentable images, one per image.
+    /// Creates commandbuffer.
     ///
     /// * `rs`            The RenderState.
-    /// * `framebuffers`  Framebuffers for the presentable images.
-    fn create_commandbuffer(
-        rs: &RenderState,
-        framebuffers: &Vec<vk::Framebuffer>,
-    ) -> Vec<vk::CommandBuffer> {
+    fn create_commandbuffer(rs: &RenderState) -> vk::CommandBuffer {
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::CommandBufferAllocateInfo,
             p_next: ptr::null(),
-            command_buffer_count: framebuffers.len() as u32,
+            command_buffer_count: 1,
             command_pool: rs.commandpool,
             level: vk::CommandBufferLevel::Primary,
         };
-        let command_buffers;
+        let commandbuffers;
         unsafe {
-            command_buffers = rs.device
+            commandbuffers = rs.device
                 .allocate_command_buffers(&command_buffer_allocate_info)
                 .unwrap();
         }
 
-        command_buffers
+        commandbuffers[0]
     }
 
 
@@ -504,48 +464,30 @@ impl MainPass {
     ///
     /// * `rs`  The RenderState.
     pub fn init(rs: &RenderState, cfg: &Config) -> MainPass {
-        // Surface
-        // TODO: Maybe find a way to get this another way. Currently Straight copy from
-        // PresentPass
-        let surface_loader =
-            Surface::new(&rs.entry, &rs.instance).expect("Unable to load the Surface extension");
-        let surface = PresentPass::create_surface(&rs.entry, &rs.instance, &rs.window).unwrap();
-        assert!(surface_loader.get_physical_device_surface_support_khr(
-            rs.pdevice,
-            rs.queue_family_index,
-            surface,
-        ));
-        let surface_formats = surface_loader
-            .get_physical_device_surface_formats_khr(rs.pdevice, surface)
-            .unwrap();
-        let surface_format = surface_formats
-            .iter()
-            .map(|sfmt| match sfmt.format {
-                vk::Format::Undefined => vk::SurfaceFormatKHR {
-                    format: vk::Format::B8g8r8Unorm,
-                    color_space: sfmt.color_space,
-                },
-                _ => sfmt.clone(),
-            })
-            .nth(0)
-            .expect("Unable to find suitable surface format.");
+        let texture = rs.load_image("assets/project_peril_logo.png");
 
-        let (texture_image, texture_mem, texture_view, texture_sampler) =
-            rs.load_image("assets/project_peril_logo.png");
-
-        let render_size = vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent: vk::Extent2D {
-                width: cfg.render_dimensions.0,
-                height: cfg.render_dimensions.1,
-            },
+        let render_format = vk::Format::R8g8b8a8Unorm;
+        let render_size = vk::Extent3D {
+            width: cfg.render_dimensions.0,
+            height: cfg.render_dimensions.1,
+            depth: 1,
         };
 
         //Create image to render to.
-        let (render_image, render_mem, render_image_view, render_sampler) =
-            MainPass::create_renderimages(rs, &surface_format, &render_size);
+        let render_image = rs.create_texture(
+            render_size,
+            vk::ImageType::Type2d,
+            vk::ImageViewType::Type2d,
+            render_format,
+            vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT,
+            vk::ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            vk::ImageLayout::ColorAttachmentOptimal,
+            None,
+        );
 
-        let renderpass = MainPass::create_renderpass(rs, &surface_format);
+
+        let renderpass = MainPass::create_renderpass(rs, render_format);
         let (
             descriptor_pool,
             descriptor_set_layouts,
@@ -554,10 +496,10 @@ impl MainPass {
             viewport,
             scissor,
             pipeline,
-        ) = MainPass::create_pipeline(rs, render_size, renderpass, texture_view, texture_sampler);
-        let framebuffers =
-            MainPass::create_framebuffer(rs, render_size, render_image_view, renderpass);
-        let command_buffers = MainPass::create_commandbuffer(rs, &framebuffers);
+        ) = MainPass::create_pipeline(rs, render_size, renderpass, texture.view, texture.sampler);
+        let framebuffer =
+            MainPass::create_framebuffer(rs, render_size, render_image.view, renderpass);
+        let commandbuffer = MainPass::create_commandbuffer(rs);
 
         MainPass {
             renderpass: renderpass,
@@ -568,31 +510,22 @@ impl MainPass {
             viewport: viewport,
             scissor: scissor,
             pipeline: pipeline,
-            //one framebuffer/commandbuffer per image
-            framebuffers: framebuffers,
-            commandbuffers: command_buffers,
+            framebuffer: framebuffer,
+            commandbuffer: commandbuffer,
 
-            //ImageView to render to.
             render_image: render_image,
-            render_image_view: render_image_view,
-            render_mem: render_mem,
-            render_sampler: render_sampler,
+
+            //TODO: remove later
+            texture: texture,
 
             // Keep a pointer to the device for cleanup
             device: Rc::clone(&rs.device),
-
-            //TODO: remove later
-            //ImageView to render to.
-            texture_image: texture_image,
-            texture_image_view: texture_view,
-            texture_mem: texture_mem,
-            texture_sampler: texture_sampler,
         }
     }
-    ///Begin main render pass
+    /// Begins the main render pass
     ///
-    ///returns a command buffer to be used in rendering.
-    pub fn begin_frame(&mut self, rs: &RenderState) -> Option<vk::CommandBuffer> {
+    /// Returns a command buffer to be used in rendering.
+    pub fn begin_frame(&mut self, rs: &RenderState) -> vk::CommandBuffer {
         // Begin commandbuffer
         let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
             s_type: vk::StructureType::CommandBufferBeginInfo,
@@ -600,7 +533,7 @@ impl MainPass {
             p_inheritance_info: ptr::null(),
             flags: vk::COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
         };
-        let cmd_buf = self.commandbuffers[0];
+        let cmd_buf = self.commandbuffer;
         unsafe {
             rs.device
                 .begin_command_buffer(cmd_buf, &cmd_buf_begin_info)
@@ -616,7 +549,7 @@ impl MainPass {
             s_type: vk::StructureType::RenderPassBeginInfo,
             p_next: ptr::null(),
             render_pass: self.renderpass,
-            framebuffer: self.framebuffers[0],
+            framebuffer: self.framebuffer,
             render_area: self.scissor,
             clear_value_count: clear_values.len() as u32,
             p_clear_values: clear_values.as_ptr(),
@@ -647,12 +580,12 @@ impl MainPass {
             rs.device.cmd_set_scissor(cmd_buf, &[self.scissor]);
         }
 
-        Some(cmd_buf)
+        cmd_buf
     }
 
-    ///End the main render frame and returns an Image.
-    pub fn end_frame_and_present(&mut self, rs: &RenderState) {
-        let cmd_buf = self.commandbuffers[0];
+    /// Ends the main render frame
+    pub fn end_frame(&mut self, rs: &RenderState) {
+        let cmd_buf = self.commandbuffer;
 
         unsafe {
             // End render pass and command buffer
@@ -670,7 +603,7 @@ impl MainPass {
             new_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
             src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
             dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            image: self.render_image,
+            image: self.render_image.image,
             subresource_range: vk::ImageSubresourceRange {
                 aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
                 base_mip_level: 0,
@@ -724,21 +657,17 @@ impl Drop for MainPass {
             // Always wait for device idle
             self.device.device_wait_idle().unwrap();
 
-            self.device.destroy_sampler(self.render_sampler, None);
-            self.device.destroy_image_view(self.render_image_view, None);
-            self.device.destroy_image(self.render_image, None);
-            self.device.free_memory(self.render_mem, None);
+            self.device.destroy_sampler(self.render_image.sampler, None);
+            self.device.destroy_image_view(self.render_image.view, None);
+            self.device.destroy_image(self.render_image.image, None);
+            self.device.free_memory(self.render_image.memory, None);
 
-            self.device.destroy_sampler(self.texture_sampler, None);
-            self.device
-                .destroy_image_view(self.texture_image_view, None);
-            self.device.destroy_image(self.texture_image, None);
-            self.device.free_memory(self.texture_mem, None);
+            self.device.destroy_sampler(self.texture.sampler, None);
+            self.device.destroy_image_view(self.texture.view, None);
+            self.device.destroy_image(self.texture.image, None);
+            self.device.free_memory(self.texture.memory, None);
 
-
-            for &framebuffer in self.framebuffers.iter() {
-                self.device.destroy_framebuffer(framebuffer, None);
-            }
+            self.device.destroy_framebuffer(self.framebuffer, None);
 
             self.device.destroy_pipeline(self.pipeline, None);
             self.device

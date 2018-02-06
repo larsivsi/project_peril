@@ -23,6 +23,13 @@ pub use self::presentpass::PresentPass;
 
 use config::Config;
 
+pub struct Texture {
+    image: vk::Image,
+    memory: vk::DeviceMemory,
+    view: vk::ImageView,
+    sampler: vk::Sampler,
+}
+
 pub struct RenderState {
     // Vulkan device
     entry: Entry<V1_0>,
@@ -579,9 +586,9 @@ impl RenderState {
     /// * `texture_view_type`    The type of the image view for the texture.
     /// * `texture_format`       The format of the texture
     /// * `texture_usage`        How the texture will be used.
-    /// * `texture_access_mask`  How the texture will be accessed.
-    /// * `texture_stage`        The pipeline stage for the texture.
-    /// * `texture_layout`       The final layout for the texture.
+    /// * `initial_access_mask`  Initial access mask for the texture.
+    /// * `initial_stage`        Initial pipeline stage for the texture.
+    /// * `initial_layout`       Initial layout for the texture.
     /// * `upload_buffer`        Optional: Buffer containing the initial values for the texture.
     fn create_texture(
         &self,
@@ -590,11 +597,11 @@ impl RenderState {
         texture_view_type: vk::ImageViewType,
         texture_format: vk::Format,
         mut texture_usage: vk::ImageUsageFlags,
-        texture_access_mask: vk::AccessFlags,
-        texture_stage: vk::PipelineStageFlags,
-        texture_layout: vk::ImageLayout,
+        initial_access_mask: vk::AccessFlags,
+        initial_stage: vk::PipelineStageFlags,
+        initial_layout: vk::ImageLayout,
         upload_buffer: Option<vk::Buffer>,
-    ) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
+    ) -> Texture {
         // In case we need to upload to the texture, mark it for transfer dst
         if upload_buffer.is_some() {
             texture_usage |= vk::IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -707,9 +714,9 @@ impl RenderState {
                     s_type: vk::StructureType::ImageMemoryBarrier,
                     p_next: ptr::null(),
                     src_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
-                    dst_access_mask: texture_access_mask,
+                    dst_access_mask: initial_access_mask,
                     old_layout: vk::ImageLayout::TransferDstOptimal,
-                    new_layout: texture_layout,
+                    new_layout: initial_layout,
                     src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
                     dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
                     image: texture_image,
@@ -725,7 +732,7 @@ impl RenderState {
                     self.device.cmd_pipeline_barrier(
                         cmd_buf,
                         vk::PIPELINE_STAGE_TRANSFER_BIT,
-                        texture_stage,
+                        initial_stage,
                         vk::DependencyFlags::empty(),
                         &[],
                         &[],
@@ -739,9 +746,9 @@ impl RenderState {
                     s_type: vk::StructureType::ImageMemoryBarrier,
                     p_next: ptr::null(),
                     src_access_mask: Default::default(),
-                    dst_access_mask: texture_access_mask,
+                    dst_access_mask: initial_access_mask,
                     old_layout: vk::ImageLayout::Undefined,
-                    new_layout: texture_layout,
+                    new_layout: initial_layout,
                     src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
                     dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
                     image: texture_image,
@@ -757,7 +764,7 @@ impl RenderState {
                     self.device.cmd_pipeline_barrier(
                         cmd_buf,
                         vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                        texture_stage,
+                        initial_stage,
                         vk::DependencyFlags::empty(),
                         &[],
                         &[],
@@ -823,7 +830,12 @@ impl RenderState {
             sampler = self.device.create_sampler(&sampler_info, None).unwrap();
         }
 
-        (texture_image, texture_memory, texture_view, sampler)
+        Texture {
+            image: texture_image,
+            memory: texture_memory,
+            view: texture_view,
+            sampler: sampler,
+        }
     }
 
     /// Loads the image given by the path into read only texture.
@@ -831,7 +843,7 @@ impl RenderState {
     /// Note: The caller is responsible for cleaning up the returned vulkan types.
     ///
     /// * `path`  Path to the image.
-    fn load_image(&self, path: &str) -> (vk::Image, vk::DeviceMemory, vk::ImageView, vk::Sampler) {
+    fn load_image(&self, path: &str) -> Texture {
         // Load the image data into a vk::Buffer
         let image = image::open(path).unwrap().to_rgba();
         let image_extent;
@@ -852,7 +864,7 @@ impl RenderState {
         );
 
         // Create a texture from the buffer data
-        let (texture_image, texture_mem, texture_view, texture_sampler) = self.create_texture(
+        let texture = self.create_texture(
             image_extent,
             vk::ImageType::Type2d,
             vk::ImageViewType::Type2d,
@@ -870,7 +882,7 @@ impl RenderState {
             self.device.free_memory(image_memory, None);
         }
 
-        (texture_image, texture_mem, texture_view, texture_sampler)
+        texture
     }
 }
 
