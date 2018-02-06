@@ -8,8 +8,7 @@ use std::ptr;
 use std::rc::Rc;
 use winit;
 
-use renderer::RenderState;
-use renderer::MainPass;
+use renderer::{RenderState, Texture};
 
 pub struct PresentPass {
     // Surface
@@ -264,8 +263,6 @@ impl PresentPass {
         rs: &RenderState,
         surface_size: vk::Rect2D,
         renderpass: vk::RenderPass,
-        texture_view: vk::ImageView, //TODO: Get this imageview from main renderpass.
-        texture_sampler: vk::Sampler,
     ) -> (
         vk::DescriptorPool,
         Vec<vk::DescriptorSetLayout>,
@@ -333,29 +330,6 @@ impl PresentPass {
                 .allocate_descriptor_sets(&desc_alloc_info)
                 .unwrap();
         }
-        let tex_descriptor = vk::DescriptorImageInfo {
-            image_layout: vk::ImageLayout::General,
-            image_view: texture_view,
-            sampler: texture_sampler,
-        };
-        let write_desc_sets = [
-            vk::WriteDescriptorSet {
-                s_type: vk::StructureType::WriteDescriptorSet,
-                p_next: ptr::null(),
-                dst_set: descriptor_sets[0],
-                dst_binding: 0,
-                dst_array_element: 0,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::CombinedImageSampler,
-                p_image_info: &tex_descriptor,
-                p_buffer_info: ptr::null(),
-                p_texel_buffer_view: ptr::null(),
-            },
-        ];
-        unsafe {
-            rs.device.update_descriptor_sets(&write_desc_sets, &[]);
-        }
-
         let layout_create_info = vk::PipelineLayoutCreateInfo {
             s_type: vk::StructureType::PipelineLayoutCreateInfo,
             p_next: ptr::null(),
@@ -620,7 +594,7 @@ impl PresentPass {
     /// Initializes the PresentPass based on a RenderState
     ///
     /// This will set up the swapchain, renderpass, etc.
-    pub fn init(rs: &RenderState, mainrender: &MainPass) -> PresentPass {
+    pub fn init(rs: &RenderState) -> PresentPass {
         // Surface
         let surface_loader =
             Surface::new(&rs.entry, &rs.instance).expect("Unable to load the Surface extension");
@@ -679,13 +653,7 @@ impl PresentPass {
             viewport,
             scissor,
             pipeline,
-        ) = PresentPass::create_pipeline(
-            rs,
-            surface_size,
-            renderpass,
-            mainrender.render_image.view,
-            mainrender.render_image.sampler,
-        );
+        ) = PresentPass::create_pipeline(rs, surface_size, renderpass);
         let framebuffers =
             PresentPass::create_framebuffers(rs, surface_size, &present_image_views, renderpass);
         let command_buffers = PresentPass::create_commandbuffers(rs, &framebuffers);
@@ -762,7 +730,7 @@ impl PresentPass {
     /// Releases the old and creates a new swapchain.
     ///
     /// This function should be called when the presentable surface is resized, etc.
-    fn recreate_swapchain(&mut self, rs: &RenderState, mr: &MainPass) {
+    fn recreate_swapchain(&mut self, rs: &RenderState) {
         self.cleanup_swapchain();
 
         let (swapchain, surface_size) = PresentPass::create_swapchain(
@@ -791,13 +759,7 @@ impl PresentPass {
             viewport,
             scissor,
             pipeline,
-        ) = PresentPass::create_pipeline(
-            rs,
-            surface_size,
-            renderpass,
-            mr.render_image.view,
-            mr.render_image.sampler,
-        );
+        ) = PresentPass::create_pipeline(rs, surface_size, renderpass);
         self.descriptor_pool = descriptor_pool;
         self.descriptor_set_layouts = descriptor_set_layouts;
         self.descriptor_sets = descriptor_sets;
@@ -821,7 +783,7 @@ impl PresentPass {
     ///
     /// On error (for example when the swapchain needs to be recreated), this function returns
     /// None, meaning that the current frame should be skipped.
-    pub fn begin_frame(&mut self, rs: &RenderState, mr: &MainPass) -> Option<vk::CommandBuffer> {
+    fn begin_frame(&mut self, rs: &RenderState) -> Option<vk::CommandBuffer> {
         let result;
         unsafe {
             result = self.swapchain_loader.acquire_next_image_khr(
@@ -837,7 +799,7 @@ impl PresentPass {
                 self.current_present_idx = idx as usize;
             }
             Err(vkres) => if vkres == vk::Result::ErrorOutOfDateKhr {
-                self.recreate_swapchain(rs, mr);
+                self.recreate_swapchain(rs);
                 return None;
             },
         }
@@ -878,15 +840,6 @@ impl PresentPass {
                 vk::SubpassContents::Inline,
             );
 
-            rs.device.cmd_bind_descriptor_sets(
-                cmd_buf,
-                vk::PipelineBindPoint::Graphics,
-                self.pipeline_layout,
-                0,
-                &self.descriptor_sets[..],
-                &[],
-            );
-
             // Bind pipeline
             rs.device
                 .cmd_bind_pipeline(cmd_buf, vk::PipelineBindPoint::Graphics, self.pipeline);
@@ -901,7 +854,7 @@ impl PresentPass {
     /// Ends the current frame and presents it.
     ///
     /// begin_frame() must have been called before this function.
-    pub fn end_frame_and_present(&mut self, rs: &RenderState, mp: &MainPass) {
+    fn end_frame_and_present(&mut self, rs: &RenderState, image: &Texture) {
         debug_assert!(self.current_present_idx < std::usize::MAX);
 
         let cmd_buf = self.commandbuffers[self.current_present_idx];
@@ -921,7 +874,7 @@ impl PresentPass {
             new_layout: vk::ImageLayout::ColorAttachmentOptimal,
             src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
             dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            image: mp.render_image.image,
+            image: image.image,
             subresource_range: vk::ImageSubresourceRange {
                 aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
                 base_mip_level: 0,
@@ -997,6 +950,62 @@ impl PresentPass {
 
         // Make sure we call begin_frame() before calling this function again
         self.current_present_idx = std::usize::MAX;
+    }
+
+    /// Presents the passed image to the screen.
+    ///
+    /// If swapchain is outdated, a new one is created, but no image output is done.
+    pub fn present_image(&mut self, rs: &RenderState, image: &Texture) {
+        let cmd_buf;
+        let res = self.begin_frame(rs);
+        match res {
+            Some(buf) => {
+                cmd_buf = buf;
+            }
+            None => {
+                // Swapchain was outdated, but now one was created.
+                // Skip this frame.
+                return;
+            }
+        }
+        // Draw stuff
+        let image_descriptor = vk::DescriptorImageInfo {
+            image_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
+            image_view: image.view,
+            sampler: image.sampler,
+        };
+        let write_desc_sets = [
+            vk::WriteDescriptorSet {
+                s_type: vk::StructureType::WriteDescriptorSet,
+                p_next: ptr::null(),
+                dst_set: self.descriptor_sets[0],
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::CombinedImageSampler,
+                p_image_info: &image_descriptor,
+                p_buffer_info: ptr::null(),
+                p_texel_buffer_view: ptr::null(),
+            },
+        ];
+        unsafe {
+            // Update the descriptor set for the image to draw
+            rs.device.update_descriptor_sets(&write_desc_sets, &[]);
+            // ...and bind it
+            rs.device.cmd_bind_descriptor_sets(
+                cmd_buf,
+                vk::PipelineBindPoint::Graphics,
+                self.pipeline_layout,
+                0,
+                &self.descriptor_sets[..],
+                &[],
+            );
+
+            // We have a hardcoded quad shader, so just draw six vertices
+            rs.device.cmd_draw(cmd_buf, 6, 1, 0, 0);
+        }
+        //then swapbuffers etc.
+        self.end_frame_and_present(rs, image);
     }
 }
 

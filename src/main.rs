@@ -25,8 +25,8 @@ fn main() {
     let cfg = Config::read_config("options.cfg");
 
     let mut renderstate = RenderState::init(&cfg);
-    let mut mainrender = MainPass::init(&renderstate, &cfg);
-    let mut presentstate = PresentPass::init(&renderstate, &mainrender);
+    let mut presentpass = PresentPass::init(&renderstate);
+    let mut mainpass = MainPass::init(&renderstate, &cfg);
     let _scene = Scene::new(&renderstate);
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
     let _view_matrix = camera.generate_view_matrix();
@@ -74,33 +74,15 @@ fn main() {
             elapsed_time += delta_time;
         }
 
-        //Main RenderPass goes here
-        let main_cmd_buf = mainrender.begin_frame(&renderstate);
+        // Do the main rendering
+        let main_cmd_buf = mainpass.begin_frame(&renderstate);
         unsafe {
             renderstate.device.cmd_draw(main_cmd_buf, 6, 1, 0, 0);
         }
-        mainrender.end_frame(&renderstate);
+        mainpass.end_frame(&renderstate);
 
-        //call to render function goes here
-        let cmd_buf;
-        let res = presentstate.begin_frame(&renderstate, &mainrender);
-        match res {
-            Some(buf) => {
-                cmd_buf = buf;
-            }
-            None => {
-                // Swapchain was outdated, but now one was created.
-                // Skip this frame.
-                continue;
-            }
-        }
-        // Draw stuff
-        unsafe {
-            // just fake six vertices for now
-            renderstate.device.cmd_draw(cmd_buf, 6, 1, 0, 0);
-        }
-        //then swapbuffers etc.
-        presentstate.end_frame_and_present(&renderstate, &mainrender);
+        // Present the rendered image
+        presentpass.present_image(&renderstate, &mainpass.render_image);
         framecount += 1;
 
         if framecount % 100 == 0 {
