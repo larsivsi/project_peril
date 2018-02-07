@@ -46,7 +46,7 @@ impl MainPass {
                 stencil_load_op: vk::AttachmentLoadOp::DontCare,
                 stencil_store_op: vk::AttachmentStoreOp::DontCare,
                 initial_layout: vk::ImageLayout::ColorAttachmentOptimal,
-                final_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
+                final_layout: vk::ImageLayout::ColorAttachmentOptimal,
             },
         ];
         let color_attachment_ref = vk::AttachmentReference {
@@ -464,11 +464,10 @@ impl MainPass {
             render_format,
             vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT,
             vk::ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             vk::ImageLayout::ColorAttachmentOptimal,
+            vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             None,
         );
-
 
         let renderpass = MainPass::create_renderpass(rs, render_format);
         let (
@@ -509,6 +508,14 @@ impl MainPass {
     ///
     /// Returns a command buffer to be used in rendering.
     pub fn begin_frame(&mut self, rs: &RenderState) -> vk::CommandBuffer {
+        // Transition the mainpass output to a renderable image
+        rs.transition_texture(
+            &mut self.render_image,
+            vk::ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            vk::ImageLayout::ColorAttachmentOptimal,
+            vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        );
+
         // Begin commandbuffer
         let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
             s_type: vk::StructureType::CommandBufferBeginInfo,
@@ -573,39 +580,6 @@ impl MainPass {
         unsafe {
             // End render pass and command buffer
             rs.device.cmd_end_render_pass(cmd_buf);
-        }
-
-        // Transition the mainpass output to a samplable image
-        let image_barrier = vk::ImageMemoryBarrier {
-            s_type: vk::StructureType::ImageMemoryBarrier,
-            p_next: ptr::null(),
-            src_access_mask: vk::ACCESS_COLOR_ATTACHMENT_READ_BIT
-                | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            dst_access_mask: vk::ACCESS_SHADER_READ_BIT,
-            old_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
-            new_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
-            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            image: self.render_image.image,
-            subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-        };
-        unsafe {
-            rs.device.cmd_pipeline_barrier(
-                cmd_buf,
-                vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &[image_barrier],
-            );
-
             rs.device
                 .end_command_buffer(cmd_buf)
                 .expect("End commandbuffer");

@@ -28,6 +28,9 @@ pub struct Texture {
     memory: vk::DeviceMemory,
     view: vk::ImageView,
     sampler: vk::Sampler,
+    current_access_mask: vk::AccessFlags,
+    current_layout: vk::ImageLayout,
+    current_stage: vk::PipelineStageFlags,
 }
 
 pub struct RenderState {
@@ -555,8 +558,8 @@ impl RenderState {
         texture_format: vk::Format,
         mut texture_usage: vk::ImageUsageFlags,
         initial_access_mask: vk::AccessFlags,
-        initial_stage: vk::PipelineStageFlags,
         initial_layout: vk::ImageLayout,
+        initial_stage: vk::PipelineStageFlags,
         upload_buffer: Option<vk::Buffer>,
     ) -> Texture {
         // In case we need to upload to the texture, mark it for transfer dst
@@ -792,6 +795,9 @@ impl RenderState {
             memory: texture_memory,
             view: texture_view,
             sampler: sampler,
+            current_access_mask: initial_access_mask,
+            current_layout: initial_layout,
+            current_stage: initial_stage,
         }
     }
 
@@ -826,8 +832,8 @@ impl RenderState {
             vk::Format::R8g8b8a8Unorm,
             vk::IMAGE_USAGE_SAMPLED_BIT,
             vk::ACCESS_SHADER_READ_BIT,
-            vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             vk::ImageLayout::ShaderReadOnlyOptimal,
+            vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             Some(image_buffer),
         );
 
@@ -838,6 +844,57 @@ impl RenderState {
         }
 
         texture
+    }
+
+    pub fn transition_texture(
+        &self,
+        texture: &mut Texture,
+        new_access_mask: vk::AccessFlags,
+        new_layout: vk::ImageLayout,
+        new_stage: vk::PipelineStageFlags,
+    ) {
+        // Skip if there's nothing to do
+        if texture.current_access_mask == new_access_mask && texture.current_layout == new_layout
+            && texture.current_stage == new_stage
+        {
+            return;
+        }
+
+        let cmd_buf = self.begin_single_time_commands();
+        let texture_barrier = vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::ImageMemoryBarrier,
+            p_next: ptr::null(),
+            src_access_mask: texture.current_access_mask,
+            dst_access_mask: new_access_mask,
+            old_layout: texture.current_layout,
+            new_layout: new_layout,
+            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+            image: texture.image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+        };
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                cmd_buf,
+                texture.current_stage,
+                new_stage,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[texture_barrier],
+            );
+        }
+        self.end_single_time_commands(cmd_buf);
+
+        texture.current_access_mask = new_access_mask;
+        texture.current_layout = new_layout;
+        texture.current_stage = new_stage;
     }
 }
 

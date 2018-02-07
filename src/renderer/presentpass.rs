@@ -783,7 +783,7 @@ impl PresentPass {
     ///
     /// On error (for example when the swapchain needs to be recreated), this function returns
     /// None, meaning that the current frame should be skipped.
-    fn begin_frame(&mut self, rs: &RenderState) -> Option<vk::CommandBuffer> {
+    fn begin_frame(&mut self, rs: &RenderState, image: &mut Texture) -> Option<vk::CommandBuffer> {
         let result;
         unsafe {
             result = self.swapchain_loader.acquire_next_image_khr(
@@ -803,6 +803,14 @@ impl PresentPass {
                 return None;
             },
         }
+
+        // Transition the mainpass output to a renderable image
+        rs.transition_texture(
+            image,
+            vk::ACCESS_SHADER_READ_BIT,
+            vk::ImageLayout::ShaderReadOnlyOptimal,
+            vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        );
 
         // Begin commandbuffer
         let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
@@ -854,46 +862,13 @@ impl PresentPass {
     /// Ends the current frame and presents it.
     ///
     /// begin_frame() must have been called before this function.
-    fn end_frame_and_present(&mut self, rs: &RenderState, image: &Texture) {
+    fn end_frame_and_present(&mut self, rs: &RenderState) {
         debug_assert!(self.current_present_idx < std::usize::MAX);
 
         let cmd_buf = self.commandbuffers[self.current_present_idx];
         unsafe {
             // End render pass and command buffer
             rs.device.cmd_end_render_pass(cmd_buf);
-        }
-
-        // Transition the mainpass output back to a renderable image
-        let image_barrier = vk::ImageMemoryBarrier {
-            s_type: vk::StructureType::ImageMemoryBarrier,
-            p_next: ptr::null(),
-            src_access_mask: vk::ACCESS_SHADER_READ_BIT,
-            dst_access_mask: vk::ACCESS_COLOR_ATTACHMENT_READ_BIT
-                | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            old_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
-            new_layout: vk::ImageLayout::ColorAttachmentOptimal,
-            src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-            image: image.image,
-            subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-        };
-        unsafe {
-            rs.device.cmd_pipeline_barrier(
-                cmd_buf,
-                vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &[image_barrier],
-            );
-
             rs.device
                 .end_command_buffer(cmd_buf)
                 .expect("End commandbuffer");
@@ -955,9 +930,9 @@ impl PresentPass {
     /// Presents the passed image to the screen.
     ///
     /// If swapchain is outdated, a new one is created, but no image output is done.
-    pub fn present_image(&mut self, rs: &RenderState, image: &Texture) {
+    pub fn present_image(&mut self, rs: &RenderState, image: &mut Texture) {
         let cmd_buf;
-        let res = self.begin_frame(rs);
+        let res = self.begin_frame(rs, image);
         match res {
             Some(buf) => {
                 cmd_buf = buf;
@@ -970,7 +945,7 @@ impl PresentPass {
         }
         // Draw stuff
         let image_descriptor = vk::DescriptorImageInfo {
-            image_layout: vk::ImageLayout::ShaderReadOnlyOptimal,
+            image_layout: image.current_layout,
             image_view: image.view,
             sampler: image.sampler,
         };
@@ -1005,7 +980,7 @@ impl PresentPass {
             rs.device.cmd_draw(cmd_buf, 6, 1, 0, 0);
         }
         //then swapbuffers etc.
-        self.end_frame_and_present(rs, image);
+        self.end_frame_and_present(rs);
     }
 }
 

@@ -82,7 +82,7 @@ fn main() {
         mainpass.end_frame(&renderstate);
 
         // Present the rendered image
-        presentpass.present_image(&renderstate, &mainpass.render_image);
+        presentpass.present_image(&renderstate, &mut mainpass.render_image);
         framecount += 1;
 
         if framecount % 100 == 0 {
