@@ -508,14 +508,6 @@ impl MainPass {
     ///
     /// Returns a command buffer to be used in rendering.
     pub fn begin_frame(&mut self, rs: &RenderState) -> vk::CommandBuffer {
-        // Transition the mainpass output to a renderable image
-        rs.transition_texture(
-            &mut self.render_image,
-            vk::ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            vk::ImageLayout::ColorAttachmentOptimal,
-            vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        );
-
         // Begin commandbuffer
         let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
             s_type: vk::StructureType::CommandBufferBeginInfo,
@@ -529,6 +521,15 @@ impl MainPass {
                 .begin_command_buffer(cmd_buf, &cmd_buf_begin_info)
                 .expect("Begin commandbuffer");
         }
+
+        // Transition the mainpass output to a renderable image
+        rs.transition_texture(
+            &mut self.render_image,
+            vk::ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            vk::ImageLayout::ColorAttachmentOptimal,
+            vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            Some(cmd_buf),
+        );
 
         // Begin renderpass
         let clear_values = [

@@ -804,14 +804,6 @@ impl PresentPass {
             },
         }
 
-        // Transition the mainpass output to a renderable image
-        rs.transition_texture(
-            image,
-            vk::ACCESS_SHADER_READ_BIT,
-            vk::ImageLayout::ShaderReadOnlyOptimal,
-            vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        );
-
         // Begin commandbuffer
         let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
             s_type: vk::StructureType::CommandBufferBeginInfo,
@@ -825,6 +817,15 @@ impl PresentPass {
                 .begin_command_buffer(cmd_buf, &cmd_buf_begin_info)
                 .expect("Begin commandbuffer");
         }
+
+        // Transition the mainpass output to a samplable image
+        rs.transition_texture(
+            image,
+            vk::ACCESS_SHADER_READ_BIT,
+            vk::ImageLayout::ShaderReadOnlyOptimal,
+            vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            Some(cmd_buf),
+        );
 
         // Begin renderpass
         let clear_values = [

@@ -846,12 +846,17 @@ impl RenderState {
         texture
     }
 
+    /// Transitions a Texture from its current access_mask/layout/pipeline_stage to the passed
+    /// values.
+    ///
+    /// This will use a single time command buffer unless one is passed to the function.
     pub fn transition_texture(
         &self,
         texture: &mut Texture,
         new_access_mask: vk::AccessFlags,
         new_layout: vk::ImageLayout,
         new_stage: vk::PipelineStageFlags,
+        opt_cmd_buf: Option<vk::CommandBuffer>,
     ) {
         // Skip if there's nothing to do
         if texture.current_access_mask == new_access_mask && texture.current_layout == new_layout
@@ -860,7 +865,6 @@ impl RenderState {
             return;
         }
 
-        let cmd_buf = self.begin_single_time_commands();
         let texture_barrier = vk::ImageMemoryBarrier {
             s_type: vk::StructureType::ImageMemoryBarrier,
             p_next: ptr::null(),
@@ -879,19 +883,35 @@ impl RenderState {
                 layer_count: 1,
             },
         };
-        unsafe {
-            self.device.cmd_pipeline_barrier(
-                cmd_buf,
-                texture.current_stage,
-                new_stage,
-                vk::DependencyFlags::empty(),
-                &[],
-                &[],
-                &[texture_barrier],
-            );
-        }
-        self.end_single_time_commands(cmd_buf);
 
+        match opt_cmd_buf {
+            Some(cmd_buf) => unsafe {
+                self.device.cmd_pipeline_barrier(
+                    cmd_buf,
+                    texture.current_stage,
+                    new_stage,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[texture_barrier],
+                );
+            },
+            None => {
+                let cmd_buf = self.begin_single_time_commands();
+                unsafe {
+                    self.device.cmd_pipeline_barrier(
+                        cmd_buf,
+                        texture.current_stage,
+                        new_stage,
+                        vk::DependencyFlags::empty(),
+                        &[],
+                        &[],
+                        &[texture_barrier],
+                    );
+                }
+                self.end_single_time_commands(cmd_buf);
+            }
+        }
         texture.current_access_mask = new_access_mask;
         texture.current_layout = new_layout;
         texture.current_stage = new_stage;
