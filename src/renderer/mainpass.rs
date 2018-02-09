@@ -41,7 +41,7 @@ impl MainPass {
                 format: render_format,
                 flags: vk::AttachmentDescriptionFlags::empty(),
                 samples: vk::SAMPLE_COUNT_1_BIT,
-                load_op: vk::AttachmentLoadOp::Clear,
+                load_op: vk::AttachmentLoadOp::DontCare,
                 store_op: vk::AttachmentStoreOp::Store,
                 stencil_load_op: vk::AttachmentLoadOp::DontCare,
                 stencil_store_op: vk::AttachmentStoreOp::DontCare,
