@@ -493,7 +493,7 @@ impl MainPass {
             vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
                 | vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             vk::ImageLayout::DepthStencilAttachmentOptimal,
-            vk::PIPELINE_STAGE_GRAPHICS_ALL_BIT,
+            vk::PIPELINE_STAGE_ALL_GRAPHICS_BIT,
             None,
         );
 
