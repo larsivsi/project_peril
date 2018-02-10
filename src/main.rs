@@ -11,13 +11,17 @@ mod object;
 mod renderer;
 mod scene;
 
-use cgmath::Point3;
+use ash::vk;
+use ash::util::Align;
+use ash::version::DeviceV1_0;
+use cgmath::{Deg, Matrix4, Point3, Rad};
 use config::Config;
 use nurbs::{NURBSpline, Order};
 use object::Camera;
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
+use std::mem::{align_of, size_of};
 
 fn main() {
     // init stuff
@@ -28,7 +32,13 @@ fn main() {
     let mut mainpass = MainPass::init(&renderstate, &cfg);
     let scene = Scene::new(&renderstate);
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
-    let _view_matrix = camera.generate_view_matrix();
+    let mut view_matrix = camera.generate_view_matrix();
+    let fov_horizontal = 90.0;
+    let aspect_ratio = cfg.render_dimensions.0 as f32 / cfg.render_dimensions.1 as f32;
+    let fov_vertical = Rad::from(Deg(fov_horizontal / aspect_ratio));
+    let near = 1.0;
+    let far = 1000.0;
+    let projection_matrix = cgmath::perspective(fov_vertical, aspect_ratio, near, far);
 
     let points = vec![
         Point3::new(1.0, 0.0, 0.0),
@@ -73,9 +83,36 @@ fn main() {
             elapsed_time += delta_time;
         }
 
+        // Update the view matrix uniform buffer
+        view_matrix = camera.generate_view_matrix();
+        let view_matrix_buf_size = size_of::<Matrix4<f32>>() as u64;
+        unsafe {
+            let mem_ptr = renderstate
+                .device
+                .map_memory(
+                    mainpass.view_matrix_ub_mem,
+                    0,
+                    view_matrix_buf_size,
+                    vk::MemoryMapFlags::empty(),
+                )
+                .expect("Failed to map index memory");
+            let mut mem_align = Align::new(
+                mem_ptr,
+                align_of::<Matrix4<f32>>() as u64,
+                view_matrix_buf_size,
+            );
+            mem_align.copy_from_slice(&[view_matrix]);
+            renderstate.device.unmap_memory(mainpass.view_matrix_ub_mem);
+        }
+
         // Do the main rendering
         let main_cmd_buf = mainpass.begin_frame(&renderstate);
-        scene.draw(main_cmd_buf);
+        scene.draw(
+            main_cmd_buf,
+            mainpass.pipeline_layout,
+            &view_matrix,
+            &projection_matrix,
+        );
         mainpass.end_frame(&renderstate);
 
         // Present the rendered image

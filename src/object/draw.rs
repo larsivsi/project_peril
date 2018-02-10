@@ -1,10 +1,11 @@
 use ash::vk;
 use ash::Device;
 use ash::version::{DeviceV1_0, V1_0};
-use cgmath::Point3;
+use cgmath::{Matrix4, Point3};
 use object::{Drawable, Position};
 use renderer::RenderState;
 use std::rc::Rc;
+use std::{mem, slice};
 
 
 #[derive(Clone, Copy)]
@@ -21,7 +22,7 @@ pub struct DrawObject {
     indices: vk::Buffer,
     index_mem: vk::DeviceMemory,
 
-    position: Point3<f64>,
+    position: Point3<f32>,
 
     num_indices: u32,
 
@@ -29,9 +30,51 @@ pub struct DrawObject {
     device: Rc<Device<V1_0>>,
 }
 
+struct MatrixBlock {
+    mv: Matrix4<f32>,
+    mvp: Matrix4<f32>,
+}
+
 impl Drawable for DrawObject {
-    fn draw(&self, cmd_buf: vk::CommandBuffer) {
+    fn draw(
+        &self,
+        cmd_buf: vk::CommandBuffer,
+        pipeline_layout: vk::PipelineLayout,
+        view_matrix: &Matrix4<f32>,
+        projection_matrix: &Matrix4<f32>,
+    ) {
+        // TODO: no rotation yet
+        let model_matrix = Matrix4::from_translation(
+            self.get_position() - Point3::<f32> {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        );
+        // The order of multiplication here is important!
+        let mv_matrix = view_matrix * model_matrix;
+        let mvp_matrix = projection_matrix * mv_matrix;
+        let matrices = MatrixBlock {
+            mv: mv_matrix,
+            mvp: mvp_matrix,
+        };
+
+        let matrices_bytes;
         unsafe {
+            matrices_bytes = slice::from_raw_parts(
+                (&matrices as *const MatrixBlock) as *const u32,
+                mem::size_of::<MatrixBlock>(),
+            );
+        }
+
+        unsafe {
+            self.device.cmd_push_constants(
+                cmd_buf,
+                pipeline_layout,
+                vk::SHADER_STAGE_VERTEX_BIT,
+                0,
+                matrices_bytes,
+            );
             self.device
                 .cmd_bind_vertex_buffers(cmd_buf, 0, &[self.vertices], &[0]);
             self.device
@@ -43,11 +86,11 @@ impl Drawable for DrawObject {
 }
 
 impl Position for DrawObject {
-    fn get_position(&self) -> Point3<f64> {
+    fn get_position(&self) -> Point3<f32> {
         self.position
     }
 
-    fn set_position(&mut self, position: Point3<f64>) {
+    fn set_position(&mut self, position: Point3<f32>) {
         self.position = position;
     }
 }
@@ -56,7 +99,7 @@ impl DrawObject {
     /// Creates a new quad draw object.
     pub fn new_quad(
         rs: &RenderState,
-        position: Point3<f64>,
+        position: Point3<f32>,
         width: f32,
         height: f32,
     ) -> DrawObject {
@@ -113,7 +156,7 @@ impl DrawObject {
 
     pub fn new_cuboid(
         rs: &RenderState,
-        position: Point3<f64>,
+        position: Point3<f32>,
         width: f32,
         height: f32,
         depth: f32,

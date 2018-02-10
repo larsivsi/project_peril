@@ -5,7 +5,7 @@ use cgmath::Matrix4;
 use std::ffi::CString;
 use std::ptr;
 use std::rc::Rc;
-use std::mem;
+use std::mem::size_of;
 
 use renderer::{RenderState, Texture};
 use object::draw::Vertex;
@@ -17,7 +17,7 @@ pub struct MainPass {
     descriptor_pool: vk::DescriptorPool,
     descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     descriptor_sets: Vec<vk::DescriptorSet>,
-    pipeline_layout: vk::PipelineLayout,
+    pub pipeline_layout: vk::PipelineLayout,
     viewport: vk::Viewport,
     scissor: vk::Rect2D,
     pipeline: vk::Pipeline,
@@ -30,7 +30,7 @@ pub struct MainPass {
     depth_image: Texture,
 
     view_matrix_ub: vk::Buffer,
-    view_matrix_ub_mem: vk::DeviceMemory,
+    pub view_matrix_ub_mem: vk::DeviceMemory,
 
     // Keep a pointer to the device for cleanup
     device: Rc<Device<V1_0>>,
@@ -182,7 +182,7 @@ impl MainPass {
 
         let mv_matrices_push_constant = vk::PushConstantRange {
             stage_flags: vk::SHADER_STAGE_VERTEX_BIT,
-            size: 2 * mem::size_of::<Matrix4<f32>>() as u32,
+            size: 2 * size_of::<Matrix4<f32>>() as u32,
             offset: 0,
         };
 
@@ -231,7 +231,7 @@ impl MainPass {
         //TODO: These would probably do better to live where the Vertex struct is defined.
         let vertex_binding_description = vk::VertexInputBindingDescription {
             binding: 0,
-            stride: mem::size_of::<Vertex>() as u32,
+            stride: size_of::<Vertex>() as u32,
             input_rate: vk::VertexInputRate::Vertex,
         };
 
@@ -246,7 +246,7 @@ impl MainPass {
             binding: 0,
             location: 1,
             format: vk::Format::R32g32b32Sfloat,
-            offset: 3 * mem::size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
+            offset: 3 * size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
         };
 
         // TODO: use texture coords
@@ -254,7 +254,7 @@ impl MainPass {
         //    binding: 0,
         //    location: 2,
         //    format: vk::Format::R32g32Sfloat,
-        //    offset: 6 * mem::size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
+        //    offset: 6 * size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
         //};
 
         let vertex_input_binding_descriptions = [vertex_binding_description];
@@ -520,7 +520,7 @@ impl MainPass {
         let (vmat_buf, vmat_mem) = rs.create_buffer(
             vk::BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            mem::size_of::<Matrix4<f32>>() as u64,
+            size_of::<Matrix4<f32>>() as u64,
         );
 
         let renderpass = MainPass::create_renderpass(rs, render_format);
@@ -610,7 +610,30 @@ impl MainPass {
             p_clear_values: clear_values.as_ptr(),
         };
 
+        let view_matrix_ub_descriptor = vk::DescriptorBufferInfo {
+            buffer: self.view_matrix_ub,
+            offset: 0,
+            range: size_of::<Matrix4<f32>>() as u64,
+        };
+        let write_desc_sets = [
+            vk::WriteDescriptorSet {
+                s_type: vk::StructureType::WriteDescriptorSet,
+                p_next: ptr::null(),
+                dst_set: self.descriptor_sets[0],
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::UniformBuffer,
+                p_image_info: ptr::null(),
+                p_buffer_info: &view_matrix_ub_descriptor,
+                p_texel_buffer_view: ptr::null(),
+            },
+        ];
+
         unsafe {
+            // Update the view matrix descriptor set
+            rs.device.update_descriptor_sets(&write_desc_sets, &[]);
+
             // Start the render pass
             rs.device.cmd_begin_render_pass(
                 cmd_buf,

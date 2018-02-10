@@ -1,4 +1,4 @@
-use cgmath::Point3;
+use cgmath::{Matrix4, Point3};
 use object::{DrawObject, Drawable};
 use renderer::RenderState;
 use ash::vk;
@@ -22,9 +22,15 @@ impl Scene {
         scene
     }
 
-    pub fn draw(&self, cmd_buf: vk::CommandBuffer) {
+    pub fn draw(
+        &self,
+        cmd_buf: vk::CommandBuffer,
+        pipeline_layout: vk::PipelineLayout,
+        view_matrix: &Matrix4<f32>,
+        projection_matrix: &Matrix4<f32>,
+    ) {
         for object in self.objects.iter() {
-            object.draw(cmd_buf);
+            object.draw(cmd_buf, pipeline_layout, view_matrix, projection_matrix);
         }
     }
 }

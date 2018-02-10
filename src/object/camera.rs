@@ -3,13 +3,13 @@ use cgmath::{Matrix4, Point3, Vector3};
 use object::Position;
 
 pub struct Camera {
-    position: Point3<f64>,
-    front: Vector3<f64>,
-    up: Vector3<f64>,
-    right: Vector3<f64>,
-    world_up: Vector3<f64>,
-    yaw: f64,
-    pitch: f64,
+    position: Point3<f32>,
+    front: Vector3<f32>,
+    up: Vector3<f32>,
+    right: Vector3<f32>,
+    world_up: Vector3<f32>,
+    yaw: f32,
+    pitch: f32,
 }
 
 impl Camera {
@@ -26,7 +26,7 @@ impl Camera {
     }
 
     /// Creates a new Camera struct
-    pub fn new(position: Point3<f64>) -> Camera {
+    pub fn new(position: Point3<f32>) -> Camera {
         let mut camera = Camera {
             position: position,
             front: Vector3 {
@@ -56,17 +56,17 @@ impl Camera {
         camera
     }
 
-    pub fn generate_view_matrix(&self) -> Matrix4<f64> {
+    pub fn generate_view_matrix(&self) -> Matrix4<f32> {
         Matrix4::look_at_dir(self.position, self.front, self.up)
     }
 }
 
 impl Position for Camera {
-    fn get_position(&self) -> Point3<f64> {
+    fn get_position(&self) -> Point3<f32> {
         self.position
     }
 
-    fn set_position(&mut self, position: Point3<f64>) {
+    fn set_position(&mut self, position: Point3<f32>) {
         self.position = position;
     }
 }
