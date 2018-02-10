@@ -828,18 +828,14 @@ impl PresentPass {
         );
 
         // Begin renderpass
-        let clear_values = [
-            vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 0.0, 0.0, 1.0])),
-        ];
-
         let render_pass_begin_info = vk::RenderPassBeginInfo {
             s_type: vk::StructureType::RenderPassBeginInfo,
             p_next: ptr::null(),
             render_pass: self.renderpass,
             framebuffer: self.framebuffers[self.current_present_idx],
             render_area: self.scissor,
-            clear_value_count: clear_values.len() as u32,
-            p_clear_values: clear_values.as_ptr(),
+            clear_value_count: 0,
+            p_clear_values: ptr::null(),
         };
         unsafe {
             // Start the render pass
