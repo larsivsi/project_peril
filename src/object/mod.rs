@@ -1,15 +1,16 @@
 mod camera;
-mod draw;
+pub mod draw;
 
 pub use self::camera::Camera;
 pub use self::draw::DrawObject;
 
 use cgmath::prelude::*;
 use cgmath::Point3;
+use ash::vk;
 
 pub trait Drawable {
     /// Draws the given object.
-    fn draw(&self);
+    fn draw(&self, vk::CommandBuffer);
 }
 
 pub trait Position {

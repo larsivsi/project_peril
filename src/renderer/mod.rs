@@ -556,6 +556,7 @@ impl RenderState {
         texture_type: vk::ImageType,
         texture_view_type: vk::ImageViewType,
         texture_format: vk::Format,
+        texture_aspect_mask: vk::ImageAspectFlags,
         mut texture_usage: vk::ImageUsageFlags,
         initial_access_mask: vk::AccessFlags,
         initial_layout: vk::ImageLayout,
@@ -628,7 +629,7 @@ impl RenderState {
                     dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
                     image: texture_image,
                     subresource_range: vk::ImageSubresourceRange {
-                        aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                        aspect_mask: texture_aspect_mask,
                         base_mip_level: 0,
                         level_count: 1,
                         base_array_layer: 0,
@@ -652,7 +653,7 @@ impl RenderState {
                     buffer_row_length: 0,
                     buffer_image_height: 0,
                     image_subresource: vk::ImageSubresourceLayers {
-                        aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                        aspect_mask: texture_aspect_mask,
                         mip_level: 0,
                         base_array_layer: 0,
                         layer_count: 1,
@@ -681,7 +682,7 @@ impl RenderState {
                     dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
                     image: texture_image,
                     subresource_range: vk::ImageSubresourceRange {
-                        aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                        aspect_mask: texture_aspect_mask,
                         base_mip_level: 0,
                         level_count: 1,
                         base_array_layer: 0,
@@ -713,7 +714,7 @@ impl RenderState {
                     dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
                     image: texture_image,
                     subresource_range: vk::ImageSubresourceRange {
-                        aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                        aspect_mask: texture_aspect_mask,
                         base_mip_level: 0,
                         level_count: 1,
                         base_array_layer: 0,
@@ -749,7 +750,7 @@ impl RenderState {
                 a: vk::ComponentSwizzle::A,
             },
             subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+                aspect_mask: texture_aspect_mask,
                 base_mip_level: 0,
                 level_count: 1,
                 base_array_layer: 0,
@@ -830,6 +831,7 @@ impl RenderState {
             vk::ImageType::Type2d,
             vk::ImageViewType::Type2d,
             vk::Format::R8g8b8a8Unorm,
+            vk::IMAGE_ASPECT_COLOR_BIT,
             vk::IMAGE_USAGE_SAMPLED_BIT,
             vk::ACCESS_SHADER_READ_BIT,
             vk::ImageLayout::ShaderReadOnlyOptimal,

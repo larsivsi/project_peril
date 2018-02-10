@@ -6,9 +6,10 @@ use object::{Drawable, Position};
 use renderer::RenderState;
 use std::rc::Rc;
 
+
 #[derive(Clone, Copy)]
 #[allow(dead_code)] //not going to change vertices after creation
-struct Vertex {
+pub struct Vertex {
     pos: [f32; 4],
     normal: [f32; 4],
     tex_coord: [f32; 2],
@@ -22,12 +23,23 @@ pub struct DrawObject {
 
     position: Point3<f64>,
 
+    num_indices: u32,
+
     // Keep a pointer to the device for cleanup
     device: Rc<Device<V1_0>>,
 }
 
 impl Drawable for DrawObject {
-    fn draw(&self) {}
+    fn draw(&self, cmd_buf: vk::CommandBuffer) {
+        unsafe {
+            self.device
+                .cmd_bind_vertex_buffers(cmd_buf, 0, &[self.vertices], &[0]);
+            self.device
+                .cmd_bind_index_buffer(cmd_buf, self.indices, 0, vk::IndexType::Uint32);
+            self.device
+                .cmd_draw_indexed(cmd_buf, self.num_indices, 1, 0, 0, 1);
+        }
+    }
 }
 
 impl Position for DrawObject {
@@ -94,6 +106,7 @@ impl DrawObject {
             indices: idx_buffer,
             index_mem: idx_mem,
             position: position,
+            num_indices: indices.len() as u32,
             device: Rc::clone(&rs.device),
         }
     }
@@ -281,8 +294,6 @@ impl DrawObject {
             23,
         ];
 
-
-
         // Create buffer for vertices
         let (vert_buffer, vert_mem) = rs.create_buffer_and_upload(
             vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -305,6 +316,7 @@ impl DrawObject {
             indices: idx_buffer,
             index_mem: idx_mem,
             position: position,
+            num_indices: indices.len() as u32,
             device: Rc::clone(&rs.device),
         }
     }

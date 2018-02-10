@@ -76,9 +76,7 @@ fn main() {
 
         // Do the main rendering
         let main_cmd_buf = mainpass.begin_frame(&renderstate);
-        unsafe {
-            renderstate.device.cmd_draw(main_cmd_buf, 6, 1, 0, 0);
-        }
+        _scene.draw(main_cmd_buf);
         mainpass.end_frame(&renderstate);
 
         // Present the rendered image

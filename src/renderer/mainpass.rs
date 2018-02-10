@@ -4,8 +4,10 @@ use ash::version::{DeviceV1_0, V1_0};
 use std::ffi::CString;
 use std::ptr;
 use std::rc::Rc;
+use std::mem;
 
 use renderer::{RenderState, Texture};
+use object::draw::Vertex;
 
 use config::Config;
 
@@ -201,14 +203,20 @@ impl MainPass {
             rs.device.update_descriptor_sets(&write_desc_sets, &[]);
         }
 
+        let push_constants = vk::PushConstantRange {
+            stage_flags: vk::SHADER_STAGE_ALL_GRAPHICS,
+            size: 4 * mem::size_of::<f32>() as u32,
+            offset: 0,
+        };
+
         let layout_create_info = vk::PipelineLayoutCreateInfo {
             s_type: vk::StructureType::PipelineLayoutCreateInfo,
             p_next: ptr::null(),
             flags: Default::default(),
             set_layout_count: descriptor_set_layouts.len() as u32,
             p_set_layouts: descriptor_set_layouts.as_ptr(),
-            push_constant_range_count: 0,
-            p_push_constant_ranges: ptr::null(),
+            push_constant_range_count: 1,
+            p_push_constant_ranges: &push_constants,
         };
 
         let pipeline_layout;
@@ -242,8 +250,41 @@ impl MainPass {
                 stage: vk::SHADER_STAGE_FRAGMENT_BIT,
             },
         ];
-        let vertex_input_binding_descriptions = [];
-        let vertex_input_attribute_descriptions = [];
+
+        //TODO: These would probably do better to live where the Vertex struct is defined.
+        let vertex_binding_description = vk::VertexInputBindingDescription {
+            binding: 0,
+            stride: mem::size_of::<Vertex>() as u32,
+            input_rate: vk::VertexInputRate::Vertex,
+        };
+
+        let vertex_position_attribute_description = vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 0,
+            format: vk::Format::R8g8b8a8Unorm,
+            offset: 0 as u32, //TODO: Make these use offset_of! macro.
+        };
+
+        let vertex_normal_attribute_description = vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 1,
+            format: vk::Format::R8g8b8a8Unorm,
+            offset: 4 * mem::size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
+        };
+
+        let vertex_texcoord_attribute_description = vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 2,
+            format: vk::Format::R8g8b8a8Unorm,
+            offset: 8 * mem::size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
+        };
+
+        let vertex_input_binding_descriptions = [vertex_binding_description];
+        let vertex_input_attribute_descriptions = [
+            vertex_position_attribute_description,
+            vertex_normal_attribute_description,
+            vertex_texcoord_attribute_description,
+        ];
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
             s_type: vk::StructureType::PipelineVertexInputStateCreateInfo,
             p_next: ptr::null(),
@@ -478,6 +519,7 @@ impl MainPass {
             vk::ImageType::Type2d,
             vk::ImageViewType::Type2d,
             render_format,
+            vk::IMAGE_ASPECT_COLOR_BIT,
             vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::IMAGE_USAGE_SAMPLED_BIT,
             vk::ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
             vk::ImageLayout::ColorAttachmentOptimal,
@@ -489,6 +531,7 @@ impl MainPass {
             vk::ImageType::Type2d,
             vk::ImageViewType::Type2d,
             vk::Format::D32Sfloat,
+            vk::IMAGE_ASPECT_DEPTH_BIT,
             vk::IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
                 | vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
