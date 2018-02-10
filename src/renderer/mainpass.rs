@@ -24,6 +24,7 @@ pub struct MainPass {
 
     // Image to render to.
     pub render_image: Texture,
+    depth_image: Texture,
 
     //TODO this doesn't need to live here
     texture: Texture,
@@ -41,22 +42,37 @@ impl MainPass {
                 format: render_format,
                 flags: vk::AttachmentDescriptionFlags::empty(),
                 samples: vk::SAMPLE_COUNT_1_BIT,
-                load_op: vk::AttachmentLoadOp::DontCare,
+                load_op: vk::AttachmentLoadOp::Clear,
                 store_op: vk::AttachmentStoreOp::Store,
                 stencil_load_op: vk::AttachmentLoadOp::DontCare,
                 stencil_store_op: vk::AttachmentStoreOp::DontCare,
                 initial_layout: vk::ImageLayout::ColorAttachmentOptimal,
                 final_layout: vk::ImageLayout::ColorAttachmentOptimal,
             },
+            vk::AttachmentDescription {
+                format: vk::Format::D32Sfloat,
+                flags: vk::AttachmentDescriptionFlags::empty(),
+                samples: vk::SAMPLE_COUNT_1_BIT,
+                load_op: vk::AttachmentLoadOp::Clear,
+                store_op: vk::AttachmentStoreOp::DontCare,
+                stencil_load_op: vk::AttachmentLoadOp::DontCare,
+                stencil_store_op: vk::AttachmentStoreOp::DontCare,
+                initial_layout: vk::ImageLayout::DepthStencilAttachmentOptimal,
+                final_layout: vk::ImageLayout::DepthStencilAttachmentOptimal,
+            },
         ];
         let color_attachment_ref = vk::AttachmentReference {
             attachment: 0,
             layout: vk::ImageLayout::ColorAttachmentOptimal,
         };
+        let depth_attachment_ref = vk::AttachmentReference {
+            attachment: 0,
+            layout: vk::ImageLayout::DepthStencilAttachmentOptimal,
+        };
         let subpass = vk::SubpassDescription {
             color_attachment_count: 1,
             p_color_attachments: &color_attachment_ref,
-            p_depth_stencil_attachment: ptr::null(),
+            p_depth_stencil_attachment: &depth_attachment_ref,
             flags: Default::default(),
             pipeline_bind_point: vk::PipelineBindPoint::Graphics,
             input_attachment_count: 0,
@@ -202,8 +218,8 @@ impl MainPass {
                 .unwrap();
         }
 
-        let vertex_shader_module = rs.load_shader("shaders/final_pass_vert.spv");
-        let fragment_shader_module = rs.load_shader("shaders/final_pass_frag.spv");
+        let vertex_shader_module = rs.load_shader("shaders/phong_vert.spv");
+        let fragment_shader_module = rs.load_shader("shaders/phong_frag.spv");
 
         let shader_entry_name = CString::new("main").unwrap();
         let shader_stage_create_infos = [
@@ -468,6 +484,18 @@ impl MainPass {
             vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             None,
         );
+        let depth_image = rs.create_texture(
+            render_size,
+            vk::ImageType::Type2d,
+            vk::ImageViewType::Type2d,
+            vk::Format::D32Sfloat,
+            vk::IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                | vk::ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            vk::ImageLayout::DepthStencilAttachmentOptimal,
+            vk::PIPELINE_STAGE_GRAPHICS_ALL_BIT,
+            None,
+        );
 
         let renderpass = MainPass::create_renderpass(rs, render_format);
         let (
@@ -496,6 +524,7 @@ impl MainPass {
             commandbuffer: commandbuffer,
 
             render_image: render_image,
+            depth_image: depth_image,
 
             //TODO: remove later
             texture: texture,
