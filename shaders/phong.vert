@@ -3,9 +3,7 @@
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
-layout(push_constant) uniform MatrixBlock
-{
-	mat4 v;
+layout(push_constant) uniform MatrixBlock {
 	mat4 mv;
 	mat4 mvp;
 } Matrices;

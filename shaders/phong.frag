@@ -4,11 +4,8 @@ precision highp float;
 
 layout(location = 0) in vec3 v;
 layout(location = 1) in vec3 N;
-layout(push_constant) uniform MatrixBlock
-{
+layout(binding = 0) uniform MatrixBlock {
 	mat4 v;
-	mat4 mv;
-	mat4 mvp;
 } Matrices;
 layout(location = 0) out vec3 fragColor;
 

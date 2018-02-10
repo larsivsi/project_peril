@@ -1,6 +1,7 @@
 use ash::vk;
 use ash::Device;
 use ash::version::{DeviceV1_0, V1_0};
+use cgmath::Matrix4;
 use std::ffi::CString;
 use std::ptr;
 use std::rc::Rc;
@@ -28,8 +29,8 @@ pub struct MainPass {
     pub render_image: Texture,
     depth_image: Texture,
 
-    //TODO this doesn't need to live here
-    texture: Texture,
+    view_matrix_ub: vk::Buffer,
+    view_matrix_ub_mem: vk::DeviceMemory,
 
     // Keep a pointer to the device for cleanup
     device: Rc<Device<V1_0>>,
@@ -111,8 +112,6 @@ impl MainPass {
         rs: &RenderState,
         render_size: vk::Extent3D,
         renderpass: vk::RenderPass,
-        texture_view: vk::ImageView,
-        texture_sampler: vk::Sampler,
     ) -> (
         vk::DescriptorPool,
         Vec<vk::DescriptorSetLayout>,
@@ -125,7 +124,7 @@ impl MainPass {
         // Descriptors
         let descriptor_sizes = [
             vk::DescriptorPoolSize {
-                typ: vk::DescriptorType::CombinedImageSampler,
+                typ: vk::DescriptorType::UniformBuffer,
                 descriptor_count: 1,
             },
         ];
@@ -146,7 +145,7 @@ impl MainPass {
         let desc_layout_bindings = [
             vk::DescriptorSetLayoutBinding {
                 binding: 0,
-                descriptor_type: vk::DescriptorType::CombinedImageSampler,
+                descriptor_type: vk::DescriptorType::UniformBuffer,
                 descriptor_count: 1,
                 stage_flags: vk::SHADER_STAGE_FRAGMENT_BIT,
                 p_immutable_samplers: ptr::null(),
@@ -180,32 +179,10 @@ impl MainPass {
                 .allocate_descriptor_sets(&desc_alloc_info)
                 .unwrap();
         }
-        let tex_descriptor = vk::DescriptorImageInfo {
-            image_layout: vk::ImageLayout::General,
-            image_view: texture_view,
-            sampler: texture_sampler,
-        };
-        let write_desc_sets = [
-            vk::WriteDescriptorSet {
-                s_type: vk::StructureType::WriteDescriptorSet,
-                p_next: ptr::null(),
-                dst_set: descriptor_sets[0],
-                dst_binding: 0,
-                dst_array_element: 0,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::CombinedImageSampler,
-                p_image_info: &tex_descriptor,
-                p_buffer_info: ptr::null(),
-                p_texel_buffer_view: ptr::null(),
-            },
-        ];
-        unsafe {
-            rs.device.update_descriptor_sets(&write_desc_sets, &[]);
-        }
 
-        let push_constants = vk::PushConstantRange {
-            stage_flags: vk::SHADER_STAGE_ALL_GRAPHICS,
-            size: 4 * mem::size_of::<f32>() as u32,
+        let mv_matrices_push_constant = vk::PushConstantRange {
+            stage_flags: vk::SHADER_STAGE_VERTEX_BIT,
+            size: 2 * mem::size_of::<Matrix4<f32>>() as u32,
             offset: 0,
         };
 
@@ -216,7 +193,7 @@ impl MainPass {
             set_layout_count: descriptor_set_layouts.len() as u32,
             p_set_layouts: descriptor_set_layouts.as_ptr(),
             push_constant_range_count: 1,
-            p_push_constant_ranges: &push_constants,
+            p_push_constant_ranges: &mv_matrices_push_constant,
         };
 
         let pipeline_layout;
@@ -261,29 +238,30 @@ impl MainPass {
         let vertex_position_attribute_description = vk::VertexInputAttributeDescription {
             binding: 0,
             location: 0,
-            format: vk::Format::R8g8b8a8Unorm,
-            offset: 0 as u32, //TODO: Make these use offset_of! macro.
+            format: vk::Format::R32g32b32Sfloat,
+            offset: 0 as u32,
         };
 
         let vertex_normal_attribute_description = vk::VertexInputAttributeDescription {
             binding: 0,
             location: 1,
-            format: vk::Format::R8g8b8a8Unorm,
-            offset: 4 * mem::size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
+            format: vk::Format::R32g32b32Sfloat,
+            offset: 3 * mem::size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
         };
 
-        let vertex_texcoord_attribute_description = vk::VertexInputAttributeDescription {
-            binding: 0,
-            location: 2,
-            format: vk::Format::R8g8b8a8Unorm,
-            offset: 8 * mem::size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
-        };
+        // TODO: use texture coords
+        //let vertex_texcoord_attribute_description = vk::VertexInputAttributeDescription {
+        //    binding: 0,
+        //    location: 2,
+        //    format: vk::Format::R32g32Sfloat,
+        //    offset: 6 * mem::size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
+        //};
 
         let vertex_input_binding_descriptions = [vertex_binding_description];
         let vertex_input_attribute_descriptions = [
             vertex_position_attribute_description,
             vertex_normal_attribute_description,
-            vertex_texcoord_attribute_description,
+            //vertex_texcoord_attribute_description,
         ];
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
             s_type: vk::StructureType::PipelineVertexInputStateCreateInfo,
@@ -329,7 +307,7 @@ impl MainPass {
             s_type: vk::StructureType::PipelineRasterizationStateCreateInfo,
             p_next: ptr::null(),
             flags: Default::default(),
-            cull_mode: vk::CULL_MODE_NONE,
+            cull_mode: vk::CULL_MODE_BACK_BIT,
             depth_bias_clamp: 0.0,
             depth_bias_constant_factor: 0.0,
             depth_bias_enable: 0,
@@ -504,8 +482,6 @@ impl MainPass {
     ///
     /// This will set up the renderpass, etc.
     pub fn init(rs: &RenderState, cfg: &Config) -> MainPass {
-        let texture = rs.load_image("assets/project_peril_logo.png");
-
         let render_format = vk::Format::R8g8b8a8Unorm;
         let render_size = vk::Extent3D {
             width: cfg.render_dimensions.0,
@@ -540,6 +516,12 @@ impl MainPass {
             None,
         );
 
+        let (vmat_buf, vmat_mem) = rs.create_buffer(
+            vk::BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            mem::size_of::<Matrix4<f32>>() as u64,
+        );
+
         let renderpass = MainPass::create_renderpass(rs, render_format);
         let (
             descriptor_pool,
@@ -549,7 +531,7 @@ impl MainPass {
             viewport,
             scissor,
             pipeline,
-        ) = MainPass::create_pipeline(rs, render_size, renderpass, texture.view, texture.sampler);
+        ) = MainPass::create_pipeline(rs, render_size, renderpass);
         let framebuffer =
             MainPass::create_framebuffer(rs, render_size, render_image.view, renderpass);
         let commandbuffer = MainPass::create_commandbuffer(rs);
@@ -569,8 +551,8 @@ impl MainPass {
             render_image: render_image,
             depth_image: depth_image,
 
-            //TODO: remove later
-            texture: texture,
+            view_matrix_ub: vmat_buf,
+            view_matrix_ub_mem: vmat_mem,
 
             // Keep a pointer to the device for cleanup
             device: Rc::clone(&rs.device),
@@ -691,11 +673,6 @@ impl Drop for MainPass {
             self.device.destroy_image_view(self.render_image.view, None);
             self.device.destroy_image(self.render_image.image, None);
             self.device.free_memory(self.render_image.memory, None);
-
-            self.device.destroy_sampler(self.texture.sampler, None);
-            self.device.destroy_image_view(self.texture.view, None);
-            self.device.destroy_image(self.texture.image, None);
-            self.device.free_memory(self.texture.memory, None);
 
             self.device.destroy_framebuffer(self.framebuffer, None);
 

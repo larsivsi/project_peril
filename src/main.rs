@@ -11,7 +11,6 @@ mod object;
 mod renderer;
 mod scene;
 
-use ash::version::DeviceV1_0;
 use cgmath::Point3;
 use config::Config;
 use nurbs::{NURBSpline, Order};
@@ -27,7 +26,7 @@ fn main() {
     let mut renderstate = RenderState::init(&cfg);
     let mut presentpass = PresentPass::init(&renderstate);
     let mut mainpass = MainPass::init(&renderstate, &cfg);
-    let _scene = Scene::new(&renderstate);
+    let scene = Scene::new(&renderstate);
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
     let _view_matrix = camera.generate_view_matrix();
 
@@ -76,7 +75,7 @@ fn main() {
 
         // Do the main rendering
         let main_cmd_buf = mainpass.begin_frame(&renderstate);
-        _scene.draw(main_cmd_buf);
+        scene.draw(main_cmd_buf);
         mainpass.end_frame(&renderstate);
 
         // Present the rendered image
