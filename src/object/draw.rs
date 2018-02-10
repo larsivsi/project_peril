@@ -97,6 +97,217 @@ impl DrawObject {
             device: Rc::clone(&rs.device),
         }
     }
+
+    pub fn new_cuboid(
+        rs: &RenderState,
+        position: Point3<f64>,
+        width: f32,
+        height: f32,
+        depth: f32,
+    ) -> DrawObject {
+        let h_width = width / 2.0;
+        let h_height = height / 2.0;
+        let h_depth = depth / 2.0;
+        let vertices = [
+            //Front
+            Vertex {
+                pos: [-h_width, -h_height, -h_depth, 1.0], //Lower Left Front
+                normal: [0.0, 0.0, -1.0, 1.0],
+                tex_coord: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [h_width, -h_height, -h_depth, 1.0], //Lower Right Front
+                normal: [0.0, 0.0, -1.0, 1.0],
+                tex_coord: [1.0, 0.0],
+            },
+            Vertex {
+                pos: [-h_width, h_height, -h_depth, 1.0], //Upper Left Front
+                normal: [0.0, 0.0, -1.0, 1.0],
+                tex_coord: [0.0, 1.0],
+            },
+            Vertex {
+                pos: [h_width, h_height, -h_depth, 1.0], //Upper Right Front
+                normal: [0.0, 0.0, -1.0, 1.0],
+                tex_coord: [1.0, 1.0],
+            },
+            //Back
+            Vertex {
+                pos: [-h_width, -h_height, h_depth, 1.0], //Lower Left Back
+                normal: [0.0, 0.0, 1.0, 1.0],
+                tex_coord: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [h_width, -h_height, h_depth, 1.0], //Lower Right Back
+                normal: [0.0, 0.0, 1.0, 1.0],
+                tex_coord: [1.0, 0.0],
+            },
+            Vertex {
+                pos: [-h_width, h_height, h_depth, 1.0], //Upper Left Back
+                normal: [0.0, 0.0, 1.0, 1.0],
+                tex_coord: [0.0, 1.0],
+            },
+            Vertex {
+                pos: [h_width, h_height, h_depth, 1.0], //Upper Right Back
+                normal: [0.0, 0.0, 1.0, 1.0],
+                tex_coord: [1.0, 1.0],
+            },
+            //Top
+            Vertex {
+                pos: [-h_width, h_height, -h_depth, 1.0], //Upper Left Front
+                normal: [0.0, 1.0, 0.0, 1.0],
+                tex_coord: [0.0, 1.0],
+            },
+            Vertex {
+                pos: [h_width, h_height, -h_depth, 1.0], //Upper Right Front
+                normal: [0.0, 1.0, 0.0, 1.0],
+                tex_coord: [1.0, 1.0],
+            },
+            Vertex {
+                pos: [-h_width, h_height, h_depth, 1.0], //Upper Left Back
+                normal: [0.0, 1.0, 0.0, 1.0],
+                tex_coord: [0.0, 1.0],
+            },
+            Vertex {
+                pos: [h_width, h_height, h_depth, 1.0], //Upper Right Back
+                normal: [0.0, 1.0, 0.0, 1.0],
+                tex_coord: [1.0, 1.0],
+            },
+            //Bottom
+            Vertex {
+                pos: [-h_width, -h_height, -h_depth, 1.0], //Lower Left Front
+                normal: [0.0, -1.0, 0.0, 1.0],
+                tex_coord: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [h_width, -h_height, -h_depth, 1.0], //Lower Right Front
+                normal: [0.0, -1.0, 0.0, 1.0],
+                tex_coord: [1.0, 0.0],
+            },
+            Vertex {
+                pos: [-h_width, -h_height, h_depth, 1.0], //Lower Left Back
+                normal: [0.0, -1.0, 0.0, 1.0],
+                tex_coord: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [h_width, -h_height, h_depth, 1.0], //Lower Right Back
+                normal: [0.0, -1.0, 0.0, 1.0],
+                tex_coord: [1.0, 0.0],
+            },
+            //Right
+            Vertex {
+                pos: [h_width, -h_height, -h_depth, 1.0], //Lower Right Front
+                normal: [1.0, 0.0, 0.0, 1.0],
+                tex_coord: [1.0, 0.0],
+            },
+            Vertex {
+                pos: [h_width, -h_height, h_depth, 1.0], //Lower Right Back
+                normal: [1.0, 0.0, 0.0, 1.0],
+                tex_coord: [1.0, 0.0],
+            },
+            Vertex {
+                pos: [h_width, h_height, -h_depth, 1.0], //Upper Right Front
+                normal: [1.0, 0.0, 0.0, 1.0],
+                tex_coord: [1.0, 1.0],
+            },
+            Vertex {
+                pos: [h_width, h_height, h_depth, 1.0], //Upper Right Back
+                normal: [1.0, 0.0, 0.0, 1.0],
+                tex_coord: [1.0, 1.0],
+            },
+            //Left
+            Vertex {
+                pos: [-h_width, -h_height, -h_depth, 1.0], //Lower Left Front
+                normal: [-1.0, 0.0, 0.0, 1.0],
+                tex_coord: [1.0, 0.0],
+            },
+            Vertex {
+                pos: [-h_width, -h_height, h_depth, 1.0], //Lower Left Back
+                normal: [-1.0, 0.0, 0.0, 1.0],
+                tex_coord: [1.0, 0.0],
+            },
+            Vertex {
+                pos: [-h_width, h_height, -h_depth, 1.0], //Upper Left Front
+                normal: [-1.0, 0.0, 0.0, 1.0],
+                tex_coord: [1.0, 1.0],
+            },
+            Vertex {
+                pos: [-h_width, h_height, h_depth, 1.0], //Upper Left Back
+                normal: [-1.0, 0.0, 0.0, 1.0],
+                tex_coord: [1.0, 1.0],
+            },
+        ];
+        let indices = [
+            //Front
+            0u16,
+            1,
+            2,
+            2,
+            1,
+            3,
+            //Back
+            4,
+            5,
+            6,
+            6,
+            5,
+            7,
+            //Top
+            8,
+            9,
+            10,
+            10,
+            9,
+            11,
+            //Bottom
+            12,
+            13,
+            14,
+            14,
+            13,
+            15,
+            //Right
+            16,
+            17,
+            18,
+            18,
+            17,
+            19,
+            //Left
+            20,
+            21,
+            22,
+            22,
+            21,
+            23,
+        ];
+
+
+
+        // Create buffer for vertices
+        let (vert_buffer, vert_mem) = rs.create_buffer_and_upload(
+            vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &vertices,
+            true,
+        );
+
+        // Create buffer for indices
+        let (idx_buffer, idx_mem) = rs.create_buffer_and_upload(
+            vk::BUFFER_USAGE_INDEX_BUFFER_BIT,
+            vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &indices,
+            true,
+        );
+
+        DrawObject {
+            vertices: vert_buffer,
+            vertex_mem: vert_mem,
+            indices: idx_buffer,
+            index_mem: idx_mem,
+            position: position,
+            device: Rc::clone(&rs.device),
+        }
+    }
 }
 
 impl Drop for DrawObject {

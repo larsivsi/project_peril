@@ -32,7 +32,7 @@ impl Camera {
             front: Vector3 {
                 x: 0.0,
                 y: 0.0,
-                z: 0.0,
+                z: 1.0,
             },
             up: Vector3 {
                 x: 0.0,
@@ -40,7 +40,7 @@ impl Camera {
                 z: 0.0,
             },
             right: Vector3 {
-                x: 0.0,
+                x: 1.0,
                 y: 0.0,
                 z: 0.0,
             },
