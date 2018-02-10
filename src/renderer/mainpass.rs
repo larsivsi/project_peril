@@ -69,7 +69,7 @@ impl MainPass {
             layout: vk::ImageLayout::ColorAttachmentOptimal,
         };
         let depth_attachment_ref = vk::AttachmentReference {
-            attachment: 0,
+            attachment: 1,
             layout: vk::ImageLayout::DepthStencilAttachmentOptimal,
         };
         let subpass = vk::SubpassDescription {
@@ -434,10 +434,11 @@ impl MainPass {
     fn create_framebuffer(
         rs: &RenderState,
         render_size: vk::Extent3D,
-        image_view: vk::ImageView,
+        color_view: vk::ImageView,
+        depth_view: vk::ImageView,
         renderpass: vk::RenderPass,
     ) -> vk::Framebuffer {
-        let framebuffer_attachments = [image_view];
+        let framebuffer_attachments = [color_view, depth_view];
         let frame_buffer_create_info = vk::FramebufferCreateInfo {
             s_type: vk::StructureType::FramebufferCreateInfo,
             p_next: ptr::null(),
@@ -532,8 +533,13 @@ impl MainPass {
             scissor,
             pipeline,
         ) = MainPass::create_pipeline(rs, render_size, renderpass);
-        let framebuffer =
-            MainPass::create_framebuffer(rs, render_size, render_image.view, renderpass);
+        let framebuffer = MainPass::create_framebuffer(
+            rs,
+            render_size,
+            render_image.view,
+            depth_image.view,
+            renderpass,
+        );
         let commandbuffer = MainPass::create_commandbuffer(rs);
 
         MainPass {
@@ -588,6 +594,10 @@ impl MainPass {
         // Begin renderpass
         let clear_values = [
             vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 1.0, 0.0, 1.0])),
+            vk::ClearValue::new_depth_stencil(vk::ClearDepthStencilValue {
+                depth: 0.0,
+                stencil: 0,
+            }),
         ];
 
         let render_pass_begin_info = vk::RenderPassBeginInfo {
@@ -668,6 +678,14 @@ impl Drop for MainPass {
         unsafe {
             // Always wait for device idle
             self.device.device_wait_idle().unwrap();
+
+            self.device.destroy_buffer(self.view_matrix_ub, None);
+            self.device.free_memory(self.view_matrix_ub_mem, None);
+
+            self.device.destroy_sampler(self.depth_image.sampler, None);
+            self.device.destroy_image_view(self.depth_image.view, None);
+            self.device.destroy_image(self.depth_image.image, None);
+            self.device.free_memory(self.depth_image.memory, None);
 
             self.device.destroy_sampler(self.render_image.sampler, None);
             self.device.destroy_image_view(self.render_image.view, None);
