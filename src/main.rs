@@ -31,7 +31,7 @@ fn main() {
     let mut presentpass = PresentPass::init(&renderstate);
     let mut mainpass = MainPass::init(&renderstate, &cfg);
     let scene = Scene::new(&renderstate);
-    let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
+    let camera = Camera::new(Point3::new(2.0, 0.0, 0.0));
     let fov_horizontal = 90.0;
     let aspect_ratio = cfg.render_dimensions.0 as f32 / cfg.render_dimensions.1 as f32;
     let fov_vertical = Rad::from(Deg(fov_horizontal / aspect_ratio));
