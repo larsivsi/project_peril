@@ -32,7 +32,7 @@ impl Camera {
             front: Vector3 {
                 x: 0.0,
                 y: 0.0,
-                z: 1.0,
+                z: -1.0,
             },
             up: Vector3 {
                 x: 0.0,
@@ -49,7 +49,7 @@ impl Camera {
                 y: 1.0,
                 z: 0.0,
             },
-            yaw: 90.0,
+            yaw: 270.0,
             pitch: 0.0,
         };
         camera.update();

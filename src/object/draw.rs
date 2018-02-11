@@ -157,127 +157,127 @@ impl DrawObject {
         let vertices = [
             //Front
             Vertex {
-                pos: [-h_width, -h_height, -h_depth], //Lower Left Front
-                normal: [0.0, 0.0, -1.0],
+                pos: [-h_width, -h_height, h_depth], //Lower Left Front
+                normal: [0.0, 0.0, 1.0],
                 tex_coord: [0.0, 0.0],
             },
             Vertex {
-                pos: [h_width, -h_height, -h_depth], //Lower Right Front
-                normal: [0.0, 0.0, -1.0],
+                pos: [h_width, -h_height, h_depth], //Lower Right Front
+                normal: [0.0, 0.0, 1.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, h_height, -h_depth], //Upper Left Front
-                normal: [0.0, 0.0, -1.0],
+                pos: [-h_width, h_height, h_depth], //Upper Left Front
+                normal: [0.0, 0.0, 1.0],
                 tex_coord: [0.0, 1.0],
             },
             Vertex {
-                pos: [h_width, h_height, -h_depth], //Upper Right Front
-                normal: [0.0, 0.0, -1.0],
+                pos: [h_width, h_height, h_depth], //Upper Right Front
+                normal: [0.0, 0.0, 1.0],
                 tex_coord: [1.0, 1.0],
             },
             //Back
             Vertex {
-                pos: [-h_width, -h_height, h_depth], //Lower Left Back
-                normal: [0.0, 0.0, 1.0],
-                tex_coord: [0.0, 0.0],
-            },
-            Vertex {
-                pos: [h_width, -h_height, h_depth], //Lower Right Back
-                normal: [0.0, 0.0, 1.0],
+                pos: [h_width, -h_height, -h_depth], //Lower Right Back
+                normal: [0.0, 0.0, -1.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, h_height, h_depth], //Upper Left Back
-                normal: [0.0, 0.0, 1.0],
-                tex_coord: [0.0, 1.0],
+                pos: [-h_width, -h_height, -h_depth], //Lower Left Back
+                normal: [0.0, 0.0, -1.0],
+                tex_coord: [0.0, 0.0],
             },
             Vertex {
-                pos: [h_width, h_height, h_depth], //Upper Right Back
-                normal: [0.0, 0.0, 1.0],
+                pos: [h_width, h_height, -h_depth], //Upper Right Back
+                normal: [0.0, 0.0, -1.0],
                 tex_coord: [1.0, 1.0],
+            },
+            Vertex {
+                pos: [-h_width, h_height, -h_depth], //Upper Left Back
+                normal: [0.0, 0.0, -1.0],
+                tex_coord: [0.0, 1.0],
             },
             //Top
             Vertex {
-                pos: [-h_width, h_height, -h_depth], //Upper Left Front
+                pos: [-h_width, h_height, h_depth], //Upper Left Front
                 normal: [0.0, 1.0, 0.0],
                 tex_coord: [0.0, 1.0],
             },
             Vertex {
-                pos: [h_width, h_height, -h_depth], //Upper Right Front
+                pos: [h_width, h_height, h_depth], //Upper Right Front
                 normal: [0.0, 1.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             Vertex {
-                pos: [-h_width, h_height, h_depth], //Upper Left Back
+                pos: [-h_width, h_height, -h_depth], //Upper Left Back
                 normal: [0.0, 1.0, 0.0],
                 tex_coord: [0.0, 1.0],
             },
             Vertex {
-                pos: [h_width, h_height, h_depth], //Upper Right Back
+                pos: [h_width, h_height, -h_depth], //Upper Right Back
                 normal: [0.0, 1.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             //Bottom
             Vertex {
-                pos: [-h_width, -h_height, -h_depth], //Lower Left Front
+                pos: [-h_width, -h_height, -h_depth], //Lower Left Back
                 normal: [0.0, -1.0, 0.0],
                 tex_coord: [0.0, 0.0],
             },
             Vertex {
-                pos: [h_width, -h_height, -h_depth], //Lower Right Front
+                pos: [h_width, -h_height, -h_depth], //Lower Right Back
                 normal: [0.0, -1.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, -h_height, h_depth], //Lower Left Back
+                pos: [-h_width, -h_height, h_depth], //Lower Left Front
                 normal: [0.0, -1.0, 0.0],
                 tex_coord: [0.0, 0.0],
             },
             Vertex {
-                pos: [h_width, -h_height, h_depth], //Lower Right Back
+                pos: [h_width, -h_height, h_depth], //Lower Right Front
                 normal: [0.0, -1.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             //Right
             Vertex {
-                pos: [h_width, -h_height, -h_depth], //Lower Right Front
+                pos: [h_width, -h_height, h_depth], //Lower Right Front
                 normal: [1.0, 0.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [h_width, -h_height, h_depth], //Lower Right Back
+                pos: [h_width, -h_height, -h_depth], //Lower Right Back
                 normal: [1.0, 0.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [h_width, h_height, -h_depth], //Upper Right Front
+                pos: [h_width, h_height, h_depth], //Upper Right Front
                 normal: [1.0, 0.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             Vertex {
-                pos: [h_width, h_height, h_depth], //Upper Right Back
+                pos: [h_width, h_height, -h_depth], //Upper Right Back
                 normal: [1.0, 0.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             //Left
             Vertex {
-                pos: [-h_width, -h_height, -h_depth], //Lower Left Front
+                pos: [-h_width, -h_height, -h_depth], //Lower Left Back
                 normal: [-1.0, 0.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, -h_height, h_depth], //Lower Left Back
+                pos: [-h_width, -h_height, h_depth], //Lower Left Front
                 normal: [-1.0, 0.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, h_height, -h_depth], //Upper Left Front
+                pos: [-h_width, h_height, -h_depth], //Upper Left Back
                 normal: [-1.0, 0.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             Vertex {
-                pos: [-h_width, h_height, h_depth], //Upper Left Back
+                pos: [-h_width, h_height, h_depth], //Upper Left Front
                 normal: [-1.0, 0.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },

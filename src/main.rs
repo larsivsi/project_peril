@@ -37,7 +37,28 @@ fn main() {
     let fov_vertical = Rad::from(Deg(fov_horizontal / aspect_ratio));
     let near = 1.0;
     let far = 1000.0;
-    let projection_matrix = cgmath::perspective(fov_vertical, aspect_ratio, near, far);
+    // Need to flip projection matrix due to the Vulkan NDC coordinates.
+    // See https://matthewwellings.com/blog/the-new-vulkan-coordinate-system/ for details.
+    let glu_projection_matrix = cgmath::perspective(fov_vertical, aspect_ratio, near, far);
+    let vulkan_ndc = Matrix4::new(
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.5,
+        0.5,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    );
+    let projection_matrix = vulkan_ndc * glu_projection_matrix;
 
     let points = vec![
         Point3::new(1.0, 0.0, 0.0),
