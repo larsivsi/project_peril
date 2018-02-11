@@ -30,7 +30,7 @@ fn main() {
     let mut renderstate = RenderState::init(&cfg);
     let mut presentpass = PresentPass::init(&renderstate);
     let mut mainpass = MainPass::init(&renderstate, &cfg);
-    let mut scene = Scene::new(&renderstate);
+    let scene = Scene::new(&renderstate);
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
     let fov_horizontal = 90.0;
     let aspect_ratio = cfg.render_dimensions.0 as f32 / cfg.render_dimensions.1 as f32;
@@ -98,7 +98,6 @@ fn main() {
         accumulator += frame_time;
 
         while accumulator >= delta_time {
-            scene.update();
             //animation, physics engine, scene progression etc. goes here
             accumulator -= delta_time;
             elapsed_time += delta_time;
