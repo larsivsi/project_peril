@@ -411,7 +411,7 @@ impl PresentPass {
             s_type: vk::StructureType::PipelineRasterizationStateCreateInfo,
             p_next: ptr::null(),
             flags: Default::default(),
-            cull_mode: vk::CULL_MODE_NONE,
+            cull_mode: vk::CULL_MODE_BACK_BIT,
             depth_bias_clamp: 0.0,
             depth_bias_constant_factor: 0.0,
             depth_bias_enable: 0,
@@ -973,8 +973,8 @@ impl PresentPass {
                 &[],
             );
 
-            // We have a hardcoded quad shader, so just draw six vertices
-            rs.device.cmd_draw(cmd_buf, 6, 1, 0, 0);
+            // We have a hardcoded quad shader, so just draw three vertices
+            rs.device.cmd_draw(cmd_buf, 3, 1, 0, 0);
         }
         //then swapbuffers etc.
         self.end_frame_and_present(rs);
