@@ -30,11 +30,6 @@ pub struct DrawObject {
     device: Rc<Device<V1_0>>,
 }
 
-struct MatrixBlock {
-    mv: Matrix4<f32>,
-    mvp: Matrix4<f32>,
-}
-
 impl Drawable for DrawObject {
     fn draw(
         &self,
@@ -54,17 +49,12 @@ impl Drawable for DrawObject {
         // The order of multiplication here is important!
         let mv_matrix = view_matrix * model_matrix;
         let mvp_matrix = projection_matrix * mv_matrix;
-        let matrices = MatrixBlock {
-            mv: mv_matrix,
-            mvp: mvp_matrix,
-        };
+        let matrices = [mv_matrix, mvp_matrix];
 
         let matrices_bytes;
         unsafe {
-            matrices_bytes = slice::from_raw_parts(
-                (&matrices as *const MatrixBlock) as *const u32,
-                mem::size_of::<MatrixBlock>(),
-            );
+            matrices_bytes =
+                slice::from_raw_parts(matrices.as_ptr() as *const u32, mem::size_of_val(&matrices));
         }
 
         unsafe {

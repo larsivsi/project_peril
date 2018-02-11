@@ -595,7 +595,7 @@ impl MainPass {
         let clear_values = [
             vk::ClearValue::new_color(vk::ClearColorValue::new_float32([0.0, 1.0, 0.0, 1.0])),
             vk::ClearValue::new_depth_stencil(vk::ClearDepthStencilValue {
-                depth: 0.0,
+                depth: 1.0,
                 stencil: 0,
             }),
         ];

@@ -32,7 +32,6 @@ fn main() {
     let mut mainpass = MainPass::init(&renderstate, &cfg);
     let scene = Scene::new(&renderstate);
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
-    let mut view_matrix = camera.generate_view_matrix();
     let fov_horizontal = 90.0;
     let aspect_ratio = cfg.render_dimensions.0 as f32 / cfg.render_dimensions.1 as f32;
     let fov_vertical = Rad::from(Deg(fov_horizontal / aspect_ratio));
@@ -84,7 +83,7 @@ fn main() {
         }
 
         // Update the view matrix uniform buffer
-        view_matrix = camera.generate_view_matrix();
+        let view_matrix = camera.generate_view_matrix();
         let view_matrix_buf_size = size_of::<Matrix4<f32>>() as u64;
         unsafe {
             let mem_ptr = renderstate
@@ -95,7 +94,7 @@ fn main() {
                     view_matrix_buf_size,
                     vk::MemoryMapFlags::empty(),
                 )
-                .expect("Failed to map index memory");
+                .expect("Failed to view matrix uniform memory");
             let mut mem_align = Align::new(
                 mem_ptr,
                 align_of::<Matrix4<f32>>() as u64,
