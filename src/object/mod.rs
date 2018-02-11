@@ -5,7 +5,7 @@ pub use self::camera::Camera;
 pub use self::draw::DrawObject;
 
 use cgmath::prelude::*;
-use cgmath::{Matrix4, Point3};
+use cgmath::{Matrix4, Point3, Quaternion};
 use ash::vk;
 
 pub trait Drawable {
@@ -31,4 +31,10 @@ pub trait Position {
         let vec = other.get_position() - self.get_position();
         vec.dot(vec).sqrt()
     }
+}
+
+pub trait Rotation {
+    fn rotate(&mut self, quaternion: Quaternion<f32>);
+
+    fn get_rotation(&self) -> Quaternion<f32>;
 }

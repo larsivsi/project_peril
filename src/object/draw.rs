@@ -1,11 +1,14 @@
 use ash::vk;
 use ash::Device;
 use ash::version::{DeviceV1_0, V1_0};
-use cgmath::{Matrix4, Point3};
-use object::{Drawable, Position};
+use cgmath::{Matrix4, Point3, Quaternion, Vector3};
+use object::{Drawable, Position, Rotation};
 use renderer::RenderState;
 use std::rc::Rc;
 use std::{mem, slice};
+use std::ops::Mul;
+use std::f32;
+use std::ops::MulAssign;
 
 
 #[derive(Clone, Copy)]
@@ -23,6 +26,7 @@ pub struct DrawObject {
     index_mem: vk::DeviceMemory,
 
     position: Point3<f32>,
+    rotation: Quaternion<f32>,
 
     num_indices: u32,
 
@@ -39,13 +43,15 @@ impl Drawable for DrawObject {
         projection_matrix: &Matrix4<f32>,
     ) {
         // TODO: no rotation yet
-        let model_matrix = Matrix4::from_translation(
+        let model_rotation_matrix = Matrix4::from(self.rotation);
+        let mut model_matrix = Matrix4::from_translation(
             self.get_position() - Point3::<f32> {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
             },
         );
+        model_matrix = model_matrix.mul(model_rotation_matrix);
         // The order of multiplication here is important!
         let mv_matrix = view_matrix * model_matrix;
         let mvp_matrix = projection_matrix * mv_matrix;
@@ -82,6 +88,28 @@ impl Position for DrawObject {
 
     fn set_position(&mut self, position: Point3<f32>) {
         self.position = position;
+    }
+}
+
+impl Rotation for DrawObject {
+    fn rotate(&mut self, quaternion: Quaternion<f32>) {
+        println!(
+            "Do rotation {},{},{}",
+            self.get_rotation().v.x,
+            self.get_rotation().v.y,
+            self.get_rotation().v.z
+        );
+        self.rotation = quaternion.mul(self.rotation.mul(quaternion.conjugate()));
+        println!(
+            "After Do rotation {},{},{}",
+            self.get_rotation().v.x,
+            self.get_rotation().v.y,
+            self.get_rotation().v.z
+        );
+    }
+
+    fn get_rotation(&self) -> Quaternion<f32> {
+        self.rotation
     }
 }
 
@@ -139,6 +167,7 @@ impl DrawObject {
             indices: idx_buffer,
             index_mem: idx_mem,
             position: position,
+            rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
             num_indices: indices.len() as u32,
             device: Rc::clone(&rs.device),
         }
@@ -349,6 +378,7 @@ impl DrawObject {
             indices: idx_buffer,
             index_mem: idx_mem,
             position: position,
+            rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
             num_indices: indices.len() as u32,
             device: Rc::clone(&rs.device),
         }
