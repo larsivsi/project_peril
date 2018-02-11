@@ -1,9 +1,8 @@
-use cgmath::{Matrix4, Point3, Quaternion, Vector3};
+use cgmath::{Deg, Matrix4, Point3, Vector3};
 use object::{DrawObject, Drawable, Rotation};
 use renderer::RenderState;
 use ash::vk;
 use std::f32;
-use std::ops::MulAssign;
 
 pub struct Scene {
     objects: Vec<DrawObject>,
@@ -26,14 +25,10 @@ impl Scene {
     pub fn update(&mut self) {
         for mut object in self.objects.iter_mut() {
             //TODO: Move this.
-            let mut vec = Vector3::new(0.0, 0.0, 1.0);
-            let rotation = f32::consts::PI / 2.0;
-            let sine = rotation.sin();
-            let cose = rotation.cos();
-            vec.mul_assign(sine);
-            let quaternion = Quaternion::new(vec.x, vec.y, vec.z, cose);
+            let axis = Vector3::new(0.0, 1.0, 0.0);
+            let angle = Deg(1.0);
 
-            object.rotate(quaternion);
+            object.rotate(axis, angle);
         }
     }
 

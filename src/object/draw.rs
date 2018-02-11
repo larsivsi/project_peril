@@ -1,14 +1,11 @@
 use ash::vk;
 use ash::Device;
 use ash::version::{DeviceV1_0, V1_0};
-use cgmath::{Matrix4, Point3, Quaternion, Vector3};
+use cgmath::{Deg, Matrix4, Point3, Quaternion, Rotation3, Vector3};
 use object::{Drawable, Position, Rotation};
 use renderer::RenderState;
+use std::{mem, slice, f32};
 use std::rc::Rc;
-use std::{mem, slice};
-use std::ops::Mul;
-use std::f32;
-use std::ops::MulAssign;
 
 
 #[derive(Clone, Copy)]
@@ -44,14 +41,14 @@ impl Drawable for DrawObject {
     ) {
         // TODO: no rotation yet
         let model_rotation_matrix = Matrix4::from(self.rotation);
-        let mut model_matrix = Matrix4::from_translation(
+        let model_translation_matrix = Matrix4::from_translation(
             self.get_position() - Point3::<f32> {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
             },
         );
-        model_matrix = model_matrix.mul(model_rotation_matrix);
+        let model_matrix = model_translation_matrix * model_rotation_matrix;
         // The order of multiplication here is important!
         let mv_matrix = view_matrix * model_matrix;
         let mvp_matrix = projection_matrix * mv_matrix;
@@ -92,20 +89,9 @@ impl Position for DrawObject {
 }
 
 impl Rotation for DrawObject {
-    fn rotate(&mut self, quaternion: Quaternion<f32>) {
-        println!(
-            "Do rotation {},{},{}",
-            self.get_rotation().v.x,
-            self.get_rotation().v.y,
-            self.get_rotation().v.z
-        );
-        self.rotation = quaternion.mul(self.rotation.mul(quaternion.conjugate()));
-        println!(
-            "After Do rotation {},{},{}",
-            self.get_rotation().v.x,
-            self.get_rotation().v.y,
-            self.get_rotation().v.z
-        );
+    fn rotate(&mut self, axis: Vector3<f32>, angle: Deg<f32>) {
+        let rotation_quat = Quaternion::from_axis_angle(axis, angle);
+        self.rotation = self.rotation * rotation_quat;
     }
 
     fn get_rotation(&self) -> Quaternion<f32> {
