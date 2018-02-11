@@ -19,7 +19,7 @@ $ cargo run [--release]
 ## To enable debug layer, specify --features debug\_layer in the cargo build command:
 $ cargo run [--release] --features debug\_layer
 
-##Compile glsl to spv:
+## Compile glsl to spv:
 Get glslangValidator from https://cvs.khronos.org/svn/repos/ogl/trunk/ecosystem/public/sdk/tools/glslang/Install/
 Add it to your PATH
 $ glslangValidator -V shader.<stage> [-o <output.spv>]
