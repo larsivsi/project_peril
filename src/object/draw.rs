@@ -1,11 +1,14 @@
 use ash::vk;
 use ash::Device;
 use ash::version::{DeviceV1_0, V1_0};
-use cgmath::{Matrix4, Point3};
-use object::{Drawable, Position};
+use cgmath::{Matrix4, Point3, Quaternion, Vector3};
+use object::{Drawable, Position, Rotation};
 use renderer::RenderState;
 use std::rc::Rc;
 use std::{mem, slice};
+use std::ops::Mul;
+use std::f32;
+use std::ops::MulAssign;
 
 
 #[derive(Clone, Copy)]
@@ -23,11 +26,17 @@ pub struct DrawObject {
     index_mem: vk::DeviceMemory,
 
     position: Point3<f32>,
+    rotation: Quaternion<f32>,
 
     num_indices: u32,
 
     // Keep a pointer to the device for cleanup
     device: Rc<Device<V1_0>>,
+}
+
+struct MatrixBlock {
+    mv: Matrix4<f32>,
+    mvp: Matrix4<f32>,
 }
 
 impl Drawable for DrawObject {
@@ -39,22 +48,29 @@ impl Drawable for DrawObject {
         projection_matrix: &Matrix4<f32>,
     ) {
         // TODO: no rotation yet
-        let model_matrix = Matrix4::from_translation(
+        let model_rotation_matrix = Matrix4::from(self.rotation);
+        let mut model_matrix = Matrix4::from_translation(
             self.get_position() - Point3::<f32> {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
             },
         );
+        model_matrix = model_matrix.mul(model_rotation_matrix);
         // The order of multiplication here is important!
         let mv_matrix = view_matrix * model_matrix;
         let mvp_matrix = projection_matrix * mv_matrix;
-        let matrices = [mv_matrix, mvp_matrix];
+        let matrices = MatrixBlock {
+            mv: mv_matrix,
+            mvp: mvp_matrix,
+        };
 
         let matrices_bytes;
         unsafe {
-            matrices_bytes =
-                slice::from_raw_parts(matrices.as_ptr() as *const u32, mem::size_of_val(&matrices));
+            matrices_bytes = slice::from_raw_parts(
+                (&matrices as *const MatrixBlock) as *const u32,
+                mem::size_of::<MatrixBlock>(),
+            );
         }
 
         unsafe {
@@ -82,6 +98,28 @@ impl Position for DrawObject {
 
     fn set_position(&mut self, position: Point3<f32>) {
         self.position = position;
+    }
+}
+
+impl Rotation for DrawObject {
+    fn rotate(&mut self, quaternion: Quaternion<f32>) {
+        println!(
+            "Do rotation {},{},{}",
+            self.get_rotation().v.x,
+            self.get_rotation().v.y,
+            self.get_rotation().v.z
+        );
+        self.rotation = quaternion.mul(self.rotation.mul(quaternion.conjugate()));
+        println!(
+            "After Do rotation {},{},{}",
+            self.get_rotation().v.x,
+            self.get_rotation().v.y,
+            self.get_rotation().v.z
+        );
+    }
+
+    fn get_rotation(&self) -> Quaternion<f32> {
+        self.rotation
     }
 }
 
@@ -139,6 +177,7 @@ impl DrawObject {
             indices: idx_buffer,
             index_mem: idx_mem,
             position: position,
+            rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
             num_indices: indices.len() as u32,
             device: Rc::clone(&rs.device),
         }
@@ -157,127 +196,127 @@ impl DrawObject {
         let vertices = [
             //Front
             Vertex {
-                pos: [-h_width, -h_height, h_depth], //Lower Left Front
-                normal: [0.0, 0.0, 1.0],
+                pos: [-h_width, -h_height, -h_depth], //Lower Left Front
+                normal: [0.0, 0.0, -1.0],
                 tex_coord: [0.0, 0.0],
             },
             Vertex {
-                pos: [h_width, -h_height, h_depth], //Lower Right Front
-                normal: [0.0, 0.0, 1.0],
+                pos: [h_width, -h_height, -h_depth], //Lower Right Front
+                normal: [0.0, 0.0, -1.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, h_height, h_depth], //Upper Left Front
-                normal: [0.0, 0.0, 1.0],
+                pos: [-h_width, h_height, -h_depth], //Upper Left Front
+                normal: [0.0, 0.0, -1.0],
                 tex_coord: [0.0, 1.0],
             },
             Vertex {
-                pos: [h_width, h_height, h_depth], //Upper Right Front
-                normal: [0.0, 0.0, 1.0],
+                pos: [h_width, h_height, -h_depth], //Upper Right Front
+                normal: [0.0, 0.0, -1.0],
                 tex_coord: [1.0, 1.0],
             },
             //Back
             Vertex {
-                pos: [h_width, -h_height, -h_depth], //Lower Right Back
-                normal: [0.0, 0.0, -1.0],
-                tex_coord: [1.0, 0.0],
-            },
-            Vertex {
-                pos: [-h_width, -h_height, -h_depth], //Lower Left Back
-                normal: [0.0, 0.0, -1.0],
+                pos: [-h_width, -h_height, h_depth], //Lower Left Back
+                normal: [0.0, 0.0, 1.0],
                 tex_coord: [0.0, 0.0],
             },
             Vertex {
-                pos: [h_width, h_height, -h_depth], //Upper Right Back
-                normal: [0.0, 0.0, -1.0],
-                tex_coord: [1.0, 1.0],
+                pos: [h_width, -h_height, h_depth], //Lower Right Back
+                normal: [0.0, 0.0, 1.0],
+                tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, h_height, -h_depth], //Upper Left Back
-                normal: [0.0, 0.0, -1.0],
+                pos: [-h_width, h_height, h_depth], //Upper Left Back
+                normal: [0.0, 0.0, 1.0],
                 tex_coord: [0.0, 1.0],
+            },
+            Vertex {
+                pos: [h_width, h_height, h_depth], //Upper Right Back
+                normal: [0.0, 0.0, 1.0],
+                tex_coord: [1.0, 1.0],
             },
             //Top
             Vertex {
-                pos: [-h_width, h_height, h_depth], //Upper Left Front
+                pos: [-h_width, h_height, -h_depth], //Upper Left Front
                 normal: [0.0, 1.0, 0.0],
                 tex_coord: [0.0, 1.0],
             },
             Vertex {
-                pos: [h_width, h_height, h_depth], //Upper Right Front
+                pos: [h_width, h_height, -h_depth], //Upper Right Front
                 normal: [0.0, 1.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             Vertex {
-                pos: [-h_width, h_height, -h_depth], //Upper Left Back
+                pos: [-h_width, h_height, h_depth], //Upper Left Back
                 normal: [0.0, 1.0, 0.0],
                 tex_coord: [0.0, 1.0],
             },
             Vertex {
-                pos: [h_width, h_height, -h_depth], //Upper Right Back
+                pos: [h_width, h_height, h_depth], //Upper Right Back
                 normal: [0.0, 1.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             //Bottom
             Vertex {
-                pos: [-h_width, -h_height, -h_depth], //Lower Left Back
+                pos: [-h_width, -h_height, -h_depth], //Lower Left Front
                 normal: [0.0, -1.0, 0.0],
                 tex_coord: [0.0, 0.0],
             },
             Vertex {
-                pos: [h_width, -h_height, -h_depth], //Lower Right Back
+                pos: [h_width, -h_height, -h_depth], //Lower Right Front
                 normal: [0.0, -1.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, -h_height, h_depth], //Lower Left Front
+                pos: [-h_width, -h_height, h_depth], //Lower Left Back
                 normal: [0.0, -1.0, 0.0],
                 tex_coord: [0.0, 0.0],
             },
             Vertex {
-                pos: [h_width, -h_height, h_depth], //Lower Right Front
+                pos: [h_width, -h_height, h_depth], //Lower Right Back
                 normal: [0.0, -1.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             //Right
             Vertex {
-                pos: [h_width, -h_height, h_depth], //Lower Right Front
+                pos: [h_width, -h_height, -h_depth], //Lower Right Front
                 normal: [1.0, 0.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [h_width, -h_height, -h_depth], //Lower Right Back
+                pos: [h_width, -h_height, h_depth], //Lower Right Back
                 normal: [1.0, 0.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [h_width, h_height, h_depth], //Upper Right Front
+                pos: [h_width, h_height, -h_depth], //Upper Right Front
                 normal: [1.0, 0.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             Vertex {
-                pos: [h_width, h_height, -h_depth], //Upper Right Back
+                pos: [h_width, h_height, h_depth], //Upper Right Back
                 normal: [1.0, 0.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             //Left
             Vertex {
-                pos: [-h_width, -h_height, -h_depth], //Lower Left Back
+                pos: [-h_width, -h_height, -h_depth], //Lower Left Front
                 normal: [-1.0, 0.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, -h_height, h_depth], //Lower Left Front
+                pos: [-h_width, -h_height, h_depth], //Lower Left Back
                 normal: [-1.0, 0.0, 0.0],
                 tex_coord: [1.0, 0.0],
             },
             Vertex {
-                pos: [-h_width, h_height, -h_depth], //Upper Left Back
+                pos: [-h_width, h_height, -h_depth], //Upper Left Front
                 normal: [-1.0, 0.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
             Vertex {
-                pos: [-h_width, h_height, h_depth], //Upper Left Front
+                pos: [-h_width, h_height, h_depth], //Upper Left Back
                 normal: [-1.0, 0.0, 0.0],
                 tex_coord: [1.0, 1.0],
             },
@@ -349,6 +388,7 @@ impl DrawObject {
             indices: idx_buffer,
             index_mem: idx_mem,
             position: position,
+            rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
             num_indices: indices.len() as u32,
             device: Rc::clone(&rs.device),
         }
