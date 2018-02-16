@@ -4,19 +4,17 @@ precision highp float;
 
 layout(location = 0) in vec3 viewspace_pos;
 layout(location = 1) in vec3 viewspace_normal;
-layout(binding = 0) uniform MatrixBlock {
-	mat4 v;
-} Matrices;
+layout(location = 2) in vec3 viewspace_lightvec;
+
 layout(location = 0) out vec3 fragColor;
 
 struct PointLight {
-	vec3 pos;
 	float radius;
 	vec3 color;
 };
 
 //hardcoded for now
-PointLight light = PointLight(vec3(0.0, 0.0, 0.0), 6.0, vec3(1.0, 1.0, 1.0));
+PointLight light = PointLight(6.0, vec3(1.0, 1.0, 1.0));
 
 void main()
 {
@@ -24,17 +22,12 @@ void main()
 	// for each light
 	for (uint i = 0; i < 1u; i++)
 	{
-		// lightpos is a point, set w to 1.0 and divide it out afterwards
-		vec4 viewspace_lightpos4 = Matrices.v * vec4(light.pos, 1.0);
-		vec3 viewspace_lightpos = vec3(viewspace_lightpos4) / viewspace_lightpos4.w;
-
 		// Set up phong variables
-		vec3 light_dir = viewspace_lightpos - viewspace_pos;
-		if (length(light_dir) > light.radius)
+		if (length(viewspace_lightvec) > light.radius)
 			continue;
-		vec3 L_r = light_dir / light.radius;
+		vec3 L_r = viewspace_lightvec / light.radius;
 
-		vec3 L = normalize(light_dir);
+		vec3 L = normalize(viewspace_lightvec);
 		vec3 V = normalize(-viewspace_pos);
 		vec3 N = viewspace_normal;
 		vec3 R = normalize(reflect(-L, N));

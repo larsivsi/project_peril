@@ -147,7 +147,7 @@ impl MainPass {
                 binding: 0,
                 descriptor_type: vk::DescriptorType::UniformBuffer,
                 descriptor_count: 1,
-                stage_flags: vk::SHADER_STAGE_FRAGMENT_BIT,
+                stage_flags: vk::SHADER_STAGE_VERTEX_BIT,
                 p_immutable_samplers: ptr::null(),
             },
         ];
@@ -477,7 +477,6 @@ impl MainPass {
 
         commandbuffers[0]
     }
-
 
     /// Initializes the MainPass based on a RenderState
     ///
