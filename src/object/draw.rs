@@ -7,13 +7,14 @@ use renderer::RenderState;
 use std::{mem, slice, f32};
 use std::rc::Rc;
 
-
 #[derive(Clone, Copy)]
 #[allow(dead_code)] //not going to change vertices after creation
 pub struct Vertex {
     pos: [f32; 3],
     normal: [f32; 3],
-    tex_coord: [f32; 2],
+    tangent: [f32; 3],
+    bitangent: [f32; 3],
+    tex_uv: [f32; 2],
 }
 
 pub struct DrawObject {
@@ -50,9 +51,8 @@ impl Drawable for DrawObject {
         );
         let model_matrix = model_translation_matrix * model_rotation_matrix;
         // The order of multiplication here is important!
-        let mv_matrix = view_matrix * model_matrix;
-        let mvp_matrix = projection_matrix * mv_matrix;
-        let matrices = [mv_matrix, mvp_matrix];
+        let mvp_matrix = projection_matrix * view_matrix * model_matrix;
+        let matrices = [model_matrix, mvp_matrix];
 
         let matrices_bytes;
         unsafe {
@@ -111,22 +111,30 @@ impl DrawObject {
             Vertex {
                 pos: [-width, -height, 0.0],
                 normal: [0.0, 0.0, 1.0],
-                tex_coord: [0.0, 0.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [0.0, 0.0],
             },
             Vertex {
                 pos: [width, -height, 0.0],
                 normal: [0.0, 0.0, 1.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 0.0],
             },
             Vertex {
                 pos: [-width, height, 0.0],
                 normal: [0.0, 0.0, 1.0],
-                tex_coord: [0.0, 1.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [0.0, 1.0],
             },
             Vertex {
                 pos: [width, height, 0.0],
                 normal: [0.0, 0.0, 1.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 1.0],
             },
         ];
         let indices = [0u16, 1, 3, 0, 3, 2];
@@ -174,127 +182,175 @@ impl DrawObject {
             Vertex {
                 pos: [-h_width, -h_height, h_depth], //Lower Left Front
                 normal: [0.0, 0.0, 1.0],
-                tex_coord: [0.0, 0.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [0.0, 0.0],
             },
             Vertex {
                 pos: [h_width, -h_height, h_depth], //Lower Right Front
                 normal: [0.0, 0.0, 1.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 0.0],
             },
             Vertex {
                 pos: [-h_width, h_height, h_depth], //Upper Left Front
                 normal: [0.0, 0.0, 1.0],
-                tex_coord: [0.0, 1.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [0.0, 1.0],
             },
             Vertex {
                 pos: [h_width, h_height, h_depth], //Upper Right Front
                 normal: [0.0, 0.0, 1.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 1.0],
             },
             //Back
             Vertex {
                 pos: [h_width, -h_height, -h_depth], //Lower Right Back
                 normal: [0.0, 0.0, -1.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [-1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 0.0],
             },
             Vertex {
                 pos: [-h_width, -h_height, -h_depth], //Lower Left Back
                 normal: [0.0, 0.0, -1.0],
-                tex_coord: [0.0, 0.0],
+                tangent: [-1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [0.0, 0.0],
             },
             Vertex {
                 pos: [h_width, h_height, -h_depth], //Upper Right Back
                 normal: [0.0, 0.0, -1.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [-1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 1.0],
             },
             Vertex {
                 pos: [-h_width, h_height, -h_depth], //Upper Left Back
                 normal: [0.0, 0.0, -1.0],
-                tex_coord: [0.0, 1.0],
+                tangent: [-1.0, 0.0, 0.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [0.0, 1.0],
             },
             //Top
             Vertex {
                 pos: [-h_width, h_height, h_depth], //Upper Left Front
                 normal: [0.0, 1.0, 0.0],
-                tex_coord: [0.0, 1.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 0.0, -1.0],
+                tex_uv: [0.0, 1.0],
             },
             Vertex {
                 pos: [h_width, h_height, h_depth], //Upper Right Front
                 normal: [0.0, 1.0, 0.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 0.0, -1.0],
+                tex_uv: [1.0, 1.0],
             },
             Vertex {
                 pos: [-h_width, h_height, -h_depth], //Upper Left Back
                 normal: [0.0, 1.0, 0.0],
-                tex_coord: [0.0, 1.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 0.0, -1.0],
+                tex_uv: [0.0, 1.0],
             },
             Vertex {
                 pos: [h_width, h_height, -h_depth], //Upper Right Back
                 normal: [0.0, 1.0, 0.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 0.0, -1.0],
+                tex_uv: [1.0, 1.0],
             },
             //Bottom
             Vertex {
                 pos: [-h_width, -h_height, -h_depth], //Lower Left Back
                 normal: [0.0, -1.0, 0.0],
-                tex_coord: [0.0, 0.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 0.0, 1.0],
+                tex_uv: [0.0, 0.0],
             },
             Vertex {
                 pos: [h_width, -h_height, -h_depth], //Lower Right Back
                 normal: [0.0, -1.0, 0.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 0.0, 1.0],
+                tex_uv: [1.0, 0.0],
             },
             Vertex {
                 pos: [-h_width, -h_height, h_depth], //Lower Left Front
                 normal: [0.0, -1.0, 0.0],
-                tex_coord: [0.0, 0.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 0.0, 1.0],
+                tex_uv: [0.0, 0.0],
             },
             Vertex {
                 pos: [h_width, -h_height, h_depth], //Lower Right Front
                 normal: [0.0, -1.0, 0.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [1.0, 0.0, 0.0],
+                bitangent: [0.0, 0.0, 1.0],
+                tex_uv: [1.0, 0.0],
             },
             //Right
             Vertex {
                 pos: [h_width, -h_height, h_depth], //Lower Right Front
                 normal: [1.0, 0.0, 0.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [0.0, 0.0, -1.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 0.0],
             },
             Vertex {
                 pos: [h_width, -h_height, -h_depth], //Lower Right Back
                 normal: [1.0, 0.0, 0.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [0.0, 0.0, -1.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 0.0],
             },
             Vertex {
                 pos: [h_width, h_height, h_depth], //Upper Right Front
                 normal: [1.0, 0.0, 0.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [0.0, 0.0, -1.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 1.0],
             },
             Vertex {
                 pos: [h_width, h_height, -h_depth], //Upper Right Back
                 normal: [1.0, 0.0, 0.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [0.0, 0.0, -1.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 1.0],
             },
             //Left
             Vertex {
                 pos: [-h_width, -h_height, -h_depth], //Lower Left Back
                 normal: [-1.0, 0.0, 0.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [0.0, 0.0, 1.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 0.0],
             },
             Vertex {
                 pos: [-h_width, -h_height, h_depth], //Lower Left Front
                 normal: [-1.0, 0.0, 0.0],
-                tex_coord: [1.0, 0.0],
+                tangent: [0.0, 0.0, 1.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 0.0],
             },
             Vertex {
                 pos: [-h_width, h_height, -h_depth], //Upper Left Back
                 normal: [-1.0, 0.0, 0.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [0.0, 0.0, 1.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 1.0],
             },
             Vertex {
                 pos: [-h_width, h_height, h_depth], //Upper Left Front
                 normal: [-1.0, 0.0, 0.0],
-                tex_coord: [1.0, 1.0],
+                tangent: [0.0, 0.0, 1.0],
+                bitangent: [0.0, 1.0, 0.0],
+                tex_uv: [1.0, 1.0],
             },
         ];
         let indices = [

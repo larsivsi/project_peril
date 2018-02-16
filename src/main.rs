@@ -11,9 +11,6 @@ mod object;
 mod renderer;
 mod scene;
 
-use ash::vk;
-use ash::util::Align;
-use ash::version::DeviceV1_0;
 use cgmath::{Deg, Matrix4, Point3, Rad};
 use config::Config;
 use nurbs::{NURBSpline, Order};
@@ -21,7 +18,6 @@ use object::Camera;
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
-use std::mem::{align_of, size_of};
 
 fn main() {
     // init stuff
@@ -106,25 +102,6 @@ fn main() {
 
         // Update the view matrix uniform buffer
         let view_matrix = camera.generate_view_matrix();
-        let view_matrix_buf_size = size_of::<Matrix4<f32>>() as u64;
-        unsafe {
-            let mem_ptr = renderstate
-                .device
-                .map_memory(
-                    mainpass.view_matrix_ub_mem,
-                    0,
-                    view_matrix_buf_size,
-                    vk::MemoryMapFlags::empty(),
-                )
-                .expect("Failed to view matrix uniform memory");
-            let mut mem_align = Align::new(
-                mem_ptr,
-                align_of::<Matrix4<f32>>() as u64,
-                view_matrix_buf_size,
-            );
-            mem_align.copy_from_slice(&[view_matrix]);
-            renderstate.device.unmap_memory(mainpass.view_matrix_ub_mem);
-        }
 
         // Do the main rendering
         let main_cmd_buf = mainpass.begin_frame(&renderstate);

@@ -2,9 +2,8 @@
 #extension GL_ARB_separate_shader_objects : enable
 precision highp float;
 
-layout(location = 0) in vec3 viewspace_pos;
-layout(location = 1) in vec3 viewspace_normal;
-layout(location = 2) in vec3 viewspace_lightvec;
+layout(location = 0) in vec3 tangentspace_eyedir;
+layout(location = 1) in vec3 tangentspace_lightdir;
 
 layout(location = 0) out vec3 fragColor;
 
@@ -23,13 +22,15 @@ void main()
 	for (uint i = 0; i < 1u; i++)
 	{
 		// Set up phong variables
-		if (length(viewspace_lightvec) > light.radius)
+		//TODO: Radius is in world space, so it doesn't make sense in tangent space.
+		//      Need to figure out how to neatly solve this.
+		if (length(tangentspace_lightdir) > light.radius)
 			continue;
-		vec3 L_r = viewspace_lightvec / light.radius;
+		vec3 L_r = tangentspace_lightdir / light.radius;
 
-		vec3 L = normalize(viewspace_lightvec);
-		vec3 V = normalize(-viewspace_pos);
-		vec3 N = viewspace_normal;
+		vec3 L = normalize(tangentspace_lightdir);
+		vec3 V = normalize(tangentspace_eyedir);
+		vec3 N = vec3(0.0, 0.0, 1.0); //TODO texture lookup
 		vec3 R = normalize(reflect(-L, N));
 
 		// Diffuse
