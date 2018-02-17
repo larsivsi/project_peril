@@ -17,7 +17,7 @@ layout(location = 1) out vec3 worldspace_lightdir;
 layout(location = 2) out vec3 tangentspace_lightdir;
 layout(location = 3) out vec2 interpolated_tex_uv;
 
-vec3 worldspace_lightpos = vec3(0.0, 0.0, 2.0);
+vec3 worldspace_lightpos = vec3(0.0, 0.0, 0.0);
 
 void main()
 {

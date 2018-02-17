@@ -22,7 +22,8 @@ PointLight light = PointLight(6.0, vec3(1.0, 1.0, 1.0));
 
 void main()
 {
-	vec3 color = texture(color_tex, tex_uv).rgb;
+	vec3 color = vec3(0.0);
+	vec3 texcolor = texture(color_tex, tex_uv).rgb;
 	// for each light
 	for (uint i = 0; i < 1u; i++)
 	{
@@ -45,7 +46,7 @@ void main()
 		// Attenuation
 		float attenuation = max(0.0, 1.0 - dot(L_r,L_r));
 
-		color += light.color * (diffuse + specular) * attenuation;
+		color += texcolor * light.color * diffuse * attenuation + specular * attenuation;
 	}
 	fragColor = color;
 }
