@@ -5,6 +5,7 @@ layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec3 tangent;
 layout(location = 3) in vec3 bitangent;
+layout(location = 4) in vec2 tex_uv;
 
 layout(push_constant) uniform MatrixBlock {
 	mat4 m;
@@ -12,9 +13,11 @@ layout(push_constant) uniform MatrixBlock {
 } Matrices;
 
 layout(location = 0) out vec3 tangentspace_eyedir;
-layout(location = 1) out vec3 tangentspace_lightdir;
+layout(location = 1) out vec3 worldspace_lightdir;
+layout(location = 2) out vec3 tangentspace_lightdir;
+layout(location = 3) out vec2 interpolated_tex_uv;
 
-vec3 worldspace_lightpos = vec3(0.0, 0.0, 0.0);
+vec3 worldspace_lightpos = vec3(0.0, 0.0, 2.0);
 
 void main()
 {
@@ -32,7 +35,11 @@ void main()
 
 	// calculate eyedir and lightdir in tangent space
 	tangentspace_eyedir = TBN * (-worldspace_pos);
-	tangentspace_lightdir = TBN * (worldspace_lightpos - worldspace_pos);
+	worldspace_lightdir = (worldspace_lightpos - worldspace_pos);
+	tangentspace_lightdir = TBN * worldspace_lightdir;
+
+	// interpolate texture coordinates
+	interpolated_tex_uv = tex_uv;
 
 	gl_Position = Matrices.mvp * vec4(position, 1.0);
 }

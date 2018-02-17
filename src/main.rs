@@ -26,7 +26,7 @@ fn main() {
     let mut renderstate = RenderState::init(&cfg);
     let mut presentpass = PresentPass::init(&renderstate);
     let mut mainpass = MainPass::init(&renderstate, &cfg);
-    let mut scene = Scene::new(&renderstate);
+    let mut scene = Scene::new(&renderstate, &mainpass);
     let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
     let fov_horizontal = 90.0;
     let aspect_ratio = cfg.render_dimensions.0 as f32 / cfg.render_dimensions.1 as f32;

@@ -24,12 +24,12 @@ pub use self::presentpass::PresentPass;
 use config::Config;
 
 pub struct Texture {
-    image: vk::Image,
-    memory: vk::DeviceMemory,
-    view: vk::ImageView,
-    sampler: vk::Sampler,
+    pub image: vk::Image,
+    pub memory: vk::DeviceMemory,
+    pub view: vk::ImageView,
+    pub sampler: vk::Sampler,
     current_access_mask: vk::AccessFlags,
-    current_layout: vk::ImageLayout,
+    pub current_layout: vk::ImageLayout,
     current_stage: vk::PipelineStageFlags,
 }
 
@@ -805,7 +805,7 @@ impl RenderState {
     /// Loads the image given by the path into read only texture.
     ///
     /// Note: The caller is responsible for cleaning up the returned vulkan types.
-    fn load_image(&self, path: &str) -> Texture {
+    pub fn load_image(&self, path: &str) -> Texture {
         // Load the image data into a vk::Buffer
         let image = image::open(path).unwrap().to_rgba();
         let image_extent;

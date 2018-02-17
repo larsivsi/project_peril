@@ -3,7 +3,12 @@
 precision highp float;
 
 layout(location = 0) in vec3 tangentspace_eyedir;
-layout(location = 1) in vec3 tangentspace_lightdir;
+layout(location = 1) in vec3 worldspace_lightdir;
+layout(location = 2) in vec3 tangentspace_lightdir;
+layout(location = 3) in vec2 tex_uv;
+
+layout(binding = 0) uniform sampler2D color_tex;
+layout(binding = 1) uniform sampler2D normal_tex;
 
 layout(location = 0) out vec3 fragColor;
 
@@ -17,20 +22,18 @@ PointLight light = PointLight(6.0, vec3(1.0, 1.0, 1.0));
 
 void main()
 {
-	vec3 color = vec3(0.0);
+	vec3 color = texture(color_tex, tex_uv).rgb;
 	// for each light
 	for (uint i = 0; i < 1u; i++)
 	{
 		// Set up phong variables
-		//TODO: Radius is in world space, so it doesn't make sense in tangent space.
-		//      Need to figure out how to neatly solve this.
-		if (length(tangentspace_lightdir) > light.radius)
+		if (length(worldspace_lightdir) > light.radius)
 			continue;
-		vec3 L_r = tangentspace_lightdir / light.radius;
+		vec3 L_r = worldspace_lightdir / light.radius;
 
 		vec3 L = normalize(tangentspace_lightdir);
 		vec3 V = normalize(tangentspace_eyedir);
-		vec3 N = vec3(0.0, 0.0, 1.0); //TODO texture lookup
+		vec3 N = texture(normal_tex, tex_uv).rgb * 2.0 - 1.0;
 		vec3 R = normalize(reflect(-L, N));
 
 		// Diffuse

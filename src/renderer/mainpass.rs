@@ -14,9 +14,8 @@ use config::Config;
 
 pub struct MainPass {
     renderpass: vk::RenderPass,
-    descriptor_pool: vk::DescriptorPool,
-    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
-    descriptor_sets: Vec<vk::DescriptorSet>,
+    pub descriptor_pool: vk::DescriptorPool,
+    pub descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     pub pipeline_layout: vk::PipelineLayout,
     viewport: vk::Viewport,
     scissor: vk::Rect2D,
@@ -103,8 +102,6 @@ impl MainPass {
     }
 
     /// Creates a pipeline for the renderpass.
-    ///
-    /// Very straigt forward pipeline: Loads some hard-coded shaders that will draw a triangle.
     fn create_pipeline(
         rs: &RenderState,
         render_size: vk::Extent3D,
@@ -112,7 +109,6 @@ impl MainPass {
     ) -> (
         vk::DescriptorPool,
         Vec<vk::DescriptorSetLayout>,
-        Vec<vk::DescriptorSet>,
         vk::PipelineLayout,
         vk::Viewport,
         vk::Rect2D,
@@ -121,8 +117,8 @@ impl MainPass {
         // Descriptors
         let descriptor_sizes = [
             vk::DescriptorPoolSize {
-                typ: vk::DescriptorType::UniformBuffer,
-                descriptor_count: 1,
+                typ: vk::DescriptorType::CombinedImageSampler,
+                descriptor_count: 2,
             },
         ];
         let descriptor_pool_info = vk::DescriptorPoolCreateInfo {
@@ -139,7 +135,22 @@ impl MainPass {
                 .create_descriptor_pool(&descriptor_pool_info, None)
                 .unwrap();
         }
-        let desc_layout_bindings = [];
+        let desc_layout_bindings = [
+            vk::DescriptorSetLayoutBinding {
+                binding: 0,
+                descriptor_type: vk::DescriptorType::CombinedImageSampler,
+                descriptor_count: 1,
+                stage_flags: vk::SHADER_STAGE_FRAGMENT_BIT,
+                p_immutable_samplers: ptr::null(),
+            },
+            vk::DescriptorSetLayoutBinding {
+                binding: 1,
+                descriptor_type: vk::DescriptorType::CombinedImageSampler,
+                descriptor_count: 1,
+                stage_flags: vk::SHADER_STAGE_FRAGMENT_BIT,
+                p_immutable_samplers: ptr::null(),
+            },
+        ];
         let descriptor_info = vk::DescriptorSetLayoutCreateInfo {
             s_type: vk::StructureType::DescriptorSetLayoutCreateInfo,
             p_next: ptr::null(),
@@ -154,19 +165,6 @@ impl MainPass {
                     .create_descriptor_set_layout(&descriptor_info, None)
                     .unwrap(),
             ];
-        }
-        let desc_alloc_info = vk::DescriptorSetAllocateInfo {
-            s_type: vk::StructureType::DescriptorSetAllocateInfo,
-            p_next: ptr::null(),
-            descriptor_pool: descriptor_pool,
-            descriptor_set_count: descriptor_set_layouts.len() as u32,
-            p_set_layouts: descriptor_set_layouts.as_ptr(),
-        };
-        let descriptor_sets;
-        unsafe {
-            descriptor_sets = rs.device
-                .allocate_descriptor_sets(&desc_alloc_info)
-                .unwrap();
         }
 
         let mv_matrices_push_constant = vk::PushConstantRange {
@@ -252,13 +250,12 @@ impl MainPass {
             offset: 9 * size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
         };
 
-        // TODO: use texture coords
-        //let vertex_texcoord_attribute_description = vk::VertexInputAttributeDescription {
-        //    binding: 0,
-        //    location: 4,
-        //    format: vk::Format::R32g32Sfloat,
-        //    offset: 12 * size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
-        //};
+        let vertex_texcoord_attribute_description = vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 4,
+            format: vk::Format::R32g32Sfloat,
+            offset: 12 * size_of::<f32>() as u32, //TODO: Make these use offset_of! macro.
+        };
 
         let vertex_input_binding_descriptions = [vertex_binding_description];
         let vertex_input_attribute_descriptions = [
@@ -266,7 +263,7 @@ impl MainPass {
             vertex_normal_attribute_description,
             vertex_tangent_attribute_description,
             vertex_bitangent_attribute_description,
-            //vertex_texcoord_attribute_description,
+            vertex_texcoord_attribute_description,
         ];
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
             s_type: vk::StructureType::PipelineVertexInputStateCreateInfo,
@@ -427,7 +424,6 @@ impl MainPass {
         (
             descriptor_pool,
             descriptor_set_layouts.to_vec(),
-            descriptor_sets,
             pipeline_layout,
             viewport,
             scissor,
@@ -522,15 +518,8 @@ impl MainPass {
         );
 
         let renderpass = MainPass::create_renderpass(rs, render_format);
-        let (
-            descriptor_pool,
-            descriptor_set_layouts,
-            descriptor_sets,
-            pipeline_layout,
-            viewport,
-            scissor,
-            pipeline,
-        ) = MainPass::create_pipeline(rs, render_size, renderpass);
+        let (descriptor_pool, descriptor_set_layouts, pipeline_layout, viewport, scissor, pipeline) =
+            MainPass::create_pipeline(rs, render_size, renderpass);
         let framebuffer = MainPass::create_framebuffer(
             rs,
             render_size,
@@ -544,7 +533,6 @@ impl MainPass {
             renderpass: renderpass,
             descriptor_pool: descriptor_pool,
             descriptor_set_layouts: descriptor_set_layouts,
-            descriptor_sets: descriptor_sets,
             pipeline_layout: pipeline_layout,
             viewport: viewport,
             scissor: scissor,
@@ -611,15 +599,6 @@ impl MainPass {
                 cmd_buf,
                 &render_pass_begin_info,
                 vk::SubpassContents::Inline,
-            );
-
-            rs.device.cmd_bind_descriptor_sets(
-                cmd_buf,
-                vk::PipelineBindPoint::Graphics,
-                self.pipeline_layout,
-                0,
-                &self.descriptor_sets[..],
-                &[],
             );
 
             // Bind pipeline

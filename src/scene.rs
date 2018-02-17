@@ -1,6 +1,6 @@
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use object::{DrawObject, Drawable, Rotation};
-use renderer::RenderState;
+use renderer::{MainPass, RenderState};
 use ash::vk;
 use std::f32;
 
@@ -9,9 +9,9 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new(rs: &RenderState) -> Scene {
-        let _quad = DrawObject::new_quad(rs, Point3::new(0.0, 0.0, 0.0), 1.0, 1.0);
-        let cuboid = DrawObject::new_cuboid(rs, Point3::new(2.0, 0.0, -4.0), 1.0, 2.0, 1.0);
+    pub fn new(rs: &RenderState, mp: &MainPass) -> Scene {
+        //let _quad = DrawObject::new_quad(rs, Point3::new(0.0, 0.0, 0.0), 1.0, 1.0);
+        let cuboid = DrawObject::new_cuboid(rs, mp, Point3::new(1.0, 0.0, -4.0), 2.0, 2.0, 2.0);
 
         let mut scene = Scene {
             objects: Vec::new(),
@@ -26,7 +26,7 @@ impl Scene {
         for mut object in self.objects.iter_mut() {
             //TODO: Move this.
             let axis = Vector3::new(0.0, 1.0, 0.0);
-            let angle = Deg(1.0);
+            let angle = Deg(-0.5);
 
             object.rotate(axis, angle);
         }
