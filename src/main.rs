@@ -118,19 +118,42 @@ fn main() {
         framecount += 1;
 
         if framecount % 100 == 0 {
-            let frame_time_ms = frame_time.subsec_nanos() as f64 / 1_000_000.0;
-            println!(
-                "frametime: {}ms => {} FPS",
-                frame_time_ms,
-                1_000.0 / frame_time_ms
-            );
+            //let frame_time_ms = frame_time.subsec_nanos() as f64 / 1_000_000.0;
+            //println!(
+            //    "frametime: {}ms => {} FPS",
+            //    frame_time_ms,
+            //    1_000.0 / frame_time_ms
+            //);
         }
 
         renderstate.event_loop.poll_events(|ev| match ev {
-            winit::Event::WindowEvent {
-                event: winit::WindowEvent::Closed,
-                ..
-            } => running = false,
+            winit::Event::WindowEvent { event, .. } => match event {
+                winit::WindowEvent::Closed => running = false,
+                //Keyboard events
+                winit::WindowEvent::KeyboardInput { input, .. } => match input.state {
+                    winit::ElementState::Pressed => {
+                        println!("Pressed!");
+                    }
+                    winit::ElementState::Released => {
+                        println!("Released!");
+                    }
+                },
+                //Mouse presses
+                winit::WindowEvent::MouseInput { button, .. } => match button {
+                    winit::MouseButton::Left => {
+                        println!("Left mouse!");
+                    }
+                    winit::MouseButton::Right => {
+                        println!("Right mouse!");
+                    }
+                    _ => (),
+                },
+                //Mouse Movement
+                winit::WindowEvent::MouseMoved { position, .. } => {
+                    //println!("Mouse moved x: {} y: {}", position.0, position.1);
+                }
+                _ => (),
+            },
             _ => (),
         });
     }
