@@ -73,7 +73,7 @@ impl Position for Camera {
 
 impl Moveable for Camera {
     fn translate(&mut self, direction: Vector3<f32>) {
-        let camera_movement_speed = 1;
+        //let camera_movement_speed = 1;
         self.position += direction;
     }
 }

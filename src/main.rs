@@ -137,20 +137,20 @@ fn main() {
                 //Keyboard events
                 winit::WindowEvent::KeyboardInput { input, .. } => match input.state {
                     winit::ElementState::Pressed => if input.scancode == wscancode {
-                        println!("Pressed forward! {}", input.scancode);
-                        camera.translate(Vector3::new(0.0, 0.0, 1.0));
+                        //println!("Pressed forward! {}", input.scancode);
+                        camera.translate(Vector3::new(0.0, 0.0, -1.0));
                     } else if input.scancode == ascancode {
-                        println!("Pressed left! {}", input.scancode);
+                        //println!("Pressed left! {}", input.scancode);
                         camera.translate(Vector3::new(-1.0, 0.0, 0.0));
                     } else if input.scancode == sscancode {
-                        println!("Pressed back! {}", input.scancode);
-                        camera.translate(Vector3::new(0.0, 0.0, -1.0));
+                        //println!("Pressed back! {}", input.scancode);
+                        camera.translate(Vector3::new(0.0, 0.0, 1.0));
                     } else if input.scancode == dscancode {
-                        println!("Pressed right! {}", input.scancode);
+                        //println!("Pressed right! {}", input.scancode);
                         camera.translate(Vector3::new(1.0, 0.0, 0.0));
                     },
                     winit::ElementState::Released => {
-                        println!("Released!");
+                        //println!("Released!");
                     }
                 },
                 //Mouse presses
@@ -164,9 +164,9 @@ fn main() {
                     _ => (),
                 },
                 //Mouse Movement
-                winit::WindowEvent::MouseMoved { position, .. } => {
-                    //println!("Mouse moved x: {} y: {}", position.0, position.1);
-                }
+                //winit::WindowEvent::MouseMoved { position, .. } => {
+                //    //println!("Mouse moved x: {} y: {}", position.0, position.1);
+                //}
                 _ => (),
             },
             _ => (),
