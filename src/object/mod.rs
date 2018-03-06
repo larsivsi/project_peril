@@ -33,6 +33,10 @@ pub trait Position {
     }
 }
 
+pub trait Moveable {
+    fn translate(&mut self, Vector3<f32>);
+}
+
 pub trait Rotation {
     fn rotate(&mut self, axis: Vector3<f32>, angle: Deg<f32>);
     fn get_rotation(&self) -> Quaternion<f32>;

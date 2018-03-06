@@ -11,10 +11,10 @@ mod object;
 mod renderer;
 mod scene;
 
-use cgmath::{Deg, Matrix4, Point3, Rad};
+use cgmath::{Deg, Matrix4, Point3, Rad, Vector3};
 use config::Config;
 use nurbs::{NURBSpline, Order};
-use object::Camera;
+use object::{Camera, Moveable};
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};
@@ -27,7 +27,7 @@ fn main() {
     let mut presentpass = PresentPass::init(&renderstate);
     let mut mainpass = MainPass::init(&renderstate, &cfg);
     let mut scene = Scene::new(&renderstate, &mainpass);
-    let camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
+    let mut camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
     let fov_horizontal = 90.0;
     let aspect_ratio = cfg.render_dimensions.0 as f32 / cfg.render_dimensions.1 as f32;
     let fov_vertical = Rad::from(Deg(fov_horizontal / aspect_ratio));
@@ -85,6 +85,11 @@ fn main() {
     let mut accumulator = Duration::new(0, 0);
     let mut current_time = SystemTime::now();
 
+    let wscancode: u32 = 17;
+    let ascancode: u32 = 30;
+    let sscancode: u32 = 31;
+    let dscancode: u32 = 32;
+
     while running {
         let new_time = SystemTime::now();
         let frame_time = new_time
@@ -131,9 +136,19 @@ fn main() {
                 winit::WindowEvent::Closed => running = false,
                 //Keyboard events
                 winit::WindowEvent::KeyboardInput { input, .. } => match input.state {
-                    winit::ElementState::Pressed => {
-                        println!("Pressed!");
-                    }
+                    winit::ElementState::Pressed => if input.scancode == wscancode {
+                        println!("Pressed forward! {}", input.scancode);
+                        camera.translate(Vector3::new(0.0, 0.0, 1.0));
+                    } else if input.scancode == ascancode {
+                        println!("Pressed left! {}", input.scancode);
+                        camera.translate(Vector3::new(-1.0, 0.0, 0.0));
+                    } else if input.scancode == sscancode {
+                        println!("Pressed back! {}", input.scancode);
+                        camera.translate(Vector3::new(0.0, 0.0, -1.0));
+                    } else if input.scancode == dscancode {
+                        println!("Pressed right! {}", input.scancode);
+                        camera.translate(Vector3::new(1.0, 0.0, 0.0));
+                    },
                     winit::ElementState::Released => {
                         println!("Released!");
                     }
