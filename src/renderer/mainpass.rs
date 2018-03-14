@@ -485,8 +485,8 @@ impl MainPass {
     pub fn init(rs: &RenderState, cfg: &Config) -> MainPass {
         let render_format = vk::Format::R8g8b8a8Unorm;
         let render_size = vk::Extent3D {
-            width: cfg.render_dimensions.0,
-            height: cfg.render_dimensions.1,
+            width: cfg.render_width,
+            height: cfg.render_height,
             depth: 1,
         };
 

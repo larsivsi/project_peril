@@ -1,43 +1,23 @@
-use regex::Regex;
+use serde_json;
 use std::fs::File;
-use std::io::prelude::*;
+use std::io::{Error, ErrorKind};
 
 const APP_NAME: &'static str = "ProjectPeril";
 const APP_VERSION_MAJOR: &'static str = env!("CARGO_PKG_VERSION_MAJOR");
 const APP_VERSION_MINOR: &'static str = env!("CARGO_PKG_VERSION_MINOR");
 const APP_VERSION_PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
 
+#[derive(Serialize, Deserialize)]
 pub struct Config {
-    pub app_name: &'static str,
+    pub app_name: String,
     pub app_version: u32,
-    pub window_dimensions: (u32, u32),
-    pub render_dimensions: (u32, u32),
+    pub render_width: u32,
+    pub render_height: u32,
+    pub window_width: u32,
+    pub window_height: u32,
 }
 
 impl Config {
-    /// Parses an option/value pair and updates the Config struct.
-    fn parse_option(&mut self, option: &str, value: &str) {
-        match option {
-            "window_width" => {
-                let val: u32 = value.parse().expect("window width is NAN");
-                self.window_dimensions.0 = val;
-            }
-            "window_height" => {
-                let val: u32 = value.parse().expect("window height is NAN");
-                self.window_dimensions.1 = val;
-            }
-            "render_width" => {
-                let val: u32 = value.parse().expect("render width is NAN");
-                self.render_dimensions.0 = val;
-            }
-            "render_height" => {
-                let val: u32 = value.parse().expect("render height is NAN");
-                self.render_dimensions.1 = val;
-            }
-            _ => println!("Invalid option: {} with value: {}", option, value),
-        }
-    }
-
     /// Generates a packed 32 bit version number based on the given major, minor and patch
     /// versions.
     fn make_version(major: u32, minor: u32, patch: u32) -> u32 {
@@ -62,31 +42,62 @@ impl Config {
         format!("v{}.{}.{}", major, minor, patch)
     }
 
-    /// Reads the config given by the filename and generates a Config struct.
-    pub fn read_config(filename: &str) -> Config {
-        let mut file = File::open(filename).expect("Error opening config file");
-
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .expect("Error reading config file");
-
-        let mut cfg = Config {
-            app_name: APP_NAME,
-            app_version: Config::make_version(
-                APP_VERSION_MAJOR.parse().unwrap(),
-                APP_VERSION_MINOR.parse().unwrap(),
-                APP_VERSION_PATCH.parse().unwrap(),
-            ),
-            window_dimensions: (0, 0),
-            render_dimensions: (0, 0),
-        };
-
-        // match on option=value
-        let re = Regex::new(r"(\w+)=(\w+)").unwrap();
-        for rematch in re.captures_iter(&contents) {
-            cfg.parse_option(&rematch[1], &rematch[2]);
+    /// Saves the Config to the supplied filename.
+    fn save(&self, filename: &str) -> Result<(), Error> {
+        let file = File::create(filename)?;
+        match serde_json::to_writer_pretty(file, self) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.into()),
         }
+    }
 
-        cfg
+    /// Either reads the config given by the filename and generates a Config struct,
+    /// or creates a default config and saves it to disk if the config file is not found.
+    pub fn read_config(filename: &str) -> Result<Config, Error> {
+        let correct_name = String::from(APP_NAME);
+        let correct_version = Config::make_version(
+            APP_VERSION_MAJOR.parse().unwrap(),
+            APP_VERSION_MINOR.parse().unwrap(),
+            APP_VERSION_PATCH.parse().unwrap(),
+        );
+
+        match File::open(filename) {
+            Ok(file) => {
+                let mut cfg: Config = serde_json::from_reader(file)?;
+
+                let mut needs_save = false;
+                if cfg.app_name != correct_name {
+                    cfg.app_name = correct_name;
+                    needs_save = true;
+                }
+                if cfg.app_version != correct_version {
+                    cfg.app_version = correct_version;
+                    needs_save = true;
+                }
+                if needs_save {
+                    cfg.save(filename)?;
+                }
+
+                Ok(cfg)
+            }
+            Err(e) => {
+                match e.kind() {
+                    ErrorKind::NotFound => {
+                        println!("WARNING: Options file ({}) not found, creating new with default values.", filename);
+                        let cfg = Config {
+                            app_name: correct_name,
+                            app_version: correct_version,
+                            render_width: 480,
+                            render_height: 320,
+                            window_width: 480,
+                            window_height: 320,
+                        };
+                        cfg.save(filename)?;
+                        Ok(cfg)
+                    }
+                    _ => Err(e),
+                }
+            }
+        }
     }
 }

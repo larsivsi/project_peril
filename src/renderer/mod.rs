@@ -66,7 +66,7 @@ impl RenderState {
     /// Creates a Vulkan instance.
     fn create_instance(cfg: &Config, entry: &Entry<V1_0>) -> Instance<V1_0> {
         // Application info
-        let app_name = CString::new(cfg.app_name).unwrap();
+        let app_name = CString::new(cfg.app_name.clone()).unwrap();
         let raw_name = app_name.as_ptr();
         let appinfo = vk::ApplicationInfo {
             s_type: vk::StructureType::ApplicationInfo,
@@ -262,7 +262,7 @@ impl RenderState {
         let event_loop = winit::EventsLoop::new();
         let window = winit::WindowBuilder::new()
             .with_title(format!("{} {}", cfg.app_name, cfg.version_to_string()))
-            .with_dimensions(cfg.window_dimensions.0, cfg.window_dimensions.1)
+            .with_dimensions(cfg.window_width, cfg.window_height)
             .build(&event_loop)
             .unwrap();
 

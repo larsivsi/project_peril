@@ -2,7 +2,10 @@
 extern crate ash;
 extern crate cgmath;
 extern crate image;
-extern crate regex;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 extern crate winit;
 
 mod config;
@@ -21,7 +24,14 @@ use std::time::{Duration, SystemTime};
 
 fn main() {
     // init stuff
-    let cfg = Config::read_config("options.cfg");
+    let options_file = "options.json";
+    let cfg = match Config::read_config(options_file) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            println!("ERROR! reading config file ({}): {}", options_file, e);
+            return;
+        }
+    };
 
     let mut renderstate = RenderState::init(&cfg);
     let mut presentpass = PresentPass::init(&renderstate);
@@ -29,7 +39,7 @@ fn main() {
     let mut scene = Scene::new(&renderstate, &mainpass);
     let mut camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
     let fov_horizontal = 90.0;
-    let aspect_ratio = cfg.render_dimensions.0 as f32 / cfg.render_dimensions.1 as f32;
+    let aspect_ratio = cfg.render_width as f32 / cfg.render_height as f32;
     let fov_vertical = Rad::from(Deg(fov_horizontal / aspect_ratio));
     let near = 1.0;
     let far = 1000.0;

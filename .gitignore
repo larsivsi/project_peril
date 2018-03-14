@@ -3,3 +3,4 @@
 *.swp
 Cargo.lock
 rusty-tags.vi
+options.json
