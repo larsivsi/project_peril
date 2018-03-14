@@ -38,14 +38,13 @@ fn main() {
     let mut mainpass = MainPass::init(&renderstate, &cfg);
     let mut scene = Scene::new(&renderstate, &mainpass);
     let mut camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
-    let fov_horizontal = 90.0;
     let aspect_ratio = cfg.render_width as f32 / cfg.render_height as f32;
-    let fov_vertical = Rad::from(Deg(fov_horizontal / aspect_ratio));
+    let vertical_fov = Rad::from(Deg(cfg.horizontal_fov as f32 / aspect_ratio));
     let near = 1.0;
     let far = 1000.0;
     // Need to flip projection matrix due to the Vulkan NDC coordinates.
     // See https://matthewwellings.com/blog/the-new-vulkan-coordinate-system/ for details.
-    let glu_projection_matrix = cgmath::perspective(fov_vertical, aspect_ratio, near, far);
+    let glu_projection_matrix = cgmath::perspective(vertical_fov, aspect_ratio, near, far);
     let vulkan_ndc = Matrix4::new(
         1.0,
         0.0,

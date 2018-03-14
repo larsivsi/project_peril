@@ -9,6 +9,7 @@ const APP_VERSION_PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
+    pub horizontal_fov: u32,
     pub app_name: String,
     pub app_version: u32,
     pub render_width: u32,
@@ -85,6 +86,7 @@ impl Config {
                     ErrorKind::NotFound => {
                         println!("WARNING: Options file ({}) not found, creating new with default values.", filename);
                         let cfg = Config {
+                            horizontal_fov: 90,
                             app_name: correct_name,
                             app_version: correct_version,
                             render_width: 480,
