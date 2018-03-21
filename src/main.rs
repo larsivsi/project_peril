@@ -17,7 +17,7 @@ mod scene;
 use cgmath::{Deg, Matrix4, Point3, Rad, Vector3};
 use config::Config;
 use nurbs::{NURBSpline, Order};
-use object::{Camera, Moveable};
+use object::{Camera, Position};
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::time::{Duration, SystemTime};

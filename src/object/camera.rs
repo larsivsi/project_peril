@@ -1,6 +1,6 @@
 use cgmath::prelude::*;
 use cgmath::{Matrix4, Point3, Vector3};
-use object::{Moveable, Position};
+use object::Position;
 
 pub struct Camera {
     position: Point3<f32>,
@@ -68,12 +68,5 @@ impl Position for Camera {
 
     fn set_position(&mut self, position: Point3<f32>) {
         self.position = position;
-    }
-}
-
-impl Moveable for Camera {
-    fn translate(&mut self, direction: Vector3<f32>) {
-        //let camera_movement_speed = 1;
-        self.position += direction;
     }
 }

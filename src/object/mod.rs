@@ -31,10 +31,13 @@ pub trait Position {
         let vec = other.get_position() - self.get_position();
         vec.dot(vec).sqrt()
     }
-}
 
-pub trait Moveable {
-    fn translate(&mut self, Vector3<f32>);
+    /// Translates the object
+    fn translate(&mut self, translation: Vector3<f32>) {
+        let mut position = self.get_position();
+        position += translation;
+        self.set_position(position);
+    }
 }
 
 pub trait Rotation {
