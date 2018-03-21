@@ -101,7 +101,8 @@ impl Position for DrawObject {
 impl Rotation for DrawObject {
     fn rotate(&mut self, axis: Vector3<f32>, angle: Deg<f32>) {
         let rotation_quat = Quaternion::from_axis_angle(axis, angle);
-        self.rotation = self.rotation * rotation_quat;
+        // The order here is important
+        self.rotation = rotation_quat * self.rotation;
     }
 
     fn get_rotation(&self) -> Quaternion<f32> {
@@ -490,7 +491,7 @@ impl DrawObject {
             index_mem: idx_mem,
             num_indices: indices.len() as u32,
             position: position,
-            rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
+            rotation: Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(0.0)),
             descriptor_sets: descriptor_sets,
             texture: texture,
             normal_map: normal_map,
