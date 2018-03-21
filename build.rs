@@ -35,8 +35,8 @@ fn main()
 			panic!("Failed to build shader: {}", String::from_utf8_lossy(&output.stdout));
 		}
 
-		println!("cargo:rerun-if-changed={}", glsl_name);
-		println!("cargo:rerun-if-changed={}", spv_name);
+		println!("cargo:rerun-if-changed={}/{}", path.display(), glsl_name);
+		println!("cargo:rerun-if-changed={}/{}", path.display(), spv_name);
 	}
 
 	for shader in glob("*.frag").unwrap()
@@ -60,8 +60,8 @@ fn main()
 			panic!("Failed to build shader: {}", String::from_utf8_lossy(&output.stdout));
 		}
 
-		println!("cargo:rerun-if-changed={}", glsl_name);
-		println!("cargo:rerun-if-changed={}", spv_name);
+		println!("cargo:rerun-if-changed={}/{}", path.display(), glsl_name);
+		println!("cargo:rerun-if-changed={}/{}", path.display(), spv_name);
 	}
 
 	// Return to first directory
