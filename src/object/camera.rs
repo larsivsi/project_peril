@@ -56,6 +56,28 @@ impl Camera {
         camera
     }
 
+    pub fn get_front_vector(&self) -> Vector3<f32> {
+        return self.front;
+    }
+
+    pub fn get_right_vector(&self) -> Vector3<f32> {
+        return self.right;
+    }
+
+    pub fn yaw(&mut self, angle: f32) {
+        self.yaw += angle;
+        self.update();
+    }
+
+    pub fn pitch(&mut self, angle: f32) {
+        let new_pitch = self.pitch + angle;
+        // Avoid flipping the world
+        if new_pitch.abs() < 90.0 {
+            self.pitch = new_pitch;
+        }
+        self.update();
+    }
+
     pub fn generate_view_matrix(&self) -> Matrix4<f32> {
         Matrix4::look_at_dir(self.position, self.front, self.up)
     }

@@ -14,7 +14,7 @@ mod object;
 mod renderer;
 mod scene;
 
-use cgmath::{Deg, Matrix4, Point3, Rad, Vector3};
+use cgmath::{Deg, Matrix4, Point3, Rad};
 use config::Config;
 use nurbs::{NURBSpline, Order};
 use object::{Camera, Position};
@@ -94,11 +94,6 @@ fn main() {
     let mut accumulator = Duration::new(0, 0);
     let mut current_time = SystemTime::now();
 
-    let wscancode: u32 = 17;
-    let ascancode: u32 = 30;
-    let sscancode: u32 = 31;
-    let dscancode: u32 = 32;
-
     while running {
         let new_time = SystemTime::now();
         let frame_time = new_time
@@ -145,19 +140,41 @@ fn main() {
                 winit::WindowEvent::Closed => running = false,
                 //Keyboard events
                 winit::WindowEvent::KeyboardInput { input, .. } => match input.state {
-                    winit::ElementState::Pressed => if input.scancode == wscancode {
-                        //println!("Pressed forward! {}", input.scancode);
-                        camera.translate(Vector3::new(0.0, 0.0, -1.0));
-                    } else if input.scancode == ascancode {
-                        //println!("Pressed left! {}", input.scancode);
-                        camera.translate(Vector3::new(-1.0, 0.0, 0.0));
-                    } else if input.scancode == sscancode {
-                        //println!("Pressed back! {}", input.scancode);
-                        camera.translate(Vector3::new(0.0, 0.0, 1.0));
-                    } else if input.scancode == dscancode {
-                        //println!("Pressed right! {}", input.scancode);
-                        camera.translate(Vector3::new(1.0, 0.0, 0.0));
-                    },
+                    winit::ElementState::Pressed => {
+                        match input.virtual_keycode.expect("Error getting keycode") {
+                            winit::VirtualKeyCode::W => {
+                                let translation = camera.get_front_vector();
+                                camera.translate(translation);
+                            }
+                            winit::VirtualKeyCode::A => {
+                                let translation = camera.get_right_vector() * -1.0;
+                                camera.translate(translation);
+                            }
+                            winit::VirtualKeyCode::S => {
+                                let translation = camera.get_front_vector() * -1.0;
+                                camera.translate(translation);
+                            }
+                            winit::VirtualKeyCode::D => {
+                                let translation = camera.get_right_vector();
+                                camera.translate(translation);
+                            }
+                            winit::VirtualKeyCode::Up => {
+                                camera.pitch(5.0);
+                            }
+                            winit::VirtualKeyCode::Left => {
+                                camera.yaw(-5.0);
+                            }
+                            winit::VirtualKeyCode::Down => {
+                                camera.pitch(-5.0);
+                            }
+                            winit::VirtualKeyCode::Right => {
+                                camera.yaw(5.0);
+                            }
+                            _ => {
+                                //println!("Pressed {}", input.scancode);
+                            }
+                        }
+                    }
                     winit::ElementState::Released => {
                         //println!("Released!");
                     }
