@@ -54,8 +54,9 @@ impl Drawable for DrawObject
 		);
 		// The order of multiplication here is important!
 		let model_matrix = model_translation_matrix * model_rotation_matrix;
-		let mvp_matrix = projection_matrix * view_matrix * model_matrix;
-		let matrices = [model_matrix, mvp_matrix];
+		let view_matrix = view_matrix * model_matrix;
+		let mvp_matrix = projection_matrix * view_matrix;
+		let matrices = [model_matrix, view_matrix, mvp_matrix];
 
 		let matrices_bytes;
 		unsafe {

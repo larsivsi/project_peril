@@ -9,6 +9,7 @@ layout(location = 4) in vec2 tex_uv;
 
 layout(push_constant) uniform MatrixBlock {
 	mat4 m;
+	mat4 mv;
 	mat4 mvp;
 } Matrices;
 
@@ -22,12 +23,12 @@ vec3 worldspace_lightpos = vec3(0.0, 0.0, 0.0);
 void main()
 {
 	// normal, tangent and bitanget are vectors, set w to 0.0
-	vec3 worldspace_normal = vec3(Matrices.m * vec4(normal, 0.0));
-	vec3 worldspace_tangent = vec3(Matrices.m * vec4(tangent, 0.0));
-	vec3 worldspace_bitangent = vec3(Matrices.m * vec4(bitangent, 0.0));
+	vec3 viewspace_normal = vec3(Matrices.mv * vec4(normal, 0.0));
+	vec3 viewspace_tangent = vec3(Matrices.mv * vec4(tangent, 0.0));
+	vec3 viewspace_bitangent = vec3(Matrices.mv * vec4(bitangent, 0.0));
 
 	// calulate the tangent space matrix
-	mat3 TBN = transpose(mat3(worldspace_tangent, worldspace_bitangent, worldspace_normal));
+	mat3 TBN = transpose(mat3(viewspace_tangent, viewspace_bitangent, viewspace_normal));
 
 	// position is a point, set w to 1.0 and divide it out afterwards
 	vec4 worldspace_pos4 = Matrices.m * vec4(position, 1.0);

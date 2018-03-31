@@ -156,7 +156,7 @@ impl MainPass
 
 		let mv_matrices_push_constant = vk::PushConstantRange {
 			stage_flags: vk::SHADER_STAGE_VERTEX_BIT,
-			size: 2 * size_of::<Matrix4<f32>>() as u32,
+			size: 3 * size_of::<Matrix4<f32>>() as u32,
 			offset: 0,
 		};
 
