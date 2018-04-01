@@ -89,7 +89,7 @@ fn main()
 		x: 0.0 as f64,
 		y: 0.0 as f64,
 	};
-	let mouse_sensitivity = 0.3;
+	let mouse_sensitivity = cfg.mouse_sensitivity;
 
 	while running
 	{
@@ -240,8 +240,8 @@ fn main()
 				{
 					println!("Mouse moved x: {} y: {}", delta.0, delta.1);
 					let mut dir_change = Vector2 {
-						x: last_mouse_position.x + delta.0,
-						y: last_mouse_position.y + delta.1,
+						x: (last_mouse_position.x + delta.0) * cfg.mouse_invert_x,
+						y: (last_mouse_position.y + delta.1) * cfg.mouse_invert_y,
 					};
 					last_mouse_position.x = delta.0;
 					last_mouse_position.y = delta.1;
