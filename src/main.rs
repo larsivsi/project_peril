@@ -186,6 +186,10 @@ fn main()
 							{
 								camera.yaw(5.0);
 							}
+							winit::VirtualKeyCode::Escape =>
+							{
+								running = false;
+							}
 							_ =>
 							{
 								// println!("Pressed {}", input.scancode);
