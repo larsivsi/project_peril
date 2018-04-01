@@ -17,7 +17,7 @@ mod scene;
 use ash::util::Align;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use cgmath::{Deg, Matrix4, Point3, Rad};
+use cgmath::{Deg, Matrix4, Point3, Rad, Vector2};
 use config::Config;
 use nurbs::{NURBSpline, Order};
 use object::{Camera, Position};
@@ -84,6 +84,12 @@ fn main()
 	let mut elapsed_time = Duration::new(0, 0);
 	let mut accumulator = Duration::new(0, 0);
 	let mut current_time = SystemTime::now();
+
+	let mut last_mouse_position = Vector2 {
+		x: 0.0 as f64,
+		y: 0.0 as f64,
+	};
+	let mouse_sensitivity = 0.3;
 
 	while running
 	{
@@ -217,10 +223,34 @@ fn main()
 					}
 					_ => (),
 				},
+				_ => (),
+			},
+
+			winit::Event::DeviceEvent {
+				event,
+				..
+			} => match event
+			{
 				// Mouse Movement
-				// winit::WindowEvent::MouseMoved { position, .. } => {
-				//    //println!("Mouse moved x: {} y: {}", position.0, position.1);
-				// }
+				// Use DeviceEvent as it gives raw unfiltered physical motion
+				winit::DeviceEvent::MouseMotion {
+					delta,
+					..
+				} =>
+				{
+					println!("Mouse moved x: {} y: {}", delta.0, delta.1);
+					let mut dir_change = Vector2 {
+						x: last_mouse_position.x + delta.0,
+						y: last_mouse_position.y + delta.1,
+					};
+					last_mouse_position.x = delta.0;
+					last_mouse_position.y = delta.1;
+
+					// Update camera.
+					dir_change *= mouse_sensitivity;
+					camera.yaw(dir_change.x as f32);
+					camera.pitch(-dir_change.y as f32);
+				}
 				_ => (),
 			},
 			_ => (),
