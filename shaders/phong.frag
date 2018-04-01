@@ -7,8 +7,8 @@ layout(location = 1) in vec3 worldspace_lightdir;
 layout(location = 2) in vec3 tangentspace_lightdir;
 layout(location = 3) in vec2 tex_uv;
 
-layout(binding = 0) uniform sampler2D color_tex;
-layout(binding = 1) uniform sampler2D normal_tex;
+layout(set = 0, binding = 0) uniform sampler2D color_tex;
+layout(set = 0, binding = 1) uniform sampler2D normal_tex;
 
 layout(location = 0) out vec3 fragColor;
 
@@ -18,7 +18,7 @@ struct PointLight {
 };
 
 //hardcoded for now
-PointLight light = PointLight(6.0, vec3(1.0, 1.0, 1.0));
+PointLight light = PointLight(15.0, vec3(1.0, 1.0, 1.0));
 
 void main()
 {
@@ -34,7 +34,8 @@ void main()
 
 		vec3 L = normalize(tangentspace_lightdir);
 		vec3 V = normalize(tangentspace_eyedir);
-		vec3 N = texture(normal_tex, tex_uv).rgb * 2.0 - 1.0;
+		// Look up the normal and move it from [0,1] to [-1, 1]
+		vec3 N = 2.0 * texture(normal_tex, tex_uv).rgb - 1.0;
 		vec3 R = normalize(reflect(-L, N));
 
 		// Diffuse
@@ -46,7 +47,7 @@ void main()
 		// Attenuation
 		float attenuation = max(0.0, 1.0 - dot(L_r,L_r));
 
-		color += texcolor * light.color * diffuse * attenuation + specular * attenuation;
+		color += (texcolor * light.color * diffuse * attenuation) + (light.color * specular * attenuation);
 	}
 	fragColor = color;
 }

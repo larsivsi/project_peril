@@ -13,22 +13,36 @@ impl Scene
 {
 	pub fn new(rs: &RenderState, mp: &MainPass) -> Scene
 	{
-		// let _quad = DrawObject::new_quad(rs, Point3::new(0.0, 0.0, 0.0), 1.0, 1.0);
-		let cuboid = DrawObject::new_cuboid(rs, mp, Point3::new(1.0, 0.0, -4.0), 2.0, 2.0, 2.0);
-
 		let mut scene = Scene {
 			objects: Vec::new(),
 		};
 
+		let cuboid = DrawObject::new_cuboid(rs, mp, Point3::new(1.0, 0.0, -4.0), 2.0, 2.0, 2.0);
 		scene.objects.push(cuboid);
+
+		let mut right_wall = DrawObject::new_quad(rs, mp, Point3::new(10.0, 0.0, 0.0), 10.0, 10.0);
+		right_wall.rotate(Vector3::new(0.0, 1.0, 0.0), Deg(-90.0));
+		scene.objects.push(right_wall);
+
+		let mut left_wall = DrawObject::new_quad(rs, mp, Point3::new(-10.0, 0.0, 0.0), 10.0, 10.0);
+		left_wall.rotate(Vector3::new(0.0, 1.0, 0.0), Deg(90.0));
+		scene.objects.push(left_wall);
+
+		let mut floor = DrawObject::new_quad(rs, mp, Point3::new(0.0, -10.0, 0.0), 10.0, 10.0);
+		floor.rotate(Vector3::new(1.0, 0.0, 0.0), Deg(-90.0));
+		scene.objects.push(floor);
 
 		scene
 	}
 
 	pub fn update(&mut self)
 	{
-		for mut object in self.objects.iter_mut()
+		for (i, mut object) in self.objects.iter_mut().enumerate()
 		{
+			if i > 0
+			{
+				break;
+			}
 			// TODO: Move this.
 			let axis = Vector3::new(0.0, 1.0, 0.0);
 			let angle = Deg(-0.5);

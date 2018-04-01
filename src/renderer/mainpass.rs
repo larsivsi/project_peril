@@ -29,6 +29,10 @@ pub struct MainPass
 	pub render_image: Texture,
 	depth_image: Texture,
 
+	view_matrix_ub: vk::Buffer,
+	pub view_matrix_ub_mem: vk::DeviceMemory,
+	view_matrix_ds: Vec<vk::DescriptorSet>,
+
 	// Keep a pointer to the device for cleanup
 	device: Rc<Device<V1_0>>,
 }
@@ -111,7 +115,11 @@ impl MainPass
 		let descriptor_sizes = [
 			vk::DescriptorPoolSize {
 				typ: vk::DescriptorType::CombinedImageSampler,
-				descriptor_count: 2,
+				descriptor_count: 8,
+			},
+			vk::DescriptorPoolSize {
+				typ: vk::DescriptorType::UniformBuffer,
+				descriptor_count: 1,
 			},
 		];
 		let descriptor_pool_info = vk::DescriptorPoolCreateInfo {
@@ -120,13 +128,13 @@ impl MainPass
 			flags: Default::default(),
 			pool_size_count: descriptor_sizes.len() as u32,
 			p_pool_sizes: descriptor_sizes.as_ptr(),
-			max_sets: 1,
+			max_sets: 5, // TODO figure out how to properly do this
 		};
 		let descriptor_pool;
 		unsafe {
 			descriptor_pool = rs.device.create_descriptor_pool(&descriptor_pool_info, None).unwrap();
 		}
-		let desc_layout_bindings = [
+		let color_normal_tex_dsl_bindings = [
 			vk::DescriptorSetLayoutBinding {
 				binding: 0,
 				descriptor_type: vk::DescriptorType::CombinedImageSampler,
@@ -142,21 +150,41 @@ impl MainPass
 				p_immutable_samplers: ptr::null(),
 			},
 		];
-		let descriptor_info = vk::DescriptorSetLayoutCreateInfo {
+		let view_matrix_dsl_binding = [
+			vk::DescriptorSetLayoutBinding {
+				binding: 0,
+				descriptor_type: vk::DescriptorType::UniformBuffer,
+				descriptor_count: 1,
+				stage_flags: vk::SHADER_STAGE_VERTEX_BIT,
+				p_immutable_samplers: ptr::null(),
+			},
+		];
+		let color_normal_tex_info = vk::DescriptorSetLayoutCreateInfo {
 			s_type: vk::StructureType::DescriptorSetLayoutCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
-			binding_count: desc_layout_bindings.len() as u32,
-			p_bindings: desc_layout_bindings.as_ptr(),
+			binding_count: color_normal_tex_dsl_bindings.len() as u32,
+			p_bindings: color_normal_tex_dsl_bindings.as_ptr(),
 		};
+		let view_matrix_info = vk::DescriptorSetLayoutCreateInfo {
+			s_type: vk::StructureType::DescriptorSetLayoutCreateInfo,
+			p_next: ptr::null(),
+			flags: Default::default(),
+			binding_count: view_matrix_dsl_binding.len() as u32,
+			p_bindings: view_matrix_dsl_binding.as_ptr(),
+		};
+
 		let descriptor_set_layouts;
 		unsafe {
-			descriptor_set_layouts = [rs.device.create_descriptor_set_layout(&descriptor_info, None).unwrap()];
+			descriptor_set_layouts = [
+				rs.device.create_descriptor_set_layout(&color_normal_tex_info, None).unwrap(),
+				rs.device.create_descriptor_set_layout(&view_matrix_info, None).unwrap(),
+			];
 		}
 
 		let mv_matrices_push_constant = vk::PushConstantRange {
 			stage_flags: vk::SHADER_STAGE_VERTEX_BIT,
-			size: 3 * size_of::<Matrix4<f32>>() as u32,
+			size: 2 * size_of::<Matrix4<f32>>() as u32,
 			offset: 0,
 		};
 
@@ -495,6 +523,23 @@ impl MainPass
 			MainPass::create_framebuffer(rs, render_size, render_image.view, depth_image.view, renderpass);
 		let commandbuffer = MainPass::create_commandbuffer(rs);
 
+		let (vmat_buf, vmat_mem) = rs.create_buffer(
+			vk::BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			size_of::<Matrix4<f32>>() as u64,
+		);
+		let desc_alloc_info = vk::DescriptorSetAllocateInfo {
+			s_type: vk::StructureType::DescriptorSetAllocateInfo,
+			p_next: ptr::null(),
+			descriptor_pool: descriptor_pool,
+			descriptor_set_count: 1,
+			p_set_layouts: &descriptor_set_layouts[1],
+		};
+		let view_matrix_ds;
+		unsafe {
+			view_matrix_ds = rs.device.allocate_descriptor_sets(&desc_alloc_info).unwrap();
+		}
+
 		MainPass {
 			renderpass: renderpass,
 			descriptor_pool: descriptor_pool,
@@ -508,6 +553,10 @@ impl MainPass
 
 			render_image: render_image,
 			depth_image: depth_image,
+
+			view_matrix_ub: vmat_buf,
+			view_matrix_ub_mem: vmat_mem,
+			view_matrix_ds: view_matrix_ds,
 
 			// Keep a pointer to the device for cleanup
 			device: Rc::clone(&rs.device),
@@ -558,9 +607,41 @@ impl MainPass
 			p_clear_values: clear_values.as_ptr(),
 		};
 
+		let view_matrix_ub_descriptor = vk::DescriptorBufferInfo {
+			buffer: self.view_matrix_ub,
+			offset: 0,
+			range: size_of::<Matrix4<f32>>() as u64,
+		};
+		let write_desc_sets = [
+			vk::WriteDescriptorSet {
+				s_type: vk::StructureType::WriteDescriptorSet,
+				p_next: ptr::null(),
+				dst_set: self.view_matrix_ds[0],
+				dst_binding: 0,
+				dst_array_element: 0,
+				descriptor_count: 1,
+				descriptor_type: vk::DescriptorType::UniformBuffer,
+				p_image_info: ptr::null(),
+				p_buffer_info: &view_matrix_ub_descriptor,
+				p_texel_buffer_view: ptr::null(),
+			},
+		];
+
 		unsafe {
+			// Update the view matrix descriptor set
+			rs.device.update_descriptor_sets(&write_desc_sets, &[]);
+
 			// Start the render pass
 			rs.device.cmd_begin_render_pass(cmd_buf, &render_pass_begin_info, vk::SubpassContents::Inline);
+
+			rs.device.cmd_bind_descriptor_sets(
+				cmd_buf,
+				vk::PipelineBindPoint::Graphics,
+				self.pipeline_layout,
+				1,
+				&self.view_matrix_ds[..],
+				&[],
+			);
 
 			// Bind pipeline
 			rs.device.cmd_bind_pipeline(cmd_buf, vk::PipelineBindPoint::Graphics, self.pipeline);
@@ -611,6 +692,9 @@ impl Drop for MainPass
 		unsafe {
 			// Always wait for device idle
 			self.device.device_wait_idle().unwrap();
+
+			self.device.destroy_buffer(self.view_matrix_ub, None);
+			self.device.free_memory(self.view_matrix_ub_mem, None);
 
 			self.device.destroy_sampler(self.depth_image.sampler, None);
 			self.device.destroy_image_view(self.depth_image.view, None);
