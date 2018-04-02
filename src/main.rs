@@ -26,6 +26,19 @@ use scene::Scene;
 use std::mem::{align_of, size_of};
 use std::time::{Duration, SystemTime};
 
+const W_SCAN_CODE: u32 = 17;
+const A_SCAN_CODE: u32 = 30;
+const S_SCAN_CODE: u32 = 31;
+const D_SCAN_CODE: u32 = 32;
+
+const UP_SCAN_CODE: u32 = 103;
+const LEFT_SCAN_CODE: u32 = 105;
+const DOWN_SCAN_CODE: u32 = 108;
+const RIGHT_SCAN_CODE: u32 = 106;
+
+const ESC_SCAN_CODE: u32 = 1;
+const SHIFT_SCAN_CODE: u32 = 42;
+
 fn main()
 {
 	// init stuff
@@ -92,19 +105,6 @@ fn main()
 	let mouse_sensitivity = cfg.mouse_sensitivity;
 
 	let move_sensitivity = 0.05;
-
-	let w_scan_code: u32 = 17;
-	let a_scan_code: u32 = 30;
-	let s_scan_code: u32 = 31;
-	let d_scan_code: u32 = 32;
-
-	let up_scan_code: u32 = 103;
-	let left_scan_code: u32 = 105;
-	let down_scan_code: u32 = 108;
-	let right_scan_code: u32 = 106;
-
-	let esc_scan_code: u32 = 1;
-	let shift_scan_code: u32 = 42;
 
 	let mut w_down = false;
 	let mut a_down = false;
@@ -175,43 +175,43 @@ fn main()
 				{
 					winit::ElementState::Pressed => match input.scancode
 					{
-						c if (w_scan_code == c) =>
+						W_SCAN_CODE =>
 						{
 							w_down = true;
 						}
-						c if (a_scan_code == c) =>
+						A_SCAN_CODE =>
 						{
 							a_down = true;
 						}
-						c if (s_scan_code == c) =>
+						S_SCAN_CODE =>
 						{
 							s_down = true;
 						}
-						c if (d_scan_code == c) =>
+						D_SCAN_CODE =>
 						{
 							d_down = true;
 						}
-						c if (up_scan_code == c) =>
+						UP_SCAN_CODE =>
 						{
 							camera.pitch(5.0);
 						}
-						c if (left_scan_code == c) =>
+						LEFT_SCAN_CODE =>
 						{
 							camera.yaw(-5.0);
 						}
-						c if (down_scan_code == c) =>
+						DOWN_SCAN_CODE =>
 						{
 							camera.pitch(-5.0);
 						}
-						c if (right_scan_code == c) =>
+						RIGHT_SCAN_CODE =>
 						{
 							camera.yaw(5.0);
 						}
-						c if (esc_scan_code == c) =>
+						ESC_SCAN_CODE =>
 						{
 							running = false;
 						}
-						c if (shift_scan_code == c) =>
+						SHIFT_SCAN_CODE =>
 						{
 							shift_down = true;
 						}
@@ -222,23 +222,23 @@ fn main()
 					},
 					winit::ElementState::Released => match input.scancode
 					{
-						c if (w_scan_code == c) =>
+						W_SCAN_CODE =>
 						{
 							w_down = false;
 						}
-						c if (a_scan_code == c) =>
+						A_SCAN_CODE =>
 						{
 							a_down = false;
 						}
-						c if (s_scan_code == c) =>
+						S_SCAN_CODE =>
 						{
 							s_down = false;
 						}
-						c if (d_scan_code == c) =>
+						D_SCAN_CODE =>
 						{
 							d_down = false;
 						}
-						c if (shift_scan_code == c) =>
+						SHIFT_SCAN_CODE =>
 						{
 							shift_down = false;
 						}
