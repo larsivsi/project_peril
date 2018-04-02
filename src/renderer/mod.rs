@@ -49,7 +49,7 @@ pub struct RenderState
 
 	// Window
 	pub event_loop: EventsLoop,
-	window: Window,
+	pub window: Window,
 
 	// Pools
 	commandpool: vk::CommandPool,

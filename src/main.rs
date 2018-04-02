@@ -30,6 +30,7 @@ const W_SCAN_CODE: u32 = 17;
 const A_SCAN_CODE: u32 = 30;
 const S_SCAN_CODE: u32 = 31;
 const D_SCAN_CODE: u32 = 32;
+const F_SCAN_CODE: u32 = 33;
 
 const UP_SCAN_CODE: u32 = 103;
 const LEFT_SCAN_CODE: u32 = 105;
@@ -111,6 +112,8 @@ fn main()
 	let mut s_down = false;
 	let mut d_down = false;
 	let mut shift_down = false;
+	let mut cursor_captured = false;
+	let mut cursor_dirty = false;
 
 	while running
 	{
@@ -191,6 +194,11 @@ fn main()
 						{
 							d_down = true;
 						}
+						F_SCAN_CODE =>
+						{
+							cursor_captured = !cursor_captured;
+							cursor_dirty = true;
+						}
 						UP_SCAN_CODE =>
 						{
 							camera.pitch(5.0);
@@ -249,17 +257,20 @@ fn main()
 				winit::WindowEvent::MouseInput {
 					button,
 					..
-				} => match button
+				} => if cursor_captured
 				{
-					winit::MouseButton::Left =>
+					match button
 					{
-						println!("Left mouse!");
+						winit::MouseButton::Left =>
+						{
+							println!("Left mouse!");
+						}
+						winit::MouseButton::Right =>
+						{
+							println!("Right mouse!");
+						}
+						_ => (),
 					}
-					winit::MouseButton::Right =>
-					{
-						println!("Right mouse!");
-					}
-					_ => (),
 				},
 				_ => (),
 			},
@@ -274,7 +285,7 @@ fn main()
 				winit::DeviceEvent::MouseMotion {
 					delta,
 					..
-				} =>
+				} => if cursor_captured
 				{
 					println!("Mouse moved x: {} y: {}", delta.0, delta.1);
 					let mut dir_change = Vector2 {
@@ -288,11 +299,25 @@ fn main()
 					dir_change *= mouse_sensitivity;
 					camera.yaw(dir_change.x as f32);
 					camera.pitch(-dir_change.y as f32);
-				}
+				},
 				_ => (),
 			},
 			_ => (),
 		});
+
+		if cursor_dirty
+		{
+			if cursor_captured
+			{
+				renderstate.window.set_cursor_state(winit::CursorState::Grab);
+				renderstate.window.set_cursor_state(winit::CursorState::Hide);
+			}
+			else
+			{
+				renderstate.window.set_cursor_state(winit::CursorState::Normal);
+			}
+			cursor_dirty = false;
+		}
 		// Update Input.
 		let mut move_speed = move_sensitivity;
 		if shift_down
