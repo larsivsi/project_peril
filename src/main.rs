@@ -91,6 +91,27 @@ fn main()
 	};
 	let mouse_sensitivity = cfg.mouse_sensitivity;
 
+	let move_sensitivity = 0.05;
+
+	let w_scan_code: u32 = 17;
+	let a_scan_code: u32 = 30;
+	let s_scan_code: u32 = 31;
+	let d_scan_code: u32 = 32;
+
+	let up_scan_code: u32 = 103;
+	let left_scan_code: u32 = 105;
+	let down_scan_code: u32 = 108;
+	let right_scan_code: u32 = 106;
+
+	let esc_scan_code: u32 = 1;
+	let shift_scan_code: u32 = 42;
+
+	let mut w_down = false;
+	let mut a_down = false;
+	let mut s_down = false;
+	let mut d_down = false;
+	let mut shift_down = false;
+
 	while running
 	{
 		let new_time = SystemTime::now();
@@ -152,60 +173,77 @@ fn main()
 					..
 				} => match input.state
 				{
-					winit::ElementState::Pressed =>
+					winit::ElementState::Pressed => match input.scancode
 					{
-						match input.virtual_keycode.expect("Error getting keycode")
+						c if (w_scan_code == c) =>
 						{
-							winit::VirtualKeyCode::W =>
-							{
-								let translation = camera.get_front_vector();
-								camera.translate(translation);
-							}
-							winit::VirtualKeyCode::A =>
-							{
-								let translation = camera.get_right_vector() * -1.0;
-								camera.translate(translation);
-							}
-							winit::VirtualKeyCode::S =>
-							{
-								let translation = camera.get_front_vector() * -1.0;
-								camera.translate(translation);
-							}
-							winit::VirtualKeyCode::D =>
-							{
-								let translation = camera.get_right_vector();
-								camera.translate(translation);
-							}
-							winit::VirtualKeyCode::Up =>
-							{
-								camera.pitch(5.0);
-							}
-							winit::VirtualKeyCode::Left =>
-							{
-								camera.yaw(-5.0);
-							}
-							winit::VirtualKeyCode::Down =>
-							{
-								camera.pitch(-5.0);
-							}
-							winit::VirtualKeyCode::Right =>
-							{
-								camera.yaw(5.0);
-							}
-							winit::VirtualKeyCode::Escape =>
-							{
-								running = false;
-							}
-							_ =>
-							{
-								// println!("Pressed {}", input.scancode);
-							}
+							w_down = true;
 						}
-					}
-					winit::ElementState::Released =>
+						c if (a_scan_code == c) =>
+						{
+							a_down = true;
+						}
+						c if (s_scan_code == c) =>
+						{
+							s_down = true;
+						}
+						c if (d_scan_code == c) =>
+						{
+							d_down = true;
+						}
+						c if (up_scan_code == c) =>
+						{
+							camera.pitch(5.0);
+						}
+						c if (left_scan_code == c) =>
+						{
+							camera.yaw(-5.0);
+						}
+						c if (down_scan_code == c) =>
+						{
+							camera.pitch(-5.0);
+						}
+						c if (right_scan_code == c) =>
+						{
+							camera.yaw(5.0);
+						}
+						c if (esc_scan_code == c) =>
+						{
+							running = false;
+						}
+						c if (shift_scan_code == c) =>
+						{
+							shift_down = true;
+						}
+						_ =>
+						{
+							println!("Pressed {}", input.scancode);
+						}
+					},
+					winit::ElementState::Released => match input.scancode
 					{
-						// println!("Released!");
-					}
+						c if (w_scan_code == c) =>
+						{
+							w_down = false;
+						}
+						c if (a_scan_code == c) =>
+						{
+							a_down = false;
+						}
+						c if (s_scan_code == c) =>
+						{
+							s_down = false;
+						}
+						c if (d_scan_code == c) =>
+						{
+							d_down = false;
+						}
+						c if (shift_scan_code == c) =>
+						{
+							shift_down = false;
+						}
+						_ => (),
+					},
 				},
 				// Mouse presses
 				winit::WindowEvent::MouseInput {
@@ -255,6 +293,32 @@ fn main()
 			},
 			_ => (),
 		});
+		// Update Input.
+		let mut move_speed = move_sensitivity;
+		if shift_down
+		{
+			move_speed *= 10.0;
+		}
+		if w_down
+		{
+			let translation = camera.get_front_vector();
+			camera.translate(translation * move_speed);
+		}
+		if a_down
+		{
+			let translation = camera.get_right_vector() * -1.0;
+			camera.translate(translation * move_speed);
+		}
+		if s_down
+		{
+			let translation = camera.get_front_vector() * -1.0;
+			camera.translate(translation * move_speed);
+		}
+		if d_down
+		{
+			let translation = camera.get_right_vector();
+			camera.translate(translation * move_speed);
+		}
 	}
 
 	// cleanup
