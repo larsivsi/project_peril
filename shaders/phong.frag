@@ -27,27 +27,36 @@ void main()
 	// for each light
 	for (uint i = 0; i < 1u; i++)
 	{
-		// Set up phong variables
+		// Check distance and calculate attenuation
 		if (length(worldspace_lightdir) > light.radius)
 			continue;
-		vec3 L_r = worldspace_lightdir / light.radius;
+		vec3 L_div_r = worldspace_lightdir / light.radius;
+		float attenuation = max(1.0 - dot(L_div_r, L_div_r), 0.0);
 
+		// Set up phong variables
 		vec3 L = normalize(tangentspace_lightdir);
-		vec3 V = normalize(tangentspace_eyedir);
-		// Look up the normal and move it from [0,1] to [-1, 1]
-		vec3 N = 2.0 * texture(normal_tex, tex_uv).rgb - 1.0;
-		vec3 R = normalize(reflect(-L, N));
+		// Look up the normal
+		vec3 normal = texture(normal_tex, tex_uv).rgb;
+		// Flip y-value from top left to bottom left
+		normal.g = 1.0 - normal.g;
+		// Move normal it from [0,1] to [-1, 1]
+		vec3 N = normalize(2.0 * normal - 1.0);
+
+		float lambertian = max(dot(L, N), 0.0);
+		float specular = 0.0;
+
+		if (lambertian > 0.0)
+		{
+			vec3 V = normalize(tangentspace_eyedir);
+			vec3 R = normalize(reflect(-L, N));
+			specular = pow(max(dot(R, V), 0.0), 50.0);
+		}
 
 		// Diffuse
-		float diffuse = max(dot(L, N), 0.0);
+		color += texcolor * lambertian * light.color * attenuation;
 
 		// Specular
-		float specular = pow(max(dot(R, V), 0.0), 5.0);
-
-		// Attenuation
-		float attenuation = max(0.0, 1.0 - dot(L_r,L_r));
-
-		color += (texcolor * light.color * diffuse * attenuation) + (light.color * specular * attenuation);
+		color += specular * light.color * attenuation;
 	}
 	fragColor = color;
 }
