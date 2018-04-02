@@ -104,41 +104,11 @@ impl Rotation for DrawObject
 
 impl DrawObject
 {
-	/// Creates a new quad draw object.
-	pub fn new_quad(rs: &RenderState, mp: &MainPass, position: Point3<f32>, width: f32, height: f32) -> DrawObject
+	fn new(
+		rs: &RenderState, mp: &MainPass, position: Point3<f32>, vertices: &[Vertex], indices: &[u16],
+		texture_path: &str, normalmap_path: &str,
+	) -> DrawObject
 	{
-		let vertices = [
-			Vertex {
-				pos: [-width, -height, 0.0],
-				normal: [0.0, 0.0, 1.0],
-				tangent: [1.0, 0.0, 0.0],
-				bitangent: [0.0, 1.0, 0.0],
-				tex_uv: [0.0, 0.0],
-			},
-			Vertex {
-				pos: [width, -height, 0.0],
-				normal: [0.0, 0.0, 1.0],
-				tangent: [1.0, 0.0, 0.0],
-				bitangent: [0.0, 1.0, 0.0],
-				tex_uv: [1.0, 0.0],
-			},
-			Vertex {
-				pos: [-width, height, 0.0],
-				normal: [0.0, 0.0, 1.0],
-				tangent: [1.0, 0.0, 0.0],
-				bitangent: [0.0, 1.0, 0.0],
-				tex_uv: [0.0, 1.0],
-			},
-			Vertex {
-				pos: [width, height, 0.0],
-				normal: [0.0, 0.0, 1.0],
-				tangent: [1.0, 0.0, 0.0],
-				bitangent: [0.0, 1.0, 0.0],
-				tex_uv: [1.0, 1.0],
-			},
-		];
-		let indices = [0u16, 1, 3, 0, 3, 2];
-
 		// Create buffer for vertices
 		let (vert_buffer, vert_mem) = rs.create_buffer_and_upload(
 			vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -167,14 +137,14 @@ impl DrawObject
 			descriptor_sets = rs.device.allocate_descriptor_sets(&desc_alloc_info).unwrap();
 		}
 
-		let texture = rs.load_image("assets/purple.png", true);
+		let texture = rs.load_image(texture_path, true);
 		let texture_descriptor = vk::DescriptorImageInfo {
 			image_layout: texture.current_layout,
 			image_view: texture.view,
 			sampler: texture.sampler,
 		};
 
-		let normal_map = rs.load_image("assets/front_normal.png", false);
+		let normal_map = rs.load_image(normalmap_path, false);
 		let normal_descriptor = vk::DescriptorImageInfo {
 			image_layout: normal_map.current_layout,
 			image_view: normal_map.view,
@@ -224,6 +194,44 @@ impl DrawObject
 			normal_map: normal_map,
 			device: Rc::clone(&rs.device),
 		}
+	}
+
+	/// Creates a new quad draw object.
+	pub fn new_quad(rs: &RenderState, mp: &MainPass, position: Point3<f32>, width: f32, height: f32) -> DrawObject
+	{
+		let vertices = [
+			Vertex {
+				pos: [-width, -height, 0.0],
+				normal: [0.0, 0.0, 1.0],
+				tangent: [1.0, 0.0, 0.0],
+				bitangent: [0.0, 1.0, 0.0],
+				tex_uv: [0.0, 0.0],
+			},
+			Vertex {
+				pos: [width, -height, 0.0],
+				normal: [0.0, 0.0, 1.0],
+				tangent: [1.0, 0.0, 0.0],
+				bitangent: [0.0, 1.0, 0.0],
+				tex_uv: [1.0, 0.0],
+			},
+			Vertex {
+				pos: [-width, height, 0.0],
+				normal: [0.0, 0.0, 1.0],
+				tangent: [1.0, 0.0, 0.0],
+				bitangent: [0.0, 1.0, 0.0],
+				tex_uv: [0.0, 1.0],
+			},
+			Vertex {
+				pos: [width, height, 0.0],
+				normal: [0.0, 0.0, 1.0],
+				tangent: [1.0, 0.0, 0.0],
+				bitangent: [0.0, 1.0, 0.0],
+				tex_uv: [1.0, 1.0],
+			},
+		];
+		let indices = [0u16, 1, 3, 0, 3, 2];
+
+		DrawObject::new(rs, mp, position, &vertices, &indices, "assets/purple.png", "assets/front_normal.png")
 	}
 
 	pub fn new_cuboid(
@@ -415,91 +423,7 @@ impl DrawObject
 			22, 22, 21, 23,
 		];
 
-		// Create buffer for vertices
-		let (vert_buffer, vert_mem) = rs.create_buffer_and_upload(
-			vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			&vertices,
-			true,
-		);
-
-		// Create buffer for indices
-		let (idx_buffer, idx_mem) = rs.create_buffer_and_upload(
-			vk::BUFFER_USAGE_INDEX_BUFFER_BIT,
-			vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			&indices,
-			true,
-		);
-
-		let desc_alloc_info = vk::DescriptorSetAllocateInfo {
-			s_type: vk::StructureType::DescriptorSetAllocateInfo,
-			p_next: ptr::null(),
-			descriptor_pool: mp.descriptor_pool,
-			descriptor_set_count: 1,
-			p_set_layouts: &mp.descriptor_set_layouts[0],
-		};
-		let descriptor_sets;
-		unsafe {
-			descriptor_sets = rs.device.allocate_descriptor_sets(&desc_alloc_info).unwrap();
-		}
-
-		let texture = rs.load_image("assets/cubemap.png", true);
-		let texture_descriptor = vk::DescriptorImageInfo {
-			image_layout: texture.current_layout,
-			image_view: texture.view,
-			sampler: texture.sampler,
-		};
-
-		let normal_map = rs.load_image("assets/cubemap_normals.png", false);
-		let normal_descriptor = vk::DescriptorImageInfo {
-			image_layout: normal_map.current_layout,
-			image_view: normal_map.view,
-			sampler: normal_map.sampler,
-		};
-
-		let write_desc_sets = [
-			vk::WriteDescriptorSet {
-				s_type: vk::StructureType::WriteDescriptorSet,
-				p_next: ptr::null(),
-				dst_set: descriptor_sets[0],
-				dst_binding: 0,
-				dst_array_element: 0,
-				descriptor_count: 1,
-				descriptor_type: vk::DescriptorType::CombinedImageSampler,
-				p_image_info: &texture_descriptor,
-				p_buffer_info: ptr::null(),
-				p_texel_buffer_view: ptr::null(),
-			},
-			vk::WriteDescriptorSet {
-				s_type: vk::StructureType::WriteDescriptorSet,
-				p_next: ptr::null(),
-				dst_set: descriptor_sets[0],
-				dst_binding: 1,
-				dst_array_element: 0,
-				descriptor_count: 1,
-				descriptor_type: vk::DescriptorType::CombinedImageSampler,
-				p_image_info: &normal_descriptor,
-				p_buffer_info: ptr::null(),
-				p_texel_buffer_view: ptr::null(),
-			},
-		];
-		unsafe {
-			rs.device.update_descriptor_sets(&write_desc_sets, &[]);
-		}
-
-		DrawObject {
-			vertices: vert_buffer,
-			vertex_mem: vert_mem,
-			indices: idx_buffer,
-			index_mem: idx_mem,
-			num_indices: indices.len() as u32,
-			position: position,
-			rotation: Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(0.0)),
-			descriptor_sets: descriptor_sets,
-			texture: texture,
-			normal_map: normal_map,
-			device: Rc::clone(&rs.device),
-		}
+		DrawObject::new(rs, mp, position, &vertices, &indices, "assets/cubemap.png", "assets/cubemap_normals.png")
 	}
 }
 
