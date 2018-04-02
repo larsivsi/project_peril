@@ -70,6 +70,11 @@ impl Camera
 		return self.right;
 	}
 
+	pub fn get_world_up_vector(&self) -> Vector3<f32>
+	{
+		return self.world_up;
+	}
+
 	pub fn yaw(&mut self, angle: f32)
 	{
 		self.yaw += angle;

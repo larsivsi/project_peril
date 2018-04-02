@@ -38,7 +38,9 @@ const DOWN_SCAN_CODE: u32 = 108;
 const RIGHT_SCAN_CODE: u32 = 106;
 
 const ESC_SCAN_CODE: u32 = 1;
-const SHIFT_SCAN_CODE: u32 = 42;
+const SPACE_SCAN_CODE: u32 = 57;
+const LSHIFT_SCAN_CODE: u32 = 42;
+const LCTRL_SCAN_CODE: u32 = 29;
 
 fn main()
 {
@@ -107,11 +109,13 @@ fn main()
 
 	let move_sensitivity = 0.05;
 
-	let mut w_down = false;
-	let mut a_down = false;
-	let mut s_down = false;
-	let mut d_down = false;
-	let mut shift_down = false;
+	let mut key_forward = false;
+	let mut key_left = false;
+	let mut key_back = false;
+	let mut key_right = false;
+	let mut key_up = false;
+	let mut key_down = false;
+	let mut key_sprint = false;
 	let mut cursor_captured = false;
 	let mut cursor_dirty = false;
 
@@ -180,19 +184,27 @@ fn main()
 					{
 						W_SCAN_CODE =>
 						{
-							w_down = true;
+							key_forward = true;
 						}
 						A_SCAN_CODE =>
 						{
-							a_down = true;
+							key_left = true;
 						}
 						S_SCAN_CODE =>
 						{
-							s_down = true;
+							key_back = true;
 						}
 						D_SCAN_CODE =>
 						{
-							d_down = true;
+							key_right = true;
+						}
+						SPACE_SCAN_CODE =>
+						{
+							key_up = true;
+						}
+						LCTRL_SCAN_CODE =>
+						{
+							key_down = true;
 						}
 						F_SCAN_CODE =>
 						{
@@ -219,9 +231,9 @@ fn main()
 						{
 							running = false;
 						}
-						SHIFT_SCAN_CODE =>
+						LSHIFT_SCAN_CODE =>
 						{
-							shift_down = true;
+							key_sprint = true;
 						}
 						_ =>
 						{
@@ -232,23 +244,31 @@ fn main()
 					{
 						W_SCAN_CODE =>
 						{
-							w_down = false;
+							key_forward = false;
 						}
 						A_SCAN_CODE =>
 						{
-							a_down = false;
+							key_left = false;
 						}
 						S_SCAN_CODE =>
 						{
-							s_down = false;
+							key_back = false;
 						}
 						D_SCAN_CODE =>
 						{
-							d_down = false;
+							key_right = false;
 						}
-						SHIFT_SCAN_CODE =>
+						SPACE_SCAN_CODE =>
 						{
-							shift_down = false;
+							key_up = false;
+						}
+						LCTRL_SCAN_CODE =>
+						{
+							key_down = false;
+						}
+						LSHIFT_SCAN_CODE =>
+						{
+							key_sprint = false;
 						}
 						_ => (),
 					},
@@ -321,28 +341,38 @@ fn main()
 		}
 		// Update Input.
 		let mut move_speed = move_sensitivity;
-		if shift_down
+		if key_sprint
 		{
 			move_speed *= 10.0;
 		}
-		if w_down
+		if key_forward
 		{
 			let translation = camera.get_front_vector();
 			camera.translate(translation * move_speed);
 		}
-		if a_down
+		if key_left
 		{
 			let translation = camera.get_right_vector() * -1.0;
 			camera.translate(translation * move_speed);
 		}
-		if s_down
+		if key_back
 		{
 			let translation = camera.get_front_vector() * -1.0;
 			camera.translate(translation * move_speed);
 		}
-		if d_down
+		if key_right
 		{
 			let translation = camera.get_right_vector();
+			camera.translate(translation * move_speed);
+		}
+		if key_up
+		{
+			let translation = camera.get_world_up_vector();
+			camera.translate(translation * move_speed);
+		}
+		if key_down
+		{
+			let translation = camera.get_world_up_vector() * -1.0;
 			camera.translate(translation * move_speed);
 		}
 	}
