@@ -167,14 +167,14 @@ impl DrawObject
 			descriptor_sets = rs.device.allocate_descriptor_sets(&desc_alloc_info).unwrap();
 		}
 
-		let texture = rs.load_image("assets/purple.png");
+		let texture = rs.load_image("assets/purple.png", true);
 		let texture_descriptor = vk::DescriptorImageInfo {
 			image_layout: texture.current_layout,
 			image_view: texture.view,
 			sampler: texture.sampler,
 		};
 
-		let normal_map = rs.load_image("assets/front_normal.png");
+		let normal_map = rs.load_image("assets/front_normal.png", false);
 		let normal_descriptor = vk::DescriptorImageInfo {
 			image_layout: normal_map.current_layout,
 			image_view: normal_map.view,
@@ -443,14 +443,14 @@ impl DrawObject
 			descriptor_sets = rs.device.allocate_descriptor_sets(&desc_alloc_info).unwrap();
 		}
 
-		let texture = rs.load_image("assets/cubemap.png");
+		let texture = rs.load_image("assets/cubemap.png", true);
 		let texture_descriptor = vk::DescriptorImageInfo {
 			image_layout: texture.current_layout,
 			image_view: texture.view,
 			sampler: texture.sampler,
 		};
 
-		let normal_map = rs.load_image("assets/cubemap_normals.png");
+		let normal_map = rs.load_image("assets/cubemap_normals.png", false);
 		let normal_descriptor = vk::DescriptorImageInfo {
 			image_layout: normal_map.current_layout,
 			image_view: normal_map.view,

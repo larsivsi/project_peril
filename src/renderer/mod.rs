@@ -768,7 +768,7 @@ impl RenderState
 	/// Loads the image given by the path into read only texture.
 	///
 	/// Note: The caller is responsible for cleaning up the returned vulkan types.
-	pub fn load_image(&self, path: &str) -> Texture
+	pub fn load_image(&self, path: &str, srgb: bool) -> Texture
 	{
 		// Load the image data into a vk::Buffer
 		let image = image::open(path).unwrap().to_rgba();
@@ -794,7 +794,14 @@ impl RenderState
 			image_extent,
 			vk::ImageType::Type2d,
 			vk::ImageViewType::Type2d,
-			vk::Format::R8g8b8a8Unorm,
+			if srgb
+			{
+				vk::Format::R8g8b8a8Srgb
+			}
+			else
+			{
+				vk::Format::R8g8b8a8Unorm
+			},
 			vk::IMAGE_ASPECT_COLOR_BIT,
 			vk::IMAGE_USAGE_SAMPLED_BIT,
 			vk::ACCESS_SHADER_READ_BIT,
