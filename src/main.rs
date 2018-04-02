@@ -309,12 +309,12 @@ fn main()
 		{
 			if cursor_captured
 			{
-				renderstate.window.set_cursor_state(winit::CursorState::Grab);
-				renderstate.window.set_cursor_state(winit::CursorState::Hide);
+				renderstate.window.set_cursor_state(winit::CursorState::Grab).expect("Failed to grab pointer");
+				renderstate.window.set_cursor_state(winit::CursorState::Hide).expect("Failed to hide pointer");
 			}
 			else
 			{
-				renderstate.window.set_cursor_state(winit::CursorState::Normal);
+				renderstate.window.set_cursor_state(winit::CursorState::Normal).expect("Failed to return pointer");
 			}
 			cursor_dirty = false;
 		}
