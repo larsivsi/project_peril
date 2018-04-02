@@ -29,7 +29,7 @@ $ cargo build [--release]
 
 ## Run
 ~~~bash
-$ ./target/(debug|release)/project\_peril
+$ ./target/(debug|release)/project_peril
 ~~~
 
 ## Compile and run!:
