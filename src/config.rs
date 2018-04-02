@@ -13,13 +13,13 @@ pub struct Config
 	pub app_name: String,
 	pub app_version: u32,
 	pub horizontal_fov: u32,
+	pub mouse_invert_x: f64,
+	pub mouse_invert_y: f64,
+	pub mouse_sensitivity: f64,
 	pub render_width: u32,
 	pub render_height: u32,
 	pub window_width: u32,
 	pub window_height: u32,
-	pub mouse_sensitivity: f64,
-	pub mouse_invert_x: f64,
-	pub mouse_invert_y: f64,
 }
 
 impl Config
@@ -105,13 +105,13 @@ impl Config
 						app_name: correct_name,
 						app_version: correct_version,
 						horizontal_fov: 90,
+						mouse_invert_x: 1.0,
+						mouse_invert_y: 1.0,
+						mouse_sensitivity: 0.3,
 						render_width: 480,
 						render_height: 320,
 						window_width: 480,
 						window_height: 320,
-						mouse_sensitivity: 0.3,
-						mouse_invert_x: 1.0,
-						mouse_invert_y: 1.0,
 					};
 					cfg.save(filename)?;
 					Ok(cfg)
