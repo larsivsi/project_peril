@@ -43,6 +43,14 @@ pub trait Position
 
 pub trait Rotation
 {
-	fn rotate(&mut self, axis: Vector3<f32>, angle: Deg<f32>);
 	fn get_rotation(&self) -> Quaternion<f32>;
+	fn set_rotation(&mut self, rotation: Quaternion<f32>);
+
+	fn rotate(&mut self, axis: Vector3<f32>, angle: Deg<f32>)
+	{
+		let rotation = self.get_rotation();
+		// The order here is important
+		let new_rotation = Quaternion::from_axis_angle(axis, angle) * rotation;
+		self.set_rotation(new_rotation);
+	}
 }

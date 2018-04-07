@@ -89,16 +89,14 @@ impl Position for DrawObject
 
 impl Rotation for DrawObject
 {
-	fn rotate(&mut self, axis: Vector3<f32>, angle: Deg<f32>)
-	{
-		let rotation_quat = Quaternion::from_axis_angle(axis, angle);
-		// The order here is important
-		self.rotation = rotation_quat * self.rotation;
-	}
-
 	fn get_rotation(&self) -> Quaternion<f32>
 	{
 		self.rotation
+	}
+
+	fn set_rotation(&mut self, rotation: Quaternion<f32>)
+	{
+		self.rotation = rotation;
 	}
 }
 
