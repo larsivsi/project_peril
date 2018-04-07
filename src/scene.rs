@@ -26,10 +26,12 @@ impl Scene
 
 		let mut left_wall = DrawObject::new_quad(rs, mp, Point3::new(-10.0, 0.0, 0.0), 10.0, 10.0);
 		left_wall.rotate(Vector3::new(0.0, 1.0, 0.0), Deg(90.0));
+		left_wall.rotate(Vector3::new(1.0, 0.0, 0.0), Deg(180.0));
 		scene.objects.push(left_wall);
 
 		let mut floor = DrawObject::new_quad(rs, mp, Point3::new(0.0, -10.0, 0.0), 10.0, 10.0);
 		floor.rotate(Vector3::new(1.0, 0.0, 0.0), Deg(-90.0));
+		floor.rotate(Vector3::new(0.0, 1.0, 0.0), Deg(-90.0));
 		scene.objects.push(floor);
 
 		scene

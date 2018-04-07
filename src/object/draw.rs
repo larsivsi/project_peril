@@ -231,7 +231,15 @@ impl DrawObject
 		];
 		let indices = [0u16, 1, 3, 0, 3, 2];
 
-		DrawObject::new(rs, mp, position, &vertices, &indices, "assets/purple.png", "assets/front_normal.png")
+		DrawObject::new(
+			rs,
+			mp,
+			position,
+			&vertices,
+			&indices,
+			"assets/thirdparty/textures/Metal_Panel_004/Metal_Panel_004_COLOR.jpg",
+			"assets/thirdparty/textures/Metal_Panel_004/Metal_Panel_004_NORM.jpg",
+		)
 	}
 
 	pub fn new_cuboid(
@@ -423,7 +431,15 @@ impl DrawObject
 			22, 22, 21, 23,
 		];
 
-		DrawObject::new(rs, mp, position, &vertices, &indices, "assets/cubemap.png", "assets/cubemap_normals.png")
+		DrawObject::new(
+			rs,
+			mp,
+			position,
+			&vertices,
+			&indices,
+			"assets/original/textures/cubemap.png",
+			"assets/original/textures/cubemap_normals.png",
+		)
 	}
 }
 
