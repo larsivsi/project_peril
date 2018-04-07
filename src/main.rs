@@ -314,16 +314,24 @@ fn main()
 				{
 					println!("Mouse moved x: {} y: {}", delta.0, delta.1);
 					let mut dir_change = Vector2 {
-						x: (last_mouse_position.x + delta.0) * cfg.mouse_invert_x,
-						y: (last_mouse_position.y + delta.1) * cfg.mouse_invert_y,
+						x: (last_mouse_position.x + delta.0),
+						y: (last_mouse_position.y + delta.1),
 					};
 					last_mouse_position.x = delta.0;
 					last_mouse_position.y = delta.1;
 
 					// Update camera.
 					dir_change *= mouse_sensitivity;
-					camera.yaw(dir_change.x as f32);
-					camera.pitch(-dir_change.y as f32);
+					camera.yaw(match cfg.mouse_invert_x
+					{
+						true => -dir_change.x,
+						false => dir_change.x,
+					} as f32);
+					camera.pitch(match cfg.mouse_invert_y
+					{
+						true => dir_change.y,
+						false => -dir_change.y,
+					} as f32);
 				},
 				_ => (),
 			},
