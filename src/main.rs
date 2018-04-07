@@ -174,6 +174,11 @@ fn main()
 			} => match event
 			{
 				winit::WindowEvent::Closed => running = false,
+				winit::WindowEvent::Focused(has_focus) =>
+				{
+					cursor_captured = has_focus;
+					cursor_dirty = true;
+				}
 				// Keyboard events
 				winit::WindowEvent::KeyboardInput {
 					input,
@@ -339,6 +344,7 @@ fn main()
 			}
 			cursor_dirty = false;
 		}
+
 		// Update Input.
 		let mut move_speed = move_sensitivity;
 		if key_sprint
