@@ -46,6 +46,6 @@ $ cargo run [--release] --features debug_layer
 
 License:
 ========
-The code in this project is lincensed under [MIT license](LICENSE).  
+The code in this project is licensed under [MIT license](LICENSE).  
 The original assets of this project are licensed under [CC BY 4.0](assets/original/LICENSE), unless otherwise stated.  
 [Third party assets](assets/thirdparty/) will have their respective license alongside the asset files.
