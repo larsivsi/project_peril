@@ -10,7 +10,7 @@ Get glslangValidator from https://cvs.khronos.org/svn/repos/ogl/trunk/ecosystem/
 Add it to your PATH and check that it works as intended:
 
 ~~~bash
-$ glslangValidador -v
+$ glslangValidator -v
 Glslang Version: SPIRV99.947 15-Feb-2016
 ESSL Version: OpenGL ES GLSL 3.00 glslang LunarG Khronos.SPIRV99.947 15-Feb-2016
 GLSL Version: 4.20 glslang LunarG Khronos.SPIRV99.947 15-Feb-2016
