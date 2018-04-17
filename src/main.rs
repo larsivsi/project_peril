@@ -24,7 +24,6 @@ use object::{Camera, Position};
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::mem::{align_of, size_of};
-use std::thread;
 use std::time::{Duration, SystemTime};
 
 const W_SCAN_CODE: u32 = 17;
@@ -277,7 +276,7 @@ fn main()
 						..
 					} => if cursor_captured
 					{
-						println!("Mouse moved x: {} y: {}", delta.0, delta.1);
+						// println!("Mouse moved x: {} y: {}", delta.0, delta.1);
 						let mut dir_change = Vector2 {
 							x: (last_mouse_position.x + delta.0),
 							y: (last_mouse_position.y + delta.1),
@@ -371,8 +370,6 @@ fn main()
 			mem_align.copy_from_slice(&[view_matrix]);
 			renderstate.device.unmap_memory(mainpass.view_matrix_ub_mem);
 		}
-
-		thread::sleep(Duration::from_millis(40));
 
 		// Do the main rendering
 		let main_cmd_buf = mainpass.begin_frame(&renderstate);
