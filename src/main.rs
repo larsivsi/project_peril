@@ -24,6 +24,7 @@ use object::{Camera, Position};
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::mem::{align_of, size_of};
+use std::thread;
 use std::time::{Duration, SystemTime};
 
 const W_SCAN_CODE: u32 = 17;
@@ -129,6 +130,230 @@ fn main()
 		while accumulator >= delta_time
 		{
 			scene.update();
+
+			renderstate.event_loop.poll_events(|ev| match ev
+			{
+				winit::Event::WindowEvent {
+					event,
+					..
+				} => match event
+				{
+					winit::WindowEvent::Closed => running = false,
+					winit::WindowEvent::Focused(has_focus) =>
+					{
+						cursor_captured = has_focus;
+						cursor_dirty = true;
+					}
+					// Keyboard events
+					winit::WindowEvent::KeyboardInput {
+						input,
+						..
+					} => match input.state
+					{
+						winit::ElementState::Pressed => match input.scancode
+						{
+							W_SCAN_CODE =>
+							{
+								key_forward = true;
+							}
+							A_SCAN_CODE =>
+							{
+								key_left = true;
+							}
+							S_SCAN_CODE =>
+							{
+								key_back = true;
+							}
+							D_SCAN_CODE =>
+							{
+								key_right = true;
+							}
+							SPACE_SCAN_CODE =>
+							{
+								key_up = true;
+							}
+							LCTRL_SCAN_CODE =>
+							{
+								key_down = true;
+							}
+							F_SCAN_CODE =>
+							{
+								cursor_captured = !cursor_captured;
+								cursor_dirty = true;
+							}
+							UP_SCAN_CODE =>
+							{
+								camera.pitch(5.0);
+							}
+							LEFT_SCAN_CODE =>
+							{
+								camera.yaw(-5.0);
+							}
+							DOWN_SCAN_CODE =>
+							{
+								camera.pitch(-5.0);
+							}
+							RIGHT_SCAN_CODE =>
+							{
+								camera.yaw(5.0);
+							}
+							ESC_SCAN_CODE =>
+							{
+								running = false;
+							}
+							LSHIFT_SCAN_CODE =>
+							{
+								key_sprint = true;
+							}
+							_ =>
+							{
+								println!("Pressed {}", input.scancode);
+							}
+						},
+						winit::ElementState::Released => match input.scancode
+						{
+							W_SCAN_CODE =>
+							{
+								key_forward = false;
+							}
+							A_SCAN_CODE =>
+							{
+								key_left = false;
+							}
+							S_SCAN_CODE =>
+							{
+								key_back = false;
+							}
+							D_SCAN_CODE =>
+							{
+								key_right = false;
+							}
+							SPACE_SCAN_CODE =>
+							{
+								key_up = false;
+							}
+							LCTRL_SCAN_CODE =>
+							{
+								key_down = false;
+							}
+							LSHIFT_SCAN_CODE =>
+							{
+								key_sprint = false;
+							}
+							_ => (),
+						},
+					},
+					// Mouse presses
+					winit::WindowEvent::MouseInput {
+						button,
+						..
+					} => if cursor_captured
+					{
+						match button
+						{
+							winit::MouseButton::Left =>
+							{
+								println!("Left mouse!");
+							}
+							winit::MouseButton::Right =>
+							{
+								println!("Right mouse!");
+							}
+							_ => (),
+						}
+					},
+					_ => (),
+				},
+
+				winit::Event::DeviceEvent {
+					event,
+					..
+				} => match event
+				{
+					// Mouse Movement
+					// Use DeviceEvent as it gives raw unfiltered physical motion
+					winit::DeviceEvent::MouseMotion {
+						delta,
+						..
+					} => if cursor_captured
+					{
+						println!("Mouse moved x: {} y: {}", delta.0, delta.1);
+						let mut dir_change = Vector2 {
+							x: (last_mouse_position.x + delta.0),
+							y: (last_mouse_position.y + delta.1),
+						};
+						last_mouse_position.x = delta.0;
+						last_mouse_position.y = delta.1;
+
+						// Update camera.
+						dir_change *= mouse_sensitivity;
+						camera.yaw(match cfg.mouse_invert_x
+						{
+							true => -dir_change.x,
+							false => dir_change.x,
+						} as f32);
+						camera.pitch(match cfg.mouse_invert_y
+						{
+							true => dir_change.y,
+							false => -dir_change.y,
+						} as f32);
+					},
+					_ => (),
+				},
+				_ => (),
+			});
+
+			if cursor_dirty
+			{
+				if cursor_captured
+				{
+					renderstate.window.set_cursor_state(winit::CursorState::Grab).expect("Failed to grab pointer");
+					renderstate.window.set_cursor(winit::MouseCursor::NoneCursor);
+				}
+				else
+				{
+					renderstate.window.set_cursor_state(winit::CursorState::Normal).expect("Failed to return pointer");
+					renderstate.window.set_cursor(winit::MouseCursor::Default);
+				}
+				cursor_dirty = false;
+			}
+
+			// Update Input.
+			let mut move_speed = move_sensitivity;
+			if key_sprint
+			{
+				move_speed *= 10.0;
+			}
+			if key_forward
+			{
+				let translation = camera.get_front_vector();
+				camera.translate(translation * move_speed);
+			}
+			if key_left
+			{
+				let translation = camera.get_right_vector() * -1.0;
+				camera.translate(translation * move_speed);
+			}
+			if key_back
+			{
+				let translation = camera.get_front_vector() * -1.0;
+				camera.translate(translation * move_speed);
+			}
+			if key_right
+			{
+				let translation = camera.get_right_vector();
+				camera.translate(translation * move_speed);
+			}
+			if key_up
+			{
+				let translation = camera.get_world_up_vector();
+				camera.translate(translation * move_speed);
+			}
+			if key_down
+			{
+				let translation = camera.get_world_up_vector() * -1.0;
+				camera.translate(translation * move_speed);
+			}
 			// animation, physics engine, scene progression etc. goes here
 			accumulator -= delta_time;
 			elapsed_time += delta_time;
@@ -147,6 +372,8 @@ fn main()
 			renderstate.device.unmap_memory(mainpass.view_matrix_ub_mem);
 		}
 
+		thread::sleep(Duration::from_millis(40));
+
 		// Do the main rendering
 		let main_cmd_buf = mainpass.begin_frame(&renderstate);
 		scene.draw(main_cmd_buf, mainpass.pipeline_layout, &view_matrix, &projection_matrix);
@@ -164,230 +391,6 @@ fn main()
 			//    frame_time_ms,
 			//    1_000.0 / frame_time_ms
 			// );
-		}
-
-		renderstate.event_loop.poll_events(|ev| match ev
-		{
-			winit::Event::WindowEvent {
-				event,
-				..
-			} => match event
-			{
-				winit::WindowEvent::Closed => running = false,
-				winit::WindowEvent::Focused(has_focus) =>
-				{
-					cursor_captured = has_focus;
-					cursor_dirty = true;
-				}
-				// Keyboard events
-				winit::WindowEvent::KeyboardInput {
-					input,
-					..
-				} => match input.state
-				{
-					winit::ElementState::Pressed => match input.scancode
-					{
-						W_SCAN_CODE =>
-						{
-							key_forward = true;
-						}
-						A_SCAN_CODE =>
-						{
-							key_left = true;
-						}
-						S_SCAN_CODE =>
-						{
-							key_back = true;
-						}
-						D_SCAN_CODE =>
-						{
-							key_right = true;
-						}
-						SPACE_SCAN_CODE =>
-						{
-							key_up = true;
-						}
-						LCTRL_SCAN_CODE =>
-						{
-							key_down = true;
-						}
-						F_SCAN_CODE =>
-						{
-							cursor_captured = !cursor_captured;
-							cursor_dirty = true;
-						}
-						UP_SCAN_CODE =>
-						{
-							camera.pitch(5.0);
-						}
-						LEFT_SCAN_CODE =>
-						{
-							camera.yaw(-5.0);
-						}
-						DOWN_SCAN_CODE =>
-						{
-							camera.pitch(-5.0);
-						}
-						RIGHT_SCAN_CODE =>
-						{
-							camera.yaw(5.0);
-						}
-						ESC_SCAN_CODE =>
-						{
-							running = false;
-						}
-						LSHIFT_SCAN_CODE =>
-						{
-							key_sprint = true;
-						}
-						_ =>
-						{
-							println!("Pressed {}", input.scancode);
-						}
-					},
-					winit::ElementState::Released => match input.scancode
-					{
-						W_SCAN_CODE =>
-						{
-							key_forward = false;
-						}
-						A_SCAN_CODE =>
-						{
-							key_left = false;
-						}
-						S_SCAN_CODE =>
-						{
-							key_back = false;
-						}
-						D_SCAN_CODE =>
-						{
-							key_right = false;
-						}
-						SPACE_SCAN_CODE =>
-						{
-							key_up = false;
-						}
-						LCTRL_SCAN_CODE =>
-						{
-							key_down = false;
-						}
-						LSHIFT_SCAN_CODE =>
-						{
-							key_sprint = false;
-						}
-						_ => (),
-					},
-				},
-				// Mouse presses
-				winit::WindowEvent::MouseInput {
-					button,
-					..
-				} => if cursor_captured
-				{
-					match button
-					{
-						winit::MouseButton::Left =>
-						{
-							println!("Left mouse!");
-						}
-						winit::MouseButton::Right =>
-						{
-							println!("Right mouse!");
-						}
-						_ => (),
-					}
-				},
-				_ => (),
-			},
-
-			winit::Event::DeviceEvent {
-				event,
-				..
-			} => match event
-			{
-				// Mouse Movement
-				// Use DeviceEvent as it gives raw unfiltered physical motion
-				winit::DeviceEvent::MouseMotion {
-					delta,
-					..
-				} => if cursor_captured
-				{
-					println!("Mouse moved x: {} y: {}", delta.0, delta.1);
-					let mut dir_change = Vector2 {
-						x: (last_mouse_position.x + delta.0),
-						y: (last_mouse_position.y + delta.1),
-					};
-					last_mouse_position.x = delta.0;
-					last_mouse_position.y = delta.1;
-
-					// Update camera.
-					dir_change *= mouse_sensitivity;
-					camera.yaw(match cfg.mouse_invert_x
-					{
-						true => -dir_change.x,
-						false => dir_change.x,
-					} as f32);
-					camera.pitch(match cfg.mouse_invert_y
-					{
-						true => dir_change.y,
-						false => -dir_change.y,
-					} as f32);
-				},
-				_ => (),
-			},
-			_ => (),
-		});
-
-		if cursor_dirty
-		{
-			if cursor_captured
-			{
-				renderstate.window.set_cursor_state(winit::CursorState::Grab).expect("Failed to grab pointer");
-				renderstate.window.set_cursor(winit::MouseCursor::NoneCursor);
-			}
-			else
-			{
-				renderstate.window.set_cursor_state(winit::CursorState::Normal).expect("Failed to return pointer");
-				renderstate.window.set_cursor(winit::MouseCursor::Default);
-			}
-			cursor_dirty = false;
-		}
-
-		// Update Input.
-		let mut move_speed = move_sensitivity;
-		if key_sprint
-		{
-			move_speed *= 10.0;
-		}
-		if key_forward
-		{
-			let translation = camera.get_front_vector();
-			camera.translate(translation * move_speed);
-		}
-		if key_left
-		{
-			let translation = camera.get_right_vector() * -1.0;
-			camera.translate(translation * move_speed);
-		}
-		if key_back
-		{
-			let translation = camera.get_front_vector() * -1.0;
-			camera.translate(translation * move_speed);
-		}
-		if key_right
-		{
-			let translation = camera.get_right_vector();
-			camera.translate(translation * move_speed);
-		}
-		if key_up
-		{
-			let translation = camera.get_world_up_vector();
-			camera.translate(translation * move_speed);
-		}
-		if key_down
-		{
-			let translation = camera.get_world_up_vector() * -1.0;
-			camera.translate(translation * move_speed);
 		}
 	}
 
