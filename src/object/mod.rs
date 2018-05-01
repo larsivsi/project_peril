@@ -6,7 +6,7 @@ pub use self::draw::DrawObject;
 
 use ash::vk;
 use cgmath::prelude::*;
-use cgmath::{Deg, Euler, Matrix4, Point3, Quaternion, Vector3};
+use cgmath::{Euler, Matrix4, Point3, Quaternion, Vector3};
 
 pub trait Drawable
 {
@@ -46,11 +46,19 @@ pub trait Rotation
 	fn get_rotation(&self) -> Quaternion<f32>;
 	fn set_rotation(&mut self, rotation: Quaternion<f32>);
 
-	fn rotate(&mut self, axis: Vector3<f32>, angle: Deg<f32>)
+	/// Visit https://gamedev.stackexchange.com/a/136175 for a good explanation of this
+	fn globally_rotate(&mut self, rotation: Quaternion<f32>)
 	{
-		let rotation = self.get_rotation();
-		// The order here is important
-		let new_rotation = Quaternion::from_axis_angle(axis, angle) * rotation;
+		let cur_rotation = self.get_rotation();
+		// global rotation, notice the order
+		let new_rotation = rotation * cur_rotation;
+		self.set_rotation(new_rotation);
+	}
+	fn locally_rotate(&mut self, rotation: Quaternion<f32>)
+	{
+		let cur_rotation = self.get_rotation();
+		// local rotation, notice the order
+		let new_rotation = cur_rotation * rotation;
 		self.set_rotation(new_rotation);
 	}
 

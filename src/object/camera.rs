@@ -76,18 +76,16 @@ impl Camera
 	pub fn yaw(&mut self, angle: f32)
 	{
 		let yaw = Quaternion::from(Euler::new(Deg(angle), Deg(0.0), Deg(0.0)));
-		// global yaw, notice the order
-		let cur_rotation = self.get_rotation();
-		self.set_rotation(yaw * cur_rotation);
+		// global yaw
+		self.globally_rotate(yaw);
 		self.update();
 	}
 
 	pub fn pitch(&mut self, angle: f32)
 	{
 		let pitch = Quaternion::from(Euler::new(Deg(0.0), Deg(angle), Deg(0.0)));
-		// local pitch, notice the order
-		let cur_rotation = self.get_rotation();
-		self.set_rotation(cur_rotation * pitch);
+		// local pitch
+		self.locally_rotate(pitch);
 		self.update();
 	}
 
