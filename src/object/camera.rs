@@ -1,16 +1,15 @@
 use cgmath::prelude::*;
-use cgmath::{Matrix4, Point3, Vector3};
-use object::Position;
+use cgmath::{Deg, Euler, Matrix4, Point3, Quaternion, Vector3};
+use object::{Position, Rotation};
 
 pub struct Camera
 {
 	position: Point3<f32>,
+	rotation: Quaternion<f32>,
 	front: Vector3<f32>,
-	up: Vector3<f32>,
 	right: Vector3<f32>,
+	up: Vector3<f32>,
 	world_up: Vector3<f32>,
-	yaw: f32,
-	pitch: f32,
 }
 
 impl Camera
@@ -18,9 +17,13 @@ impl Camera
 	/// Updates the front, right and up-vectors based on the camera's pitch and yaw.
 	fn update(&mut self)
 	{
-		self.front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
-		self.front.y = self.pitch.to_radians().sin();
-		self.front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
+		let euler_angles = Euler::from(self.rotation);
+		let yaw = euler_angles.x;
+		let pitch = euler_angles.y;
+
+		self.front.x = yaw.cos() * pitch.cos();
+		self.front.y = pitch.sin();
+		self.front.z = yaw.sin() * pitch.cos();
 		self.front.normalize();
 		self.right = self.front.cross(self.world_up);
 		self.right.normalize();
@@ -33,28 +36,29 @@ impl Camera
 	{
 		let mut camera = Camera {
 			position: position,
+			rotation: Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(90.0)),
+			// just set zeroes for these, as they will be overwritten
 			front: Vector3 {
 				x: 0.0,
 				y: 0.0,
-				z: -1.0,
-			},
-			up: Vector3 {
-				x: 0.0,
-				y: 1.0,
 				z: 0.0,
 			},
 			right: Vector3 {
-				x: 1.0,
+				x: 0.0,
 				y: 0.0,
 				z: 0.0,
 			},
+			up: Vector3 {
+				x: 0.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			// this one must be correct
 			world_up: Vector3 {
 				x: 0.0,
 				y: 1.0,
 				z: 0.0,
 			},
-			yaw: 270.0,
-			pitch: 0.0,
 		};
 		camera.update();
 		camera
@@ -75,20 +79,20 @@ impl Camera
 		return self.world_up;
 	}
 
+	/// Visit https://gamedev.stackexchange.com/a/136175 for a good explanation of this
 	pub fn yaw(&mut self, angle: f32)
 	{
-		self.yaw += angle;
+		let yaw = Quaternion::from(Euler::new(Deg(angle), Deg(0.0), Deg(0.0)));
+		// global yaw, notice the order
+		self.set_rotation(yaw * self.get_rotation());
 		self.update();
 	}
 
 	pub fn pitch(&mut self, angle: f32)
 	{
-		let new_pitch = self.pitch + angle;
-		// Avoid flipping the world
-		if new_pitch.abs() < 90.0
-		{
-			self.pitch = new_pitch;
-		}
+		let pitch = Quaternion::from(Euler::new(Deg(0.0), Deg(angle), Deg(0.0)));
+		// local pitch, notice the order
+		self.set_rotation(self.get_rotation() * pitch);
 		self.update();
 	}
 
@@ -108,5 +112,18 @@ impl Position for Camera
 	fn set_position(&mut self, position: Point3<f32>)
 	{
 		self.position = position;
+	}
+}
+
+impl Rotation for Camera
+{
+	fn get_rotation(&self) -> Quaternion<f32>
+	{
+		self.rotation
+	}
+
+	fn set_rotation(&mut self, rotation: Quaternion<f32>)
+	{
+		self.rotation = rotation;
 	}
 }
