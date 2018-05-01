@@ -36,7 +36,7 @@ impl Camera
 	{
 		let mut camera = Camera {
 			position: position,
-			rotation: Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(90.0)),
+			rotation: Quaternion::from(Euler::new(Deg(-90.0), Deg(0.0), Deg(0.0))),
 			// just set zeroes for these, as they will be overwritten
 			front: Vector3 {
 				x: 0.0,
@@ -84,7 +84,8 @@ impl Camera
 	{
 		let yaw = Quaternion::from(Euler::new(Deg(angle), Deg(0.0), Deg(0.0)));
 		// global yaw, notice the order
-		self.set_rotation(yaw * self.get_rotation());
+		let cur_rotation = self.get_rotation();
+		self.set_rotation(yaw * cur_rotation);
 		self.update();
 	}
 
@@ -92,7 +93,8 @@ impl Camera
 	{
 		let pitch = Quaternion::from(Euler::new(Deg(0.0), Deg(angle), Deg(0.0)));
 		// local pitch, notice the order
-		self.set_rotation(self.get_rotation() * pitch);
+		let cur_rotation = self.get_rotation();
+		self.set_rotation(cur_rotation * pitch);
 		self.update();
 	}
 
