@@ -1,8 +1,8 @@
-use ash::{Device, Entry, Instance};
 use ash::extensions::{DebugReport, Surface, Swapchain, XlibSurface};
 use ash::util::Align;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0, V1_0};
 use ash::vk;
+use ash::{Device, Entry, Instance};
 use image;
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -197,7 +197,7 @@ impl RenderState
 
 	/// Creates a Vulkan device (logical) based on the instance and physical device.
 	fn create_logical_device(
-		instance: &Instance<V1_0>, pdevice: vk::PhysicalDevice, queue_family_index: u32
+		instance: &Instance<V1_0>, pdevice: vk::PhysicalDevice, queue_family_index: u32,
 	) -> Device<V1_0>
 	{
 		let queue_priorities = [1.0]; // One queue of priority 1.0
@@ -379,7 +379,7 @@ impl RenderState
 
 	/// Creates a vk::Buffer based on the requirements.
 	fn create_buffer(
-		&self, usage: vk::BufferUsageFlags, properties: vk::MemoryPropertyFlags, buffersize: vk::DeviceSize
+		&self, usage: vk::BufferUsageFlags, properties: vk::MemoryPropertyFlags, buffersize: vk::DeviceSize,
 	) -> (vk::Buffer, vk::DeviceMemory)
 	{
 		let bufferinfo = vk::BufferCreateInfo {
