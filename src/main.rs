@@ -135,22 +135,22 @@ fn main()
 			}
 			if key_forward
 			{
-				let translation = camera.get_front_vector();
+				let translation = camera.get_cam_front();
 				camera.translate(translation * move_speed);
 			}
 			if key_left
 			{
-				let translation = camera.get_right_vector() * -1.0;
+				let translation = camera.get_cam_right() * -1.0;
 				camera.translate(translation * move_speed);
 			}
 			if key_back
 			{
-				let translation = camera.get_front_vector() * -1.0;
+				let translation = camera.get_cam_front() * -1.0;
 				camera.translate(translation * move_speed);
 			}
 			if key_right
 			{
-				let translation = camera.get_right_vector();
+				let translation = camera.get_cam_right();
 				camera.translate(translation * move_speed);
 			}
 			if key_up

@@ -6,7 +6,7 @@ pub use self::draw::DrawObject;
 
 use ash::vk;
 use cgmath::prelude::*;
-use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
+use cgmath::{Deg, Euler, Matrix4, Point3, Quaternion, Vector3};
 
 pub trait Drawable
 {
@@ -52,5 +52,18 @@ pub trait Rotation
 		// The order here is important
 		let new_rotation = Quaternion::from_axis_angle(axis, angle) * rotation;
 		self.set_rotation(new_rotation);
+	}
+
+	fn get_front_vector(&self) -> Vector3<f32>
+	{
+		let cur_rotation = self.get_rotation();
+
+		let euler_angles = Euler::from(cur_rotation);
+		let yaw = euler_angles.x;
+		let pitch = euler_angles.y;
+
+		let front = Vector3::new(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos());
+
+		front.normalize()
 	}
 }

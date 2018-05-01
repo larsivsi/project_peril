@@ -17,14 +17,7 @@ impl Camera
 	/// Updates the front, right and up-vectors based on the camera's pitch and yaw.
 	fn update(&mut self)
 	{
-		let euler_angles = Euler::from(self.rotation);
-		let yaw = euler_angles.x;
-		let pitch = euler_angles.y;
-
-		self.front.x = yaw.cos() * pitch.cos();
-		self.front.y = pitch.sin();
-		self.front.z = yaw.sin() * pitch.cos();
-		self.front.normalize();
+		self.front = self.get_front_vector();
 		self.right = self.front.cross(self.world_up);
 		self.right.normalize();
 		self.up = self.right.cross(self.front);
@@ -64,12 +57,12 @@ impl Camera
 		camera
 	}
 
-	pub fn get_front_vector(&self) -> Vector3<f32>
+	pub fn get_cam_front(&self) -> Vector3<f32>
 	{
 		return self.front;
 	}
 
-	pub fn get_right_vector(&self) -> Vector3<f32>
+	pub fn get_cam_right(&self) -> Vector3<f32>
 	{
 		return self.right;
 	}
