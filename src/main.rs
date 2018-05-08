@@ -17,10 +17,10 @@ mod scene;
 use ash::util::Align;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use cgmath::{Deg, Matrix4, Point3, Rad, Vector2};
+use cgmath::{Deg, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector2, Vector3};
 use config::Config;
 use nurbs::{NURBSpline, Order};
-use object::{Camera, Position};
+use object::{Camera, Car, Drawable, Physics, Position, Rotation};
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::mem::{align_of, size_of};
@@ -61,6 +61,7 @@ fn main()
 	let mut mainpass = MainPass::init(&renderstate, &cfg);
 	let mut scene = Scene::new(&renderstate, &mainpass);
 	let mut camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
+	let mut car = Car::new(&renderstate, &mainpass, Point3::new(0.0, 0.0, -2.0));
 	let aspect_ratio = cfg.render_width as f32 / cfg.render_height as f32;
 	let vertical_fov = Rad::from(Deg(cfg.horizontal_fov as f32 / aspect_ratio));
 	let near = 1.0;
@@ -135,44 +136,57 @@ fn main()
 			}
 			if key_forward
 			{
-				let translation = camera.get_cam_front();
-				camera.translate(translation * move_speed);
+				// let translation = camera.get_cam_front();
+				// camera.translate(translation * move_speed);
+				let forward = car.get_front_vector();
+				car.apply_force(forward * 5000.0); // 5000 newton
 			}
 			if key_left
 			{
-				let translation = camera.get_cam_right() * -1.0;
-				camera.translate(translation * move_speed);
+				// let translation = camera.get_cam_right() * -1.0;
+				// camera.translate(translation * move_speed);
+				car.locally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(1.0)));
 			}
 			if key_back
 			{
-				let translation = camera.get_cam_front() * -1.0;
-				camera.translate(translation * move_speed);
+				// let translation = camera.get_cam_front() * -1.0;
+				// camera.translate(translation * move_speed);
+				let forward = car.get_front_vector();
+				car.apply_force(-forward * 3000.0); // 3000 newton
 			}
 			if key_right
 			{
-				let translation = camera.get_cam_right();
-				camera.translate(translation * move_speed);
+				// let translation = camera.get_cam_right();
+				// camera.translate(translation * move_speed);
+				car.locally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-1.0)));
 			}
 			if key_up
 			{
-				let translation = camera.get_world_up_vector();
-				camera.translate(translation * move_speed);
+				// let translation = camera.get_world_up_vector();
+				// camera.translate(translation * move_speed);
 			}
 			if key_down
 			{
-				let translation = camera.get_world_up_vector() * -1.0;
-				camera.translate(translation * move_speed);
+				// let translation = camera.get_world_up_vector() * -1.0;
+				// camera.translate(translation * move_speed);
 			}
 
+			car.apply_gravity(9.81);
+			car.apply_drag(0.4257); // http://www.asawicki.info/Mirror/Car%20Physics%20for%20Games/Car%20Physics%20for%20Games.html
+			car.update(delta_time);
+
+			let cam_pos = car.get_position() - (car.get_front_vector() * 10.0) + Vector3::new(0.0, 5.0, 0.0);
+			camera.set_position(cam_pos);
+
 			// animation, physics engine, scene progression etc. goes here
-			scene.update();
+			// scene.update();
 
 			accumulator -= delta_time;
 			elapsed_time += delta_time;
 		}
 
 		// Update the view matrix uniform buffer
-		let view_matrix = camera.generate_view_matrix();
+		let view_matrix = camera.generate_look_at_view_matrix(car.get_position());
 		let view_matrix_buf_size = size_of::<Matrix4<f32>>() as u64;
 		unsafe {
 			let mem_ptr = renderstate
@@ -187,6 +201,7 @@ fn main()
 		// Do the main rendering
 		let main_cmd_buf = mainpass.begin_frame(&renderstate);
 		scene.draw(main_cmd_buf, mainpass.pipeline_layout, &view_matrix, &projection_matrix);
+		car.draw(main_cmd_buf, mainpass.pipeline_layout, &view_matrix, &projection_matrix);
 		mainpass.end_frame(&renderstate);
 
 		// Present the rendered image

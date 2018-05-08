@@ -1,12 +1,15 @@
 mod camera;
+mod car;
 pub mod draw;
 
 pub use self::camera::Camera;
+pub use self::car::Car;
 pub use self::draw::DrawObject;
 
 use ash::vk;
 use cgmath::prelude::*;
 use cgmath::{Euler, Matrix4, Point3, Quaternion, Vector3};
+use std::time::Duration;
 
 pub trait Drawable
 {
@@ -74,4 +77,12 @@ pub trait Rotation
 
 		front.normalize()
 	}
+}
+
+pub trait Physics
+{
+	fn apply_force(&mut self, force_newton: Vector3<f32>);
+	fn apply_drag(&mut self, drag_const: f32);
+	fn apply_gravity(&mut self, standard_gravity: f32);
+	fn update(&mut self, delta_time: Duration);
 }

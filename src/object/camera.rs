@@ -93,6 +93,11 @@ impl Camera
 	{
 		Matrix4::look_at_dir(self.position, self.front, self.up)
 	}
+
+	pub fn generate_look_at_view_matrix(&self, focus: Point3<f32>) -> Matrix4<f32>
+	{
+		Matrix4::look_at(self.position, focus, self.up)
+	}
 }
 
 impl Position for Camera
