@@ -18,6 +18,9 @@ impl Scene
 			objects: Vec::new(),
 		};
 
+		let cuboid = DrawObject::new_cuboid(rs, mp, Point3::new(1.0, 0.0, -4.0), 2.0, 2.0, 2.0);
+		scene.objects.push(cuboid);
+
 		let mut right_wall = DrawObject::new_quad(rs, mp, Point3::new(10.0, 0.0, 0.0), 10.0, 10.0);
 		right_wall.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-90.0)));
 		scene.objects.push(right_wall);
@@ -37,6 +40,15 @@ impl Scene
 
 	pub fn update(&mut self)
 	{
+		for (i, mut object) in self.objects.iter_mut().enumerate()
+		{
+			if i > 0
+			{
+				break;
+			}
+			// TODO: Move this.
+			object.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-0.5)));
+		}
 	}
 
 	pub fn draw(
