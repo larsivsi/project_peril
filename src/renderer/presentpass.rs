@@ -1,7 +1,7 @@
+use ash::Device;
 use ash::extensions::{Surface, Swapchain, XlibSurface};
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0, V1_0};
 use ash::vk;
-use ash::Device;
 use std;
 use std::ffi::CString;
 use std::ptr;
@@ -50,7 +50,7 @@ impl PresentPass
 {
 	/// Creates an X11 surface.
 	fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
-		entry: &E, instance: &I, window: &winit::Window,
+		entry: &E, instance: &I, window: &winit::Window
 	) -> Result<vk::SurfaceKHR, vk::Result>
 	{
 		use winit::os::unix::WindowExt;
@@ -191,17 +191,19 @@ impl PresentPass
 	fn create_renderpass(rs: &RenderState, surface_format: &vk::SurfaceFormatKHR) -> vk::RenderPass
 	{
 		// One attachment, color only. Will produce the presentable image.
-		let renderpass_attachments = [vk::AttachmentDescription {
-			format: surface_format.format,
-			flags: vk::AttachmentDescriptionFlags::empty(),
-			samples: vk::SAMPLE_COUNT_1_BIT,
-			load_op: vk::AttachmentLoadOp::DontCare,
-			store_op: vk::AttachmentStoreOp::Store,
-			stencil_load_op: vk::AttachmentLoadOp::DontCare,
-			stencil_store_op: vk::AttachmentStoreOp::DontCare,
-			initial_layout: vk::ImageLayout::Undefined,
-			final_layout: vk::ImageLayout::PresentSrcKhr,
-		}];
+		let renderpass_attachments = [
+			vk::AttachmentDescription {
+				format: surface_format.format,
+				flags: vk::AttachmentDescriptionFlags::empty(),
+				samples: vk::SAMPLE_COUNT_1_BIT,
+				load_op: vk::AttachmentLoadOp::DontCare,
+				store_op: vk::AttachmentStoreOp::Store,
+				stencil_load_op: vk::AttachmentLoadOp::DontCare,
+				stencil_store_op: vk::AttachmentStoreOp::DontCare,
+				initial_layout: vk::ImageLayout::Undefined,
+				final_layout: vk::ImageLayout::PresentSrcKhr,
+			},
+		];
 		let color_attachment_ref = vk::AttachmentReference {
 			attachment: 0,
 			layout: vk::ImageLayout::ColorAttachmentOptimal,
@@ -241,7 +243,7 @@ impl PresentPass
 	///
 	/// Very straigt forward pipeline: Loads some hard-coded shaders that will draw a triangle.
 	fn create_pipeline(
-		rs: &RenderState, surface_size: vk::Rect2D, renderpass: vk::RenderPass,
+		rs: &RenderState, surface_size: vk::Rect2D, renderpass: vk::RenderPass
 	) -> (
 		vk::DescriptorPool,
 		Vec<vk::DescriptorSetLayout>,
@@ -253,10 +255,12 @@ impl PresentPass
 	)
 	{
 		// Descriptors
-		let descriptor_sizes = [vk::DescriptorPoolSize {
-			typ: vk::DescriptorType::CombinedImageSampler,
-			descriptor_count: 1,
-		}];
+		let descriptor_sizes = [
+			vk::DescriptorPoolSize {
+				typ: vk::DescriptorType::CombinedImageSampler,
+				descriptor_count: 1,
+			},
+		];
 		let descriptor_pool_info = vk::DescriptorPoolCreateInfo {
 			s_type: vk::StructureType::DescriptorPoolCreateInfo,
 			p_next: ptr::null(),
@@ -269,13 +273,15 @@ impl PresentPass
 		unsafe {
 			descriptor_pool = rs.device.create_descriptor_pool(&descriptor_pool_info, None).unwrap();
 		}
-		let desc_layout_bindings = [vk::DescriptorSetLayoutBinding {
-			binding: 0,
-			descriptor_type: vk::DescriptorType::CombinedImageSampler,
-			descriptor_count: 1,
-			stage_flags: vk::SHADER_STAGE_FRAGMENT_BIT,
-			p_immutable_samplers: ptr::null(),
-		}];
+		let desc_layout_bindings = [
+			vk::DescriptorSetLayoutBinding {
+				binding: 0,
+				descriptor_type: vk::DescriptorType::CombinedImageSampler,
+				descriptor_count: 1,
+				stage_flags: vk::SHADER_STAGE_FRAGMENT_BIT,
+				p_immutable_samplers: ptr::null(),
+			},
+		];
 		let descriptor_info = vk::DescriptorSetLayoutCreateInfo {
 			s_type: vk::StructureType::DescriptorSetLayoutCreateInfo,
 			p_next: ptr::null(),
@@ -422,16 +428,18 @@ impl PresentPass
 			max_depth_bounds: 1.0,
 			min_depth_bounds: 0.0,
 		};
-		let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
-			blend_enable: 0,
-			src_color_blend_factor: vk::BlendFactor::SrcColor,
-			dst_color_blend_factor: vk::BlendFactor::OneMinusDstColor,
-			color_blend_op: vk::BlendOp::Add,
-			src_alpha_blend_factor: vk::BlendFactor::Zero,
-			dst_alpha_blend_factor: vk::BlendFactor::Zero,
-			alpha_blend_op: vk::BlendOp::Add,
-			color_write_mask: vk::ColorComponentFlags::all(),
-		}];
+		let color_blend_attachment_states = [
+			vk::PipelineColorBlendAttachmentState {
+				blend_enable: 0,
+				src_color_blend_factor: vk::BlendFactor::SrcColor,
+				dst_color_blend_factor: vk::BlendFactor::OneMinusDstColor,
+				color_blend_op: vk::BlendOp::Add,
+				src_alpha_blend_factor: vk::BlendFactor::Zero,
+				dst_alpha_blend_factor: vk::BlendFactor::Zero,
+				alpha_blend_op: vk::BlendOp::Add,
+				color_write_mask: vk::ColorComponentFlags::all(),
+			},
+		];
 		let color_blend_state = vk::PipelineColorBlendStateCreateInfo {
 			s_type: vk::StructureType::PipelineColorBlendStateCreateInfo,
 			p_next: ptr::null(),
@@ -861,18 +869,20 @@ impl PresentPass
 			image_view: image.view,
 			sampler: image.sampler,
 		};
-		let write_desc_sets = [vk::WriteDescriptorSet {
-			s_type: vk::StructureType::WriteDescriptorSet,
-			p_next: ptr::null(),
-			dst_set: self.descriptor_sets[0],
-			dst_binding: 0,
-			dst_array_element: 0,
-			descriptor_count: 1,
-			descriptor_type: vk::DescriptorType::CombinedImageSampler,
-			p_image_info: &image_descriptor,
-			p_buffer_info: ptr::null(),
-			p_texel_buffer_view: ptr::null(),
-		}];
+		let write_desc_sets = [
+			vk::WriteDescriptorSet {
+				s_type: vk::StructureType::WriteDescriptorSet,
+				p_next: ptr::null(),
+				dst_set: self.descriptor_sets[0],
+				dst_binding: 0,
+				dst_array_element: 0,
+				descriptor_count: 1,
+				descriptor_type: vk::DescriptorType::CombinedImageSampler,
+				p_image_info: &image_descriptor,
+				p_buffer_info: ptr::null(),
+				p_texel_buffer_view: ptr::null(),
+			},
+		];
 		unsafe {
 			// Update the descriptor set for the image to draw
 			rs.device.update_descriptor_sets(&write_desc_sets, &[]);

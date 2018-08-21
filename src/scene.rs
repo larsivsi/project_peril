@@ -1,6 +1,6 @@
 use ash::vk;
-use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
+use cgmath::prelude::*;
 use object::{DrawObject, Drawable, Rotation};
 use renderer::{MainPass, RenderState};
 use std::f32;

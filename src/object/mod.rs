@@ -5,8 +5,8 @@ pub use self::camera::Camera;
 pub use self::draw::DrawObject;
 
 use ash::vk;
-use cgmath::prelude::*;
 use cgmath::{Euler, Matrix4, Point3, Quaternion, Vector3};
+use cgmath::prelude::*;
 
 pub trait Drawable
 {

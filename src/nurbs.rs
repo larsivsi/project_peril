@@ -1,5 +1,5 @@
-use cgmath::prelude::*;
 use cgmath::Point3;
+use cgmath::prelude::*;
 
 #[derive(Copy, Clone)]
 #[allow(dead_code)]
