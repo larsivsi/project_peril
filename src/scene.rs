@@ -1,7 +1,7 @@
 use ash::vk;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
 use cgmath::prelude::*;
-use object::{DrawObject, Drawable, Rotation};
+use object::{DrawObject, Drawable, Position, Rotation};
 use renderer::{MainPass, RenderState};
 use std::f32;
 
@@ -21,21 +21,36 @@ impl Scene
 		let cuboid = DrawObject::new_cuboid(rs, mp, Point3::new(1.0, 0.0, -4.0), 2.0, 2.0, 2.0);
 		scene.objects.push(cuboid);
 
-		let mut right_wall = DrawObject::new_quad(rs, mp, Point3::new(10.0, 0.0, 0.0), 10.0, 10.0);
-		right_wall.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-90.0)));
-		scene.objects.push(right_wall);
+		let points = vec![
+			Point3::new(1.0, 0.0, 0.0),
+			Point3::new(-1.0, 0.0, 0.0),
+			Point3::new(0.0, 1.0, 0.0),
+			Point3::new(0.0, -1.0, 0.0),
+			Point3::new(0.0, 0.0, -1.0),
+			Point3::new(0.0, 0.0, 1.0),
+		];
 
-		let mut left_wall = DrawObject::new_quad(rs, mp, Point3::new(-10.0, 0.0, 0.0), 10.0, 10.0);
-		left_wall.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(90.0)));
-		left_wall.globally_rotate(Quaternion::from_axis_angle(Vector3::new(1.0, 0.0, 0.0), Deg(180.0)));
-		scene.objects.push(left_wall);
+		let directions = vec![
+			Vector3::new(0.0, -1.0, 0.0),
+			Vector3::new(0.0, 1.0, 0.0),
+			Vector3::new(1.0, 0.0, 0.0),
+			Vector3::new(-1.0, 0.0, 0.0),
+			Vector3::new(0.0, 0.0, 1.0),
+			Vector3::new(0.0, 0.0, 1.0),
+		];
 
-		let mut floor = DrawObject::new_quad(rs, mp, Point3::new(0.0, -10.0, 0.0), 10.0, 10.0);
-		floor.globally_rotate(Quaternion::from_axis_angle(Vector3::new(1.0, 0.0, 0.0), Deg(-90.0)));
-		floor.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-90.0)));
-		scene.objects.push(floor);
+		for i in 0..6 {
+			let x:f32 = points[i].x;
+			let y:f32 = points[i].y;
+			let z:f32 = points[i].z;
+			let mut wall = DrawObject::new_quad(rs, mp, Point3::new(0., 0., 0.), 20.0, 20.0);
+			wall.set_rotation(Quaternion::from_axis_angle( directions[i], Deg(90.0)));
+			if i==5 { wall.set_rotation(Quaternion::new( 0.0, 0.0, 1.0, 0.0 )); }
+			wall.set_position( Point3::new(20.*x, 20.*y, 20.*z) );	
+			scene.objects.push(wall);
+		}
 
-		scene
+		return scene
 	}
 
 	pub fn update(&mut self)

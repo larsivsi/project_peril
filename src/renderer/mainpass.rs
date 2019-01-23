@@ -115,7 +115,7 @@ impl MainPass
 		let descriptor_sizes = [
 			vk::DescriptorPoolSize {
 				typ: vk::DescriptorType::CombinedImageSampler,
-				descriptor_count: 8,
+				descriptor_count: 14,
 			},
 			vk::DescriptorPoolSize {
 				typ: vk::DescriptorType::UniformBuffer,
@@ -128,7 +128,7 @@ impl MainPass
 			flags: Default::default(),
 			pool_size_count: descriptor_sizes.len() as u32,
 			p_pool_sizes: descriptor_sizes.as_ptr(),
-			max_sets: 5, // TODO figure out how to properly do this
+			max_sets: 8, // TODO figure out how to properly do this
 		};
 		let descriptor_pool;
 		unsafe {
