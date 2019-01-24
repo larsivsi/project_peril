@@ -319,21 +319,24 @@ fn main()
 				winit::WindowEvent::MouseInput {
 					button,
 					..
-				} => if cursor_captured
+				} =>
 				{
-					match button
+					if cursor_captured
 					{
-						winit::MouseButton::Left =>
+						match button
 						{
-							println!("Left mouse!");
+							winit::MouseButton::Left =>
+							{
+								println!("Left mouse!");
+							}
+							winit::MouseButton::Right =>
+							{
+								println!("Right mouse!");
+							}
+							_ => (),
 						}
-						winit::MouseButton::Right =>
-						{
-							println!("Right mouse!");
-						}
-						_ => (),
 					}
-				},
+				}
 				_ => (),
 			},
 
@@ -347,29 +350,32 @@ fn main()
 				winit::DeviceEvent::MouseMotion {
 					delta,
 					..
-				} => if cursor_captured
+				} =>
 				{
-					// println!("Mouse moved x: {} y: {}", delta.0, delta.1);
-					let mut dir_change = Vector2 {
-						x: (last_mouse_position.x + delta.0),
-						y: (last_mouse_position.y + delta.1),
-					};
-					last_mouse_position.x = delta.0;
-					last_mouse_position.y = delta.1;
+					if cursor_captured
+					{
+						// println!("Mouse moved x: {} y: {}", delta.0, delta.1);
+						let mut dir_change = Vector2 {
+							x: (last_mouse_position.x + delta.0),
+							y: (last_mouse_position.y + delta.1),
+						};
+						last_mouse_position.x = delta.0;
+						last_mouse_position.y = delta.1;
 
-					// Update camera.
-					dir_change *= mouse_sensitivity;
-					camera.yaw(match cfg.mouse_invert_x
-					{
-						true => -dir_change.x,
-						false => dir_change.x,
-					} as f32);
-					camera.pitch(match cfg.mouse_invert_y
-					{
-						true => dir_change.y,
-						false => -dir_change.y,
-					} as f32);
-				},
+						// Update camera.
+						dir_change *= mouse_sensitivity;
+						camera.yaw(match cfg.mouse_invert_x
+						{
+							true => -dir_change.x,
+							false => dir_change.x,
+						} as f32);
+						camera.pitch(match cfg.mouse_invert_y
+						{
+							true => dir_change.y,
+							false => -dir_change.y,
+						} as f32);
+					}
+				}
 				_ => (),
 			},
 			_ => (),

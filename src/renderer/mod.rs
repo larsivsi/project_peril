@@ -1,11 +1,11 @@
-use ash::{Device, Entry, Instance};
 use ash::extensions::{
-    ext::DebugReport,
-    khr::{Surface, Swapchain, XlibSurface}
+	ext::DebugReport,
+	khr::{Surface, Swapchain, XlibSurface},
 };
 use ash::util::Align;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::vk;
+use ash::{Device, Entry, Instance};
 use image;
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -140,8 +140,8 @@ impl RenderState
 	///
 	/// This function is called from the debug layer if an issue is identified.
 	unsafe extern "system" fn vulkan_debug_callback(
-		_: vk::DebugReportFlagsEXT, _: vk::DebugReportObjectTypeEXT, _: u64, _: usize, _: i32,
-		_: *const c_char, p_message: *const c_char, _: *mut c_void,
+		_: vk::DebugReportFlagsEXT, _: vk::DebugReportObjectTypeEXT, _: u64, _: usize, _: i32, _: *const c_char,
+		p_message: *const c_char, _: *mut c_void,
 	) -> u32
 	{
 		println!("{:?}", CStr::from_ptr(p_message));
@@ -149,13 +149,13 @@ impl RenderState
 	}
 
 	/// Sets up the debug report layer and callback.
-	fn setup_debug_callback(entry: &Entry, instance: &Instance)
-		-> (DebugReport, vk::DebugReportCallbackEXT)
+	fn setup_debug_callback(entry: &Entry, instance: &Instance) -> (DebugReport, vk::DebugReportCallbackEXT)
 	{
 		let debug_info = vk::DebugReportCallbackCreateInfoEXT {
 			s_type: vk::StructureType::DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
 			p_next: ptr::null(),
-			flags: vk::DebugReportFlagsEXT::ERROR | vk::DebugReportFlagsEXT::WARNING |
+			flags: vk::DebugReportFlagsEXT::ERROR |
+				vk::DebugReportFlagsEXT::WARNING |
 				vk::DebugReportFlagsEXT::PERFORMANCE_WARNING,
 			pfn_callback: Some(RenderState::vulkan_debug_callback),
 			p_user_data: ptr::null_mut(),
@@ -173,43 +173,41 @@ impl RenderState
 	fn pick_physical_device(instance: &Instance) -> (vk::PhysicalDevice, u32)
 	{
 		let pdevices;
-                let pdevice;
-                let queue_family_index;
-                unsafe {
-                    pdevices = instance.enumerate_physical_devices().expect("Failed to find GPU with Vulkan support");
-		    let (pd, qfi) = pdevices
-			.iter()
-			.map(|pdevice| {
-				instance
-					.get_physical_device_queue_family_properties(*pdevice)
-					.iter()
-					.enumerate()
-					.filter_map(|(index, ref info)| {
-						let supports_graphics =
+		let pdevice;
+		let queue_family_index;
+		unsafe {
+			pdevices = instance.enumerate_physical_devices().expect("Failed to find GPU with Vulkan support");
+			let (pd, qfi) = pdevices
+				.iter()
+				.map(|pdevice| {
+					instance
+						.get_physical_device_queue_family_properties(*pdevice)
+						.iter()
+						.enumerate()
+						.filter_map(|(index, ref info)| {
+							let supports_graphics =
                                 // Any GPU that can render
                                 info.queue_flags.contains(vk::QueueFlags::GRAPHICS);
-						match supports_graphics
-						{
-							true => Some((*pdevice, index)),
-							_ => None,
-						}
-					})
-					.nth(0)
-			})
-			.filter_map(|v| v)
-			.nth(0)
-			.expect("Couldn't find suitable device.");
-                    pdevice = pd;
-                    queue_family_index = qfi;
-                }
+							match supports_graphics
+							{
+								true => Some((*pdevice, index)),
+								_ => None,
+							}
+						})
+						.nth(0)
+				})
+				.filter_map(|v| v)
+				.nth(0)
+				.expect("Couldn't find suitable device.");
+			pdevice = pd;
+			queue_family_index = qfi;
+		}
 
 		(pdevice, queue_family_index as u32)
 	}
 
 	/// Creates a Vulkan device (logical) based on the instance and physical device.
-	fn create_logical_device(
-		instance: &Instance, pdevice: vk::PhysicalDevice, queue_family_index: u32
-	) -> Device
+	fn create_logical_device(instance: &Instance, pdevice: vk::PhysicalDevice, queue_family_index: u32) -> Device
 	{
 		let queue_priorities = [1.0]; // One queue of priority 1.0
 		let queue_info = vk::DeviceQueueCreateInfo {
@@ -288,9 +286,9 @@ impl RenderState
 		}
 		let (pdevice, queue_family_index) = RenderState::pick_physical_device(&instance);
 		let device_memory_properties;
-                unsafe {
-                    device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
-                }
+		unsafe {
+			device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
+		}
 		let device = RenderState::create_logical_device(&instance, pdevice, queue_family_index);
 		let graphics_queue;
 		unsafe {
@@ -393,7 +391,7 @@ impl RenderState
 
 	/// Creates a vk::Buffer based on the requirements.
 	fn create_buffer(
-		&self, usage: vk::BufferUsageFlags, properties: vk::MemoryPropertyFlags, buffersize: vk::DeviceSize
+		&self, usage: vk::BufferUsageFlags, properties: vk::MemoryPropertyFlags, buffersize: vk::DeviceSize,
 	) -> (vk::Buffer, vk::DeviceMemory)
 	{
 		let bufferinfo = vk::BufferCreateInfo {
@@ -443,7 +441,9 @@ impl RenderState
 		// Create a temporary staging buffer
 		if optimal_layout
 		{
-			debug_assert!((properties & vk::MemoryPropertyFlags::DEVICE_LOCAL) == vk::MemoryPropertyFlags::DEVICE_LOCAL);
+			debug_assert!(
+				(properties & vk::MemoryPropertyFlags::DEVICE_LOCAL) == vk::MemoryPropertyFlags::DEVICE_LOCAL
+			);
 
 			let (buf, mem) = self.create_buffer(
 				vk::BufferUsageFlags::TRANSFER_SRC,
@@ -468,7 +468,8 @@ impl RenderState
 
 		// Upload data to the buffer we just created
 		unsafe {
-			let mem_ptr = self.device
+			let mem_ptr = self
+				.device
 				.map_memory(memory, 0, buffersize, vk::MemoryMapFlags::empty())
 				.expect("Failed to map index memory");
 			let mut mem_align = Align::new(mem_ptr, align_of::<T>() as u64, buffersize);
@@ -575,10 +576,8 @@ impl RenderState
 			s_type: vk::StructureType::MEMORY_ALLOCATE_INFO,
 			p_next: ptr::null(),
 			allocation_size: texture_memory_req.size,
-			memory_type_index: self.find_memory_type(
-				texture_memory_req.memory_type_bits,
-				vk::MemoryPropertyFlags::DEVICE_LOCAL,
-			),
+			memory_type_index: self
+				.find_memory_type(texture_memory_req.memory_type_bits, vk::MemoryPropertyFlags::DEVICE_LOCAL),
 		};
 		let texture_memory;
 		unsafe {
@@ -845,7 +844,8 @@ impl RenderState
 	)
 	{
 		// Skip if there's nothing to do
-		if texture.current_access_mask == new_access_mask && texture.current_layout == new_layout &&
+		if texture.current_access_mask == new_access_mask &&
+			texture.current_layout == new_layout &&
 			texture.current_stage == new_stage
 		{
 			return;

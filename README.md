@@ -49,3 +49,17 @@ License:
 The code in this project is licensed under [MIT license](LICENSE).  
 The original assets of this project are licensed under [CC BY 4.0](assets/original/LICENSE), unless otherwise stated.  
 [Third party assets](assets/thirdparty/) will have their respective license alongside the asset files.
+
+Contribute:
+===========
+Please create pull requests with reviewers for commits to the master branch. This is currently enforced by GitHub option.  
+Please also use rustfmt on the code before opening code reviews. The project is currently using the nightly rustfmt,
+which is used as follows:
+
+~~~bash
+$ rustup toolchain install nightly
+$ rustup component add rustfmt --toolchain nightly
+$ cargo +nightly fmt
+~~~
+
+For more information, see [rustfmt's GitHub page](https://github.com/rust-lang/rustfmt).

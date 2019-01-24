@@ -1,11 +1,11 @@
-use ash::Device;
 use ash::version::DeviceV1_0;
 use ash::vk;
+use ash::Device;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Rotation3, Vector3};
 use object::{Drawable, Position, Rotation};
 use renderer::{MainPass, RenderState, Texture};
-use std::{mem, ptr, slice, f32};
 use std::rc::Rc;
+use std::{f32, mem, ptr, slice};
 
 #[derive(Clone, Copy)]
 #[allow(dead_code)] // not going to change vertices after creation
@@ -241,7 +241,7 @@ impl DrawObject
 	}
 
 	pub fn new_cuboid(
-		rs: &RenderState, mp: &MainPass, position: Point3<f32>, width: f32, height: f32, depth: f32
+		rs: &RenderState, mp: &MainPass, position: Point3<f32>, width: f32, height: f32, depth: f32,
 	) -> DrawObject
 	{
 		let h_width = width / 2.0;
@@ -424,9 +424,12 @@ impl DrawObject
 			},
 		];
 		let indices = [
-			/* Front */ 0u16, 1, 2, 2, 1, 3, /* Back */ 4, 5, 6, 6, 5, 7, /* Top */ 8, 9, 10, 10, 9, 11,
-			/* Bottom */ 12, 13, 14, 14, 13, 15, /* Right */ 16, 17, 18, 18, 17, 19, /* Left */ 20, 21,
-			22, 22, 21, 23,
+			0u16, 1, 2, 2, 1, 3, // Front
+			4, 5, 6, 6, 5, 7, // Back
+			8, 9, 10, 10, 9, 11, // Top
+			12, 13, 14, 14, 13, 15, // Bottom
+			16, 17, 18, 18, 17, 19, // Right
+			20, 21, 22, 22, 21, 23, // Left
 		];
 
 		DrawObject::new(

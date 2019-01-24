@@ -1,6 +1,6 @@
-use ash::Device;
 use ash::version::DeviceV1_0;
 use ash::vk;
+use ash::Device;
 use cgmath::Matrix4;
 use std::ffi::CString;
 use std::mem::size_of;
@@ -108,7 +108,7 @@ impl MainPass
 
 	/// Creates a pipeline for the renderpass.
 	fn create_pipeline(
-		rs: &RenderState, render_size: vk::Extent3D, renderpass: vk::RenderPass
+		rs: &RenderState, render_size: vk::Extent3D, renderpass: vk::RenderPass,
 	) -> (vk::DescriptorPool, Vec<vk::DescriptorSetLayout>, vk::PipelineLayout, vk::Viewport, vk::Rect2D, vk::Pipeline)
 	{
 		// Descriptors
@@ -150,15 +150,13 @@ impl MainPass
 				p_immutable_samplers: ptr::null(),
 			},
 		];
-		let view_matrix_dsl_binding = [
-			vk::DescriptorSetLayoutBinding {
-				binding: 0,
-				descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-				descriptor_count: 1,
-				stage_flags: vk::ShaderStageFlags::VERTEX,
-				p_immutable_samplers: ptr::null(),
-			},
-		];
+		let view_matrix_dsl_binding = [vk::DescriptorSetLayoutBinding {
+			binding: 0,
+			descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+			descriptor_count: 1,
+			stage_flags: vk::ShaderStageFlags::VERTEX,
+			p_immutable_samplers: ptr::null(),
+		}];
 		let color_normal_tex_info = vk::DescriptorSetLayoutCreateInfo {
 			s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
 			p_next: ptr::null(),
@@ -370,18 +368,16 @@ impl MainPass
 			max_depth_bounds: 1.0,
 			min_depth_bounds: 0.0,
 		};
-		let color_blend_attachment_states = [
-			vk::PipelineColorBlendAttachmentState {
-				blend_enable: 0,
-				src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-				dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
-				color_blend_op: vk::BlendOp::ADD,
-				src_alpha_blend_factor: vk::BlendFactor::ZERO,
-				dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-				alpha_blend_op: vk::BlendOp::ADD,
-				color_write_mask: vk::ColorComponentFlags::all(),
-			},
-		];
+		let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
+			blend_enable: 0,
+			src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
+			dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+			color_blend_op: vk::BlendOp::ADD,
+			src_alpha_blend_factor: vk::BlendFactor::ZERO,
+			dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+			alpha_blend_op: vk::BlendOp::ADD,
+			color_write_mask: vk::ColorComponentFlags::all(),
+		}];
 		let color_blend_state = vk::PipelineColorBlendStateCreateInfo {
 			s_type: vk::StructureType::PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 			p_next: ptr::null(),
@@ -423,7 +419,8 @@ impl MainPass
 		};
 		let graphics_pipelines;
 		unsafe {
-			graphics_pipelines = rs.device
+			graphics_pipelines = rs
+				.device
 				.create_graphics_pipelines(vk::PipelineCache::null(), &[graphic_pipeline_info], None)
 				.expect("Unable to create graphics pipeline");
 
@@ -590,11 +587,17 @@ impl MainPass
 
 		// Begin renderpass
 		let clear_values = [
-			vk::ClearValue { color: vk::ClearColorValue { float32: [0.0, 1.0, 0.0, 1.0] } },
-                        vk::ClearValue { depth_stencil: vk::ClearDepthStencilValue {
-				depth: 1.0,
-				stencil: 0,
-			} },
+			vk::ClearValue {
+				color: vk::ClearColorValue {
+					float32: [0.0, 1.0, 0.0, 1.0],
+				},
+			},
+			vk::ClearValue {
+				depth_stencil: vk::ClearDepthStencilValue {
+					depth: 1.0,
+					stencil: 0,
+				},
+			},
 		];
 
 		let render_pass_begin_info = vk::RenderPassBeginInfo {
@@ -612,20 +615,18 @@ impl MainPass
 			offset: 0,
 			range: size_of::<Matrix4<f32>>() as u64,
 		};
-		let write_desc_sets = [
-			vk::WriteDescriptorSet {
-				s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-				p_next: ptr::null(),
-				dst_set: self.view_matrix_ds[0],
-				dst_binding: 0,
-				dst_array_element: 0,
-				descriptor_count: 1,
-				descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-				p_image_info: ptr::null(),
-				p_buffer_info: &view_matrix_ub_descriptor,
-				p_texel_buffer_view: ptr::null(),
-			},
-		];
+		let write_desc_sets = [vk::WriteDescriptorSet {
+			s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+			p_next: ptr::null(),
+			dst_set: self.view_matrix_ds[0],
+			dst_binding: 0,
+			dst_array_element: 0,
+			descriptor_count: 1,
+			descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+			p_image_info: ptr::null(),
+			p_buffer_info: &view_matrix_ub_descriptor,
+			p_texel_buffer_view: ptr::null(),
+		}];
 
 		unsafe {
 			// Update the view matrix descriptor set
