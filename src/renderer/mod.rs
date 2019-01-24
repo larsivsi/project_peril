@@ -1,13 +1,17 @@
 use ash::{Device, Entry, Instance};
-use ash::extensions::{DebugReport, Surface, Swapchain, XlibSurface};
+use ash::extensions::{
+    ext::DebugReport,
+    khr::{Surface, Swapchain, XlibSurface}
+};
 use ash::util::Align;
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0, V1_0};
+use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::vk;
 use image;
 use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::prelude::*;
 use std::mem::{align_of, size_of};
+use std::os::raw::{c_char, c_void};
 use std::path::Path;
 use std::ptr;
 use std::rc::Rc;
@@ -37,12 +41,12 @@ pub struct Texture
 pub struct RenderState
 {
 	// Vulkan device
-	entry: Entry<V1_0>,
-	instance: Instance<V1_0>,
+	entry: Entry,
+	instance: Instance,
 	debug_report_loader: Option<DebugReport>,
 	debug_callback: Option<vk::DebugReportCallbackEXT>,
 	pdevice: vk::PhysicalDevice,
-	pub device: Rc<Device<V1_0>>,
+	pub device: Rc<Device>,
 	device_memory_properties: vk::PhysicalDeviceMemoryProperties,
 	queue_family_index: u32,
 	graphics_queue: vk::Queue,
@@ -69,19 +73,19 @@ impl RenderState
 	}
 
 	/// Creates a Vulkan instance.
-	fn create_instance(cfg: &Config, entry: &Entry<V1_0>) -> Instance<V1_0>
+	fn create_instance(cfg: &Config, entry: &Entry) -> Instance
 	{
 		// Application info
 		let app_name = CString::new(cfg.app_name.clone()).unwrap();
 		let raw_name = app_name.as_ptr();
 		let appinfo = vk::ApplicationInfo {
-			s_type: vk::StructureType::ApplicationInfo,
+			s_type: vk::StructureType::APPLICATION_INFO,
 			p_next: ptr::null(),
 			p_application_name: raw_name,
 			application_version: cfg.app_version,
 			p_engine_name: raw_name,
 			engine_version: cfg.app_version,
-			api_version: vk_make_version!(1, 0, 57),
+			api_version: vk_make_version!(1, 1, 82),
 		};
 
 		// Layers
@@ -115,7 +119,7 @@ impl RenderState
 		// Instance
 		let extension_names_raw = RenderState::extension_names();
 		let create_info = vk::InstanceCreateInfo {
-			s_type: vk::StructureType::InstanceCreateInfo,
+			s_type: vk::StructureType::INSTANCE_CREATE_INFO,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			p_application_info: &appinfo,
@@ -136,8 +140,8 @@ impl RenderState
 	///
 	/// This function is called from the debug layer if an issue is identified.
 	unsafe extern "system" fn vulkan_debug_callback(
-		_: vk::DebugReportFlagsEXT, _: vk::DebugReportObjectTypeEXT, _: vk::uint64_t, _: vk::size_t, _: vk::int32_t,
-		_: *const vk::c_char, p_message: *const vk::c_char, _: *mut vk::c_void,
+		_: vk::DebugReportFlagsEXT, _: vk::DebugReportObjectTypeEXT, _: u64, _: usize, _: i32,
+		_: *const c_char, p_message: *const c_char, _: *mut c_void,
 	) -> u32
 	{
 		println!("{:?}", CStr::from_ptr(p_message));
@@ -145,31 +149,35 @@ impl RenderState
 	}
 
 	/// Sets up the debug report layer and callback.
-	fn setup_debug_callback(entry: &Entry<V1_0>, instance: &Instance<V1_0>)
+	fn setup_debug_callback(entry: &Entry, instance: &Instance)
 		-> (DebugReport, vk::DebugReportCallbackEXT)
 	{
 		let debug_info = vk::DebugReportCallbackCreateInfoEXT {
-			s_type: vk::StructureType::DebugReportCallbackCreateInfoExt,
+			s_type: vk::StructureType::DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
 			p_next: ptr::null(),
-			flags: vk::DEBUG_REPORT_ERROR_BIT_EXT | vk::DEBUG_REPORT_WARNING_BIT_EXT |
-				vk::DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-			pfn_callback: RenderState::vulkan_debug_callback,
+			flags: vk::DebugReportFlagsEXT::ERROR | vk::DebugReportFlagsEXT::WARNING |
+				vk::DebugReportFlagsEXT::PERFORMANCE_WARNING,
+			pfn_callback: Some(RenderState::vulkan_debug_callback),
 			p_user_data: ptr::null_mut(),
 		};
-		let debug_report_loader = DebugReport::new(entry, instance).unwrap();
+		let debug_report_loader = DebugReport::new(entry, instance);
 		let debug_callback;
 		unsafe {
-			debug_callback = debug_report_loader.create_debug_report_callback_ext(&debug_info, None).unwrap();
+			debug_callback = debug_report_loader.create_debug_report_callback(&debug_info, None).unwrap();
 		}
 
 		(debug_report_loader, debug_callback)
 	}
 
 	/// Selects a physical device (and queue index) for the Vulkan instance.
-	fn pick_physical_device(instance: &Instance<V1_0>) -> (vk::PhysicalDevice, u32)
+	fn pick_physical_device(instance: &Instance) -> (vk::PhysicalDevice, u32)
 	{
-		let pdevices = instance.enumerate_physical_devices().expect("Failed to find GPU with Vulkan support");
-		let (pdevice, queue_family_index) = pdevices
+		let pdevices;
+                let pdevice;
+                let queue_family_index;
+                unsafe {
+                    pdevices = instance.enumerate_physical_devices().expect("Failed to find GPU with Vulkan support");
+		    let (pd, qfi) = pdevices
 			.iter()
 			.map(|pdevice| {
 				instance
@@ -179,7 +187,7 @@ impl RenderState
 					.filter_map(|(index, ref info)| {
 						let supports_graphics =
                                 // Any GPU that can render
-                                info.queue_flags.subset(vk::QUEUE_GRAPHICS_BIT);
+                                info.queue_flags.contains(vk::QueueFlags::GRAPHICS);
 						match supports_graphics
 						{
 							true => Some((*pdevice, index)),
@@ -191,18 +199,21 @@ impl RenderState
 			.filter_map(|v| v)
 			.nth(0)
 			.expect("Couldn't find suitable device.");
+                    pdevice = pd;
+                    queue_family_index = qfi;
+                }
 
 		(pdevice, queue_family_index as u32)
 	}
 
 	/// Creates a Vulkan device (logical) based on the instance and physical device.
 	fn create_logical_device(
-		instance: &Instance<V1_0>, pdevice: vk::PhysicalDevice, queue_family_index: u32
-	) -> Device<V1_0>
+		instance: &Instance, pdevice: vk::PhysicalDevice, queue_family_index: u32
+	) -> Device
 	{
 		let queue_priorities = [1.0]; // One queue of priority 1.0
 		let queue_info = vk::DeviceQueueCreateInfo {
-			s_type: vk::StructureType::DeviceQueueCreateInfo,
+			s_type: vk::StructureType::DEVICE_QUEUE_CREATE_INFO,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			queue_family_index: queue_family_index,
@@ -211,12 +222,12 @@ impl RenderState
 		};
 		let device_extension_names_raw = [Swapchain::name().as_ptr()]; // VK_KHR_swapchain
 		let features = vk::PhysicalDeviceFeatures {
-			shader_clip_distance: vk::VK_TRUE,
+			shader_clip_distance: vk::TRUE,
 			// Can request more stuff here later
 			..Default::default()
 		};
 		let device_create_info = vk::DeviceCreateInfo {
-			s_type: vk::StructureType::DeviceCreateInfo,
+			s_type: vk::StructureType::DEVICE_CREATE_INFO,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			queue_create_info_count: 1,
@@ -227,7 +238,7 @@ impl RenderState
 			pp_enabled_extension_names: device_extension_names_raw.as_ptr(),
 			p_enabled_features: &features,
 		};
-		let device: Device<V1_0>;
+		let device;
 		unsafe {
 			device =
 				instance.create_device(pdevice, &device_create_info, None).expect("Failed to create logical device");
@@ -237,12 +248,12 @@ impl RenderState
 	}
 
 	/// Creates various pools required by the RenderState.
-	fn create_pools(device: &Device<V1_0>, queue_family_index: u32) -> (vk::CommandPool)
+	fn create_pools(device: &Device, queue_family_index: u32) -> (vk::CommandPool)
 	{
 		let cmd_pool_create_info = vk::CommandPoolCreateInfo {
-			s_type: vk::StructureType::CommandPoolCreateInfo,
+			s_type: vk::StructureType::COMMAND_POOL_CREATE_INFO,
 			p_next: ptr::null(),
-			flags: vk::COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+			flags: vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
 			queue_family_index: queue_family_index,
 		};
 		let commandpool;
@@ -258,12 +269,12 @@ impl RenderState
 		let event_loop = winit::EventsLoop::new();
 		let window = winit::WindowBuilder::new()
 			.with_title(format!("{} {}", cfg.app_name, cfg.version_to_string()))
-			.with_dimensions(cfg.window_width, cfg.window_height)
+			.with_dimensions(winit::dpi::LogicalSize::new(cfg.window_width as f64, cfg.window_height as f64))
 			.build(&event_loop)
 			.unwrap();
 
 		// ash entry point
-		let entry: Entry<V1_0> = Entry::new().unwrap();
+		let entry = Entry::new().unwrap();
 
 		// Vulkan init
 		let instance = RenderState::create_instance(&cfg, &entry);
@@ -276,7 +287,10 @@ impl RenderState
 			debug_callback = Some(callback);
 		}
 		let (pdevice, queue_family_index) = RenderState::pick_physical_device(&instance);
-		let device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
+		let device_memory_properties;
+                unsafe {
+                    device_memory_properties = instance.get_physical_device_memory_properties(pdevice);
+                }
 		let device = RenderState::create_logical_device(&instance, pdevice, queue_family_index);
 		let graphics_queue;
 		unsafe {
@@ -325,11 +339,11 @@ impl RenderState
 	fn begin_single_time_commands(&self) -> vk::CommandBuffer
 	{
 		let cmd_buf_allocate_info = vk::CommandBufferAllocateInfo {
-			s_type: vk::StructureType::CommandBufferAllocateInfo,
+			s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
 			p_next: ptr::null(),
 			command_buffer_count: 1,
 			command_pool: self.commandpool,
-			level: vk::CommandBufferLevel::Primary,
+			level: vk::CommandBufferLevel::PRIMARY,
 		};
 
 		let cmd_buf;
@@ -338,10 +352,10 @@ impl RenderState
 		}
 
 		let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
-			s_type: vk::StructureType::CommandBufferBeginInfo,
+			s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
 			p_next: ptr::null(),
 			p_inheritance_info: ptr::null(),
-			flags: vk::COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+			flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
 		};
 		unsafe {
 			self.device.begin_command_buffer(cmd_buf, &cmd_buf_begin_info).expect("Begin commandbuffer");
@@ -358,7 +372,7 @@ impl RenderState
 		}
 
 		let submit_info = vk::SubmitInfo {
-			s_type: vk::StructureType::SubmitInfo,
+			s_type: vk::StructureType::SUBMIT_INFO,
 			p_next: ptr::null(),
 			wait_semaphore_count: 0,
 			p_wait_semaphores: ptr::null(),
@@ -383,24 +397,25 @@ impl RenderState
 	) -> (vk::Buffer, vk::DeviceMemory)
 	{
 		let bufferinfo = vk::BufferCreateInfo {
-			s_type: vk::StructureType::BufferCreateInfo,
+			s_type: vk::StructureType::BUFFER_CREATE_INFO,
 			p_next: ptr::null(),
 			flags: vk::BufferCreateFlags::empty(),
 			size: buffersize,
 			usage: usage,
-			sharing_mode: vk::SharingMode::Exclusive,
+			sharing_mode: vk::SharingMode::EXCLUSIVE,
 			queue_family_index_count: 0,
 			p_queue_family_indices: ptr::null(),
 		};
 
 		let buffer;
+		let mem_req;
 		unsafe {
 			buffer = self.device.create_buffer(&bufferinfo, None).expect("Failed to create buffer");
+			mem_req = self.device.get_buffer_memory_requirements(buffer);
 		}
 
-		let mem_req = self.device.get_buffer_memory_requirements(buffer);
 		let alloc_info = vk::MemoryAllocateInfo {
-			s_type: vk::StructureType::MemoryAllocateInfo,
+			s_type: vk::StructureType::MEMORY_ALLOCATE_INFO,
 			p_next: ptr::null(),
 			allocation_size: mem_req.size,
 			memory_type_index: self.find_memory_type(mem_req.memory_type_bits, properties),
@@ -428,11 +443,11 @@ impl RenderState
 		// Create a temporary staging buffer
 		if optimal_layout
 		{
-			debug_assert!((properties & vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT) == vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			debug_assert!((properties & vk::MemoryPropertyFlags::DEVICE_LOCAL) == vk::MemoryPropertyFlags::DEVICE_LOCAL);
 
 			let (buf, mem) = self.create_buffer(
-				vk::BUFFER_USAGE_TRANSFER_SRC_BIT,
-				vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				vk::BufferUsageFlags::TRANSFER_SRC,
+				vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
 				buffersize,
 			);
 			buffer = buf;
@@ -442,8 +457,8 @@ impl RenderState
 		else
 		{
 			debug_assert!(
-				(properties & (vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk::MEMORY_PROPERTY_HOST_COHERENT_BIT)) ==
-					(vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk::MEMORY_PROPERTY_HOST_COHERENT_BIT)
+				(properties & (vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT)) ==
+					(vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT)
 			);
 
 			let (buf, mem) = self.create_buffer(usage, properties, buffersize);
@@ -469,7 +484,7 @@ impl RenderState
 			let staging_memory = memory;
 
 			// Create final buffer
-			let (buf, mem) = self.create_buffer(vk::BUFFER_USAGE_TRANSFER_DST_BIT | usage, properties, buffersize);
+			let (buf, mem) = self.create_buffer(vk::BufferUsageFlags::TRANSFER_DST | usage, properties, buffersize);
 			buffer = buf;
 			memory = mem;
 
@@ -503,7 +518,7 @@ impl RenderState
 		let spv_file = File::open(Path::new(path)).expect("Could not find spv file");
 		let shader_bytes: Vec<u8> = spv_file.bytes().filter_map(|byte| byte.ok()).collect();
 		let shader_info = vk::ShaderModuleCreateInfo {
-			s_type: vk::StructureType::ShaderModuleCreateInfo,
+			s_type: vk::StructureType::SHADER_MODULE_CREATE_INFO,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			code_size: shader_bytes.len(),
@@ -529,11 +544,11 @@ impl RenderState
 		// In case we need to upload to the texture, mark it for transfer dst
 		if upload_buffer.is_some()
 		{
-			texture_usage |= vk::IMAGE_USAGE_TRANSFER_DST_BIT;
+			texture_usage |= vk::ImageUsageFlags::TRANSFER_DST;
 		}
 
 		let texture_create_info = vk::ImageCreateInfo {
-			s_type: vk::StructureType::ImageCreateInfo,
+			s_type: vk::StructureType::IMAGE_CREATE_INFO,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			image_type: texture_type,
@@ -541,27 +556,28 @@ impl RenderState
 			extent: texture_dimensions,
 			mip_levels: 1,
 			array_layers: 1,
-			samples: vk::SAMPLE_COUNT_1_BIT,
-			tiling: vk::ImageTiling::Optimal,
+			samples: vk::SampleCountFlags::TYPE_1,
+			tiling: vk::ImageTiling::OPTIMAL,
 			usage: texture_usage,
-			sharing_mode: vk::SharingMode::Exclusive,
+			sharing_mode: vk::SharingMode::EXCLUSIVE,
 			queue_family_index_count: 0,
 			p_queue_family_indices: ptr::null(),
-			initial_layout: vk::ImageLayout::Undefined,
+			initial_layout: vk::ImageLayout::UNDEFINED,
 		};
 		let texture_image;
+		let texture_memory_req;
 		unsafe {
 			texture_image = self.device.create_image(&texture_create_info, None).unwrap();
+			texture_memory_req = self.device.get_image_memory_requirements(texture_image);
 		}
 
-		let texture_memory_req = self.device.get_image_memory_requirements(texture_image);
 		let texture_allocate_info = vk::MemoryAllocateInfo {
-			s_type: vk::StructureType::MemoryAllocateInfo,
+			s_type: vk::StructureType::MEMORY_ALLOCATE_INFO,
 			p_next: ptr::null(),
 			allocation_size: texture_memory_req.size,
 			memory_type_index: self.find_memory_type(
 				texture_memory_req.memory_type_bits,
-				vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				vk::MemoryPropertyFlags::DEVICE_LOCAL,
 			),
 		};
 		let texture_memory;
@@ -579,14 +595,14 @@ impl RenderState
 			{
 				// First transition the Image to TransferDstOptimal
 				let texture_barrier = vk::ImageMemoryBarrier {
-					s_type: vk::StructureType::ImageMemoryBarrier,
+					s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
 					p_next: ptr::null(),
 					src_access_mask: Default::default(),
-					dst_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
-					old_layout: vk::ImageLayout::Undefined,
-					new_layout: vk::ImageLayout::TransferDstOptimal,
-					src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-					dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+					dst_access_mask: vk::AccessFlags::TRANSFER_WRITE,
+					old_layout: vk::ImageLayout::UNDEFINED,
+					new_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+					src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+					dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
 					image: texture_image,
 					subresource_range: vk::ImageSubresourceRange {
 						aspect_mask: texture_aspect_mask,
@@ -599,8 +615,8 @@ impl RenderState
 				unsafe {
 					self.device.cmd_pipeline_barrier(
 						cmd_buf,
-						vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-						vk::PIPELINE_STAGE_TRANSFER_BIT,
+						vk::PipelineStageFlags::TOP_OF_PIPE,
+						vk::PipelineStageFlags::TRANSFER,
 						vk::DependencyFlags::empty(),
 						&[],
 						&[],
@@ -630,20 +646,20 @@ impl RenderState
 						cmd_buf,
 						image_upload_buffer,
 						texture_image,
-						vk::ImageLayout::TransferDstOptimal,
+						vk::ImageLayout::TRANSFER_DST_OPTIMAL,
 						&[buffer_copy_region],
 					);
 				}
 				// Finally transition the Image to the correct layout
 				let texture_barrier = vk::ImageMemoryBarrier {
-					s_type: vk::StructureType::ImageMemoryBarrier,
+					s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
 					p_next: ptr::null(),
-					src_access_mask: vk::ACCESS_TRANSFER_WRITE_BIT,
+					src_access_mask: vk::AccessFlags::TRANSFER_WRITE,
 					dst_access_mask: initial_access_mask,
-					old_layout: vk::ImageLayout::TransferDstOptimal,
+					old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
 					new_layout: initial_layout,
-					src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-					dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+					src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+					dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
 					image: texture_image,
 					subresource_range: vk::ImageSubresourceRange {
 						aspect_mask: texture_aspect_mask,
@@ -656,7 +672,7 @@ impl RenderState
 				unsafe {
 					self.device.cmd_pipeline_barrier(
 						cmd_buf,
-						vk::PIPELINE_STAGE_TRANSFER_BIT,
+						vk::PipelineStageFlags::TRANSFER,
 						initial_stage,
 						vk::DependencyFlags::empty(),
 						&[],
@@ -669,14 +685,14 @@ impl RenderState
 			_ =>
 			{
 				let texture_barrier = vk::ImageMemoryBarrier {
-					s_type: vk::StructureType::ImageMemoryBarrier,
+					s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
 					p_next: ptr::null(),
 					src_access_mask: Default::default(),
 					dst_access_mask: initial_access_mask,
-					old_layout: vk::ImageLayout::Undefined,
+					old_layout: vk::ImageLayout::UNDEFINED,
 					new_layout: initial_layout,
-					src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-					dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+					src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+					dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
 					image: texture_image,
 					subresource_range: vk::ImageSubresourceRange {
 						aspect_mask: texture_aspect_mask,
@@ -689,7 +705,7 @@ impl RenderState
 				unsafe {
 					self.device.cmd_pipeline_barrier(
 						cmd_buf,
-						vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+						vk::PipelineStageFlags::TOP_OF_PIPE,
 						initial_stage,
 						vk::DependencyFlags::empty(),
 						&[],
@@ -703,7 +719,7 @@ impl RenderState
 
 		// Create texture image view
 		let tex_image_view_info = vk::ImageViewCreateInfo {
-			s_type: vk::StructureType::ImageViewCreateInfo,
+			s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			view_type: texture_view_type,
@@ -730,23 +746,23 @@ impl RenderState
 
 		// Create sampler
 		let sampler_info = vk::SamplerCreateInfo {
-			s_type: vk::StructureType::SamplerCreateInfo,
+			s_type: vk::StructureType::SAMPLER_CREATE_INFO,
 			p_next: ptr::null(),
 			flags: Default::default(),
-			mag_filter: vk::Filter::Linear,
-			min_filter: vk::Filter::Linear,
-			mipmap_mode: vk::SamplerMipmapMode::Linear,
-			address_mode_u: vk::SamplerAddressMode::MirroredRepeat,
-			address_mode_v: vk::SamplerAddressMode::MirroredRepeat,
-			address_mode_w: vk::SamplerAddressMode::MirroredRepeat,
+			mag_filter: vk::Filter::LINEAR,
+			min_filter: vk::Filter::LINEAR,
+			mipmap_mode: vk::SamplerMipmapMode::LINEAR,
+			address_mode_u: vk::SamplerAddressMode::MIRRORED_REPEAT,
+			address_mode_v: vk::SamplerAddressMode::MIRRORED_REPEAT,
+			address_mode_w: vk::SamplerAddressMode::MIRRORED_REPEAT,
 			mip_lod_bias: 0.0,
 			min_lod: 0.0,
 			max_lod: 0.0,
 			anisotropy_enable: 0,
 			max_anisotropy: 1.0,
-			border_color: vk::BorderColor::FloatOpaqueWhite,
+			border_color: vk::BorderColor::FLOAT_OPAQUE_WHITE,
 			compare_enable: 0,
-			compare_op: vk::CompareOp::Never,
+			compare_op: vk::CompareOp::NEVER,
 			unnormalized_coordinates: 0,
 		};
 		let sampler;
@@ -783,8 +799,8 @@ impl RenderState
 		}
 		let image_data = image.into_raw();
 		let (image_buffer, image_memory) = self.create_buffer_and_upload(
-			vk::BUFFER_USAGE_TRANSFER_SRC_BIT,
-			vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			vk::BufferUsageFlags::TRANSFER_SRC,
+			vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
 			&image_data,
 			false,
 		);
@@ -792,21 +808,21 @@ impl RenderState
 		// Create a texture from the buffer data
 		let texture = self.create_texture(
 			image_extent,
-			vk::ImageType::Type2d,
-			vk::ImageViewType::Type2d,
+			vk::ImageType::TYPE_2D,
+			vk::ImageViewType::TYPE_2D,
 			if srgb
 			{
-				vk::Format::R8g8b8a8Srgb
+				vk::Format::R8G8B8A8_SRGB
 			}
 			else
 			{
-				vk::Format::R8g8b8a8Unorm
+				vk::Format::R8G8B8A8_UNORM
 			},
-			vk::IMAGE_ASPECT_COLOR_BIT,
-			vk::IMAGE_USAGE_SAMPLED_BIT,
-			vk::ACCESS_SHADER_READ_BIT,
-			vk::ImageLayout::ShaderReadOnlyOptimal,
-			vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			vk::ImageAspectFlags::COLOR,
+			vk::ImageUsageFlags::SAMPLED,
+			vk::AccessFlags::SHADER_READ,
+			vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+			vk::PipelineStageFlags::FRAGMENT_SHADER,
 			Some(image_buffer),
 		);
 
@@ -836,17 +852,17 @@ impl RenderState
 		}
 
 		let texture_barrier = vk::ImageMemoryBarrier {
-			s_type: vk::StructureType::ImageMemoryBarrier,
+			s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
 			p_next: ptr::null(),
 			src_access_mask: texture.current_access_mask,
 			dst_access_mask: new_access_mask,
 			old_layout: texture.current_layout,
 			new_layout: new_layout,
-			src_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
-			dst_queue_family_index: vk::VK_QUEUE_FAMILY_IGNORED,
+			src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+			dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
 			image: texture.image,
 			subresource_range: vk::ImageSubresourceRange {
-				aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
+				aspect_mask: vk::ImageAspectFlags::COLOR,
 				base_mip_level: 0,
 				level_count: 1,
 				base_array_layer: 0,
@@ -914,7 +930,7 @@ impl Drop for RenderState
 				{
 					Some(ref loader) => match self.debug_callback
 					{
-						Some(callback) => loader.destroy_debug_report_callback_ext(callback, None),
+						Some(callback) => loader.destroy_debug_report_callback(callback, None),
 						None => panic!("Debug callback is None!"),
 					},
 					None => panic!("Debug report loader is None!"),
