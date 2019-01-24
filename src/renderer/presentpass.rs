@@ -1,6 +1,6 @@
 use ash::Device;
-use ash::extensions::khr::{Surface, Swapchain, XlibSurface};
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use ash::extensions::{Surface, Swapchain, XlibSurface};
+use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0, V1_0};
 use ash::vk;
 use std;
 use std::ffi::CString;
@@ -43,7 +43,7 @@ pub struct PresentPass
 	current_present_idx: usize,
 
 	// Keep a pointer to the device for cleanup
-	device: Rc<Device>,
+	device: Rc<Device<V1_0>>,
 }
 
 impl PresentPass
@@ -57,16 +57,16 @@ impl PresentPass
 		let x11_display = window.get_xlib_display().unwrap();
 		let x11_window = window.get_xlib_window().unwrap();
 		let x11_create_info = vk::XlibSurfaceCreateInfoKHR {
-			s_type: vk::StructureType::XLIB_SURFACE_CREATE_INFO_KHR,
+			s_type: vk::StructureType::XlibSurfaceCreateInfoKhr,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			window: x11_window as vk::Window,
 			dpy: x11_display as *mut vk::Display,
 		};
-		let xlib_surface_loader = XlibSurface::new(entry, instance);
+		let xlib_surface_loader = XlibSurface::new(entry, instance).expect("Unable to load xlib surface");
 		let result;
 		unsafe {
-			result = xlib_surface_loader.create_xlib_surface(&x11_create_info, None);
+			result = xlib_surface_loader.create_xlib_surface_khr(&x11_create_info, None);
 		}
 		result
 	}
@@ -79,11 +79,8 @@ impl PresentPass
 		old_swapchain: vk::SwapchainKHR, swapchain_loader: &Swapchain,
 	) -> (vk::SwapchainKHR, vk::Rect2D)
 	{
-		let surface_capabilities;
-                unsafe {
-                    surface_capabilities =
-			surface_loader.get_physical_device_surface_capabilities(rs.pdevice, *surface).unwrap();
-                }
+		let surface_capabilities =
+			surface_loader.get_physical_device_surface_capabilities_khr(rs.pdevice, *surface).unwrap();
 
 		// TODO double-buffering for now
 		let mut desired_image_count = 2;
@@ -93,26 +90,23 @@ impl PresentPass
 			desired_image_count = surface_capabilities.max_image_count;
 		}
 
-		let pre_transform = if surface_capabilities.supported_transforms.contains(vk::SurfaceTransformFlagsKHR::IDENTITY)
+		let pre_transform = if surface_capabilities.supported_transforms.subset(vk::SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
 		{
-			vk::SurfaceTransformFlagsKHR::IDENTITY
+			vk::SURFACE_TRANSFORM_IDENTITY_BIT_KHR
 		}
 		else
 		{
 			surface_capabilities.current_transform
 		};
 
-		let present_modes;
-                unsafe {
-                    present_modes = surface_loader.get_physical_device_surface_present_modes(rs.pdevice, *surface).unwrap();
-                }
+		let present_modes = surface_loader.get_physical_device_surface_present_modes_khr(rs.pdevice, *surface).unwrap();
 		let present_mode = present_modes
 			.iter()
 			.cloned()
-			.find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
-			.unwrap_or(vk::PresentModeKHR::FIFO);
+			.find(|&mode| mode == vk::PresentModeKHR::Mailbox)
+			.unwrap_or(vk::PresentModeKHR::Fifo);
 		let swapchain_create_info = vk::SwapchainCreateInfoKHR {
-			s_type: vk::StructureType::SWAPCHAIN_CREATE_INFO_KHR,
+			s_type: vk::StructureType::SwapchainCreateInfoKhr,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			surface: *surface,
@@ -120,10 +114,10 @@ impl PresentPass
 			image_color_space: surface_format.color_space,
 			image_format: surface_format.format,
 			image_extent: surface_capabilities.current_extent.clone(),
-			image_usage: vk::ImageUsageFlags::COLOR_ATTACHMENT,
-			image_sharing_mode: vk::SharingMode::EXCLUSIVE,
+			image_usage: vk::IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			image_sharing_mode: vk::SharingMode::Exclusive,
 			pre_transform: pre_transform,
-			composite_alpha: vk::CompositeAlphaFlagsKHR::OPAQUE,
+			composite_alpha: vk::COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 			present_mode: present_mode,
 			clipped: 1,
 			old_swapchain: old_swapchain,
@@ -133,7 +127,7 @@ impl PresentPass
 		};
 		let swapchain;
 		unsafe {
-			swapchain = swapchain_loader.create_swapchain(&swapchain_create_info, None).unwrap();
+			swapchain = swapchain_loader.create_swapchain_khr(&swapchain_create_info, None).unwrap();
 		}
 
 		(
@@ -157,18 +151,15 @@ impl PresentPass
 		swapchain: vk::SwapchainKHR,
 	) -> Vec<vk::ImageView>
 	{
-		let present_images;
-                unsafe {
-                    present_images = swapchain_loader.get_swapchain_images(swapchain).unwrap();
-                }
+		let present_images = swapchain_loader.get_swapchain_images_khr(swapchain).unwrap();
 		let present_image_views: Vec<vk::ImageView> = present_images
 			.iter()
 			.map(|&image| {
 				let create_view_info = vk::ImageViewCreateInfo {
-					s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
+					s_type: vk::StructureType::ImageViewCreateInfo,
 					p_next: ptr::null(),
 					flags: Default::default(),
-					view_type: vk::ImageViewType::TYPE_2D,
+					view_type: vk::ImageViewType::Type2d,
 					format: surface_format.format,
 					components: vk::ComponentMapping {
 						r: vk::ComponentSwizzle::R,
@@ -177,7 +168,7 @@ impl PresentPass
 						a: vk::ComponentSwizzle::A,
 					},
 					subresource_range: vk::ImageSubresourceRange {
-						aspect_mask: vk::ImageAspectFlags::COLOR,
+						aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT,
 						base_mip_level: 0,
 						level_count: 1,
 						base_array_layer: 0,
@@ -204,25 +195,25 @@ impl PresentPass
 			vk::AttachmentDescription {
 				format: surface_format.format,
 				flags: vk::AttachmentDescriptionFlags::empty(),
-				samples: vk::SampleCountFlags::TYPE_1,
-				load_op: vk::AttachmentLoadOp::DONT_CARE,
-				store_op: vk::AttachmentStoreOp::STORE,
-				stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
-				stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
-				initial_layout: vk::ImageLayout::UNDEFINED,
-				final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+				samples: vk::SAMPLE_COUNT_1_BIT,
+				load_op: vk::AttachmentLoadOp::DontCare,
+				store_op: vk::AttachmentStoreOp::Store,
+				stencil_load_op: vk::AttachmentLoadOp::DontCare,
+				stencil_store_op: vk::AttachmentStoreOp::DontCare,
+				initial_layout: vk::ImageLayout::Undefined,
+				final_layout: vk::ImageLayout::PresentSrcKhr,
 			},
 		];
 		let color_attachment_ref = vk::AttachmentReference {
 			attachment: 0,
-			layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+			layout: vk::ImageLayout::ColorAttachmentOptimal,
 		};
 		let subpass = vk::SubpassDescription {
 			color_attachment_count: 1,
 			p_color_attachments: &color_attachment_ref,
 			p_depth_stencil_attachment: ptr::null(),
 			flags: Default::default(),
-			pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
+			pipeline_bind_point: vk::PipelineBindPoint::Graphics,
 			input_attachment_count: 0,
 			p_input_attachments: ptr::null(),
 			p_resolve_attachments: ptr::null(),
@@ -230,7 +221,7 @@ impl PresentPass
 			p_preserve_attachments: ptr::null(),
 		};
 		let renderpass_create_info = vk::RenderPassCreateInfo {
-			s_type: vk::StructureType::RENDER_PASS_CREATE_INFO,
+			s_type: vk::StructureType::RenderPassCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			attachment_count: renderpass_attachments.len() as u32,
@@ -266,12 +257,12 @@ impl PresentPass
 		// Descriptors
 		let descriptor_sizes = [
 			vk::DescriptorPoolSize {
-				ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+				typ: vk::DescriptorType::CombinedImageSampler,
 				descriptor_count: 1,
 			},
 		];
 		let descriptor_pool_info = vk::DescriptorPoolCreateInfo {
-			s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
+			s_type: vk::StructureType::DescriptorPoolCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			pool_size_count: descriptor_sizes.len() as u32,
@@ -285,14 +276,14 @@ impl PresentPass
 		let desc_layout_bindings = [
 			vk::DescriptorSetLayoutBinding {
 				binding: 0,
-				descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+				descriptor_type: vk::DescriptorType::CombinedImageSampler,
 				descriptor_count: 1,
-				stage_flags: vk::ShaderStageFlags::FRAGMENT,
+				stage_flags: vk::SHADER_STAGE_FRAGMENT_BIT,
 				p_immutable_samplers: ptr::null(),
 			},
 		];
 		let descriptor_info = vk::DescriptorSetLayoutCreateInfo {
-			s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			s_type: vk::StructureType::DescriptorSetLayoutCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			binding_count: desc_layout_bindings.len() as u32,
@@ -303,7 +294,7 @@ impl PresentPass
 			descriptor_set_layouts = [rs.device.create_descriptor_set_layout(&descriptor_info, None).unwrap()];
 		}
 		let desc_alloc_info = vk::DescriptorSetAllocateInfo {
-			s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
+			s_type: vk::StructureType::DescriptorSetAllocateInfo,
 			p_next: ptr::null(),
 			descriptor_pool: descriptor_pool,
 			descriptor_set_count: descriptor_set_layouts.len() as u32,
@@ -314,7 +305,7 @@ impl PresentPass
 			descriptor_sets = rs.device.allocate_descriptor_sets(&desc_alloc_info).unwrap();
 		}
 		let layout_create_info = vk::PipelineLayoutCreateInfo {
-			s_type: vk::StructureType::PIPELINE_LAYOUT_CREATE_INFO,
+			s_type: vk::StructureType::PipelineLayoutCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			set_layout_count: descriptor_set_layouts.len() as u32,
@@ -334,28 +325,28 @@ impl PresentPass
 		let shader_entry_name = CString::new("main").unwrap();
 		let shader_stage_create_infos = [
 			vk::PipelineShaderStageCreateInfo {
-				s_type: vk::StructureType::PIPELINE_SHADER_STAGE_CREATE_INFO,
+				s_type: vk::StructureType::PipelineShaderStageCreateInfo,
 				p_next: ptr::null(),
 				flags: Default::default(),
 				module: vertex_shader_module,
 				p_name: shader_entry_name.as_ptr(),
 				p_specialization_info: ptr::null(),
-				stage: vk::ShaderStageFlags::VERTEX,
+				stage: vk::SHADER_STAGE_VERTEX_BIT,
 			},
 			vk::PipelineShaderStageCreateInfo {
-				s_type: vk::StructureType::PIPELINE_SHADER_STAGE_CREATE_INFO,
+				s_type: vk::StructureType::PipelineShaderStageCreateInfo,
 				p_next: ptr::null(),
 				flags: Default::default(),
 				module: fragment_shader_module,
 				p_name: shader_entry_name.as_ptr(),
 				p_specialization_info: ptr::null(),
-				stage: vk::ShaderStageFlags::FRAGMENT,
+				stage: vk::SHADER_STAGE_FRAGMENT_BIT,
 			},
 		];
 		let vertex_input_binding_descriptions = [];
 		let vertex_input_attribute_descriptions = [];
 		let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
-			s_type: vk::StructureType::PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+			s_type: vk::StructureType::PipelineVertexInputStateCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			vertex_attribute_description_count: vertex_input_attribute_descriptions.len() as u32,
@@ -364,11 +355,11 @@ impl PresentPass
 			p_vertex_binding_descriptions: vertex_input_binding_descriptions.as_ptr(),
 		};
 		let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
-			s_type: vk::StructureType::PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+			s_type: vk::StructureType::PipelineInputAssemblyStateCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			primitive_restart_enable: 0,
-			topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+			topology: vk::PrimitiveTopology::TriangleList,
 		};
 		let viewport = vk::Viewport {
 			x: surface_size.offset.x as f32,
@@ -380,7 +371,7 @@ impl PresentPass
 		};
 		let scissor = surface_size.clone();
 		let viewport_state_info = vk::PipelineViewportStateCreateInfo {
-			s_type: vk::StructureType::PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+			s_type: vk::StructureType::PipelineViewportStateCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			scissor_count: 1,
@@ -389,25 +380,25 @@ impl PresentPass
 			p_viewports: &viewport,
 		};
 		let rasterization_info = vk::PipelineRasterizationStateCreateInfo {
-			s_type: vk::StructureType::PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+			s_type: vk::StructureType::PipelineRasterizationStateCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
-			cull_mode: vk::CullModeFlags::BACK,
+			cull_mode: vk::CULL_MODE_BACK_BIT,
 			depth_bias_clamp: 0.0,
 			depth_bias_constant_factor: 0.0,
 			depth_bias_enable: 0,
 			depth_bias_slope_factor: 0.0,
 			depth_clamp_enable: 0,
-			front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+			front_face: vk::FrontFace::CounterClockwise,
 			line_width: 1.0,
-			polygon_mode: vk::PolygonMode::FILL,
+			polygon_mode: vk::PolygonMode::Fill,
 			rasterizer_discard_enable: 0,
 		};
 		let multisample_state_info = vk::PipelineMultisampleStateCreateInfo {
-			s_type: vk::StructureType::PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+			s_type: vk::StructureType::PipelineMultisampleStateCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
-			rasterization_samples: vk::SampleCountFlags::TYPE_1,
+			rasterization_samples: vk::SAMPLE_COUNT_1_BIT,
 			sample_shading_enable: 0,
 			min_sample_shading: 0.0,
 			p_sample_mask: ptr::null(),
@@ -415,21 +406,21 @@ impl PresentPass
 			alpha_to_coverage_enable: 0,
 		};
 		let noop_stencil_state = vk::StencilOpState {
-			fail_op: vk::StencilOp::KEEP,
-			pass_op: vk::StencilOp::KEEP,
-			depth_fail_op: vk::StencilOp::KEEP,
-			compare_op: vk::CompareOp::ALWAYS,
+			fail_op: vk::StencilOp::Keep,
+			pass_op: vk::StencilOp::Keep,
+			depth_fail_op: vk::StencilOp::Keep,
+			compare_op: vk::CompareOp::Always,
 			compare_mask: 0,
 			write_mask: 0,
 			reference: 0,
 		};
 		let depth_state_info = vk::PipelineDepthStencilStateCreateInfo {
-			s_type: vk::StructureType::PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+			s_type: vk::StructureType::PipelineDepthStencilStateCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			depth_test_enable: 1,
 			depth_write_enable: 1,
-			depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+			depth_compare_op: vk::CompareOp::LessOrEqual,
 			depth_bounds_test_enable: 0,
 			stencil_test_enable: 0,
 			front: noop_stencil_state.clone(),
@@ -440,35 +431,35 @@ impl PresentPass
 		let color_blend_attachment_states = [
 			vk::PipelineColorBlendAttachmentState {
 				blend_enable: 0,
-				src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-				dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
-				color_blend_op: vk::BlendOp::ADD,
-				src_alpha_blend_factor: vk::BlendFactor::ZERO,
-				dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-				alpha_blend_op: vk::BlendOp::ADD,
+				src_color_blend_factor: vk::BlendFactor::SrcColor,
+				dst_color_blend_factor: vk::BlendFactor::OneMinusDstColor,
+				color_blend_op: vk::BlendOp::Add,
+				src_alpha_blend_factor: vk::BlendFactor::Zero,
+				dst_alpha_blend_factor: vk::BlendFactor::Zero,
+				alpha_blend_op: vk::BlendOp::Add,
 				color_write_mask: vk::ColorComponentFlags::all(),
 			},
 		];
 		let color_blend_state = vk::PipelineColorBlendStateCreateInfo {
-			s_type: vk::StructureType::PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+			s_type: vk::StructureType::PipelineColorBlendStateCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			logic_op_enable: 0,
-			logic_op: vk::LogicOp::CLEAR,
+			logic_op: vk::LogicOp::Clear,
 			attachment_count: color_blend_attachment_states.len() as u32,
 			p_attachments: color_blend_attachment_states.as_ptr(),
 			blend_constants: [0.0, 0.0, 0.0, 0.0],
 		};
-		let dynamic_state = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+		let dynamic_state = [vk::DynamicState::Viewport, vk::DynamicState::Scissor];
 		let dynamic_state_info = vk::PipelineDynamicStateCreateInfo {
-			s_type: vk::StructureType::PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+			s_type: vk::StructureType::PipelineDynamicStateCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 			dynamic_state_count: dynamic_state.len() as u32,
 			p_dynamic_states: dynamic_state.as_ptr(),
 		};
 		let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo {
-			s_type: vk::StructureType::GRAPHICS_PIPELINE_CREATE_INFO,
+			s_type: vk::StructureType::GraphicsPipelineCreateInfo,
 			p_next: ptr::null(),
 			flags: vk::PipelineCreateFlags::empty(),
 			stage_count: shader_stage_create_infos.len() as u32,
@@ -521,7 +512,7 @@ impl PresentPass
 			.map(|&present_image_view| {
 				let framebuffer_attachments = [present_image_view];
 				let frame_buffer_create_info = vk::FramebufferCreateInfo {
-					s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
+					s_type: vk::StructureType::FramebufferCreateInfo,
 					p_next: ptr::null(),
 					flags: Default::default(),
 					render_pass: renderpass,
@@ -546,11 +537,11 @@ impl PresentPass
 	fn create_commandbuffers(rs: &RenderState, framebuffers: &Vec<vk::Framebuffer>) -> Vec<vk::CommandBuffer>
 	{
 		let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
-			s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
+			s_type: vk::StructureType::CommandBufferAllocateInfo,
 			p_next: ptr::null(),
 			command_buffer_count: framebuffers.len() as u32,
 			command_pool: rs.commandpool,
-			level: vk::CommandBufferLevel::PRIMARY,
+			level: vk::CommandBufferLevel::Primary,
 		};
 		let command_buffers;
 		unsafe {
@@ -566,19 +557,16 @@ impl PresentPass
 	pub fn init(rs: &RenderState) -> PresentPass
 	{
 		// Surface
-		let surface_loader = Surface::new(&rs.entry, &rs.instance);
+		let surface_loader = Surface::new(&rs.entry, &rs.instance).expect("Unable to load the Surface extension");
 		let surface = PresentPass::create_surface(&rs.entry, &rs.instance, &rs.window).unwrap();
-		let surface_formats;
-                unsafe {
-		    assert!(surface_loader.get_physical_device_surface_support(rs.pdevice, rs.queue_family_index, surface));
-		    surface_formats = surface_loader.get_physical_device_surface_formats(rs.pdevice, surface).unwrap();
-                }
+		assert!(surface_loader.get_physical_device_surface_support_khr(rs.pdevice, rs.queue_family_index, surface,));
+		let surface_formats = surface_loader.get_physical_device_surface_formats_khr(rs.pdevice, surface).unwrap();
 		let surface_format = surface_formats
 			.iter()
 			.map(|sfmt| match sfmt.format
 			{
-				vk::Format::UNDEFINED => vk::SurfaceFormatKHR {
-					format: vk::Format::B8G8R8_UNORM,
+				vk::Format::Undefined => vk::SurfaceFormatKHR {
+					format: vk::Format::B8g8r8Unorm,
 					color_space: sfmt.color_space,
 				},
 				_ => sfmt.clone(),
@@ -587,7 +575,7 @@ impl PresentPass
 			.expect("Unable to find suitable surface format.");
 
 		let sem_create_info = vk::SemaphoreCreateInfo {
-			s_type: vk::StructureType::SEMAPHORE_CREATE_INFO,
+			s_type: vk::StructureType::SemaphoreCreateInfo,
 			p_next: ptr::null(),
 			flags: Default::default(),
 		};
@@ -598,7 +586,7 @@ impl PresentPass
 			rendering_finished_sem = rs.device.create_semaphore(&sem_create_info, None).unwrap();
 		}
 
-		let swapchain_loader = Swapchain::new(&rs.instance, rs.device.as_ref());
+		let swapchain_loader = Swapchain::new(&rs.instance, rs.device.as_ref()).expect("Unable to load swapchain");
 
 		let (swapchain, surface_size) = PresentPass::create_swapchain(
 			rs,
@@ -681,7 +669,7 @@ impl PresentPass
 				self.device.destroy_image_view(image_view, None);
 			}
 
-			self.swapchain_loader.destroy_swapchain(self.swapchain, None);
+			self.swapchain_loader.destroy_swapchain_khr(self.swapchain, None);
 		}
 	}
 
@@ -730,7 +718,7 @@ impl PresentPass
 	{
 		let result;
 		unsafe {
-			result = self.swapchain_loader.acquire_next_image(
+			result = self.swapchain_loader.acquire_next_image_khr(
 				self.swapchain,
 				std::u64::MAX,
 				self.image_available_sem,
@@ -740,12 +728,11 @@ impl PresentPass
 
 		match result
 		{
-			Ok((idx, suboptimal)) =>
+			Ok(idx) =>
 			{
-				debug_assert!(!suboptimal);
 				self.current_present_idx = idx as usize;
 			}
-			Err(vkres) => if vkres == vk::Result::ERROR_OUT_OF_DATE_KHR
+			Err(vkres) => if vkres == vk::Result::ErrorOutOfDateKhr
 			{
 				self.recreate_swapchain(rs);
 				return None;
@@ -754,10 +741,10 @@ impl PresentPass
 
 		// Begin commandbuffer
 		let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
-			s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
+			s_type: vk::StructureType::CommandBufferBeginInfo,
 			p_next: ptr::null(),
 			p_inheritance_info: ptr::null(),
-			flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
+			flags: vk::COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
 		};
 		let cmd_buf = self.commandbuffers[self.current_present_idx];
 		unsafe {
@@ -767,15 +754,15 @@ impl PresentPass
 		// Transition the mainpass output to a samplable image
 		rs.transition_texture(
 			image,
-			vk::AccessFlags::SHADER_READ,
-			vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-			vk::PipelineStageFlags::FRAGMENT_SHADER,
+			vk::ACCESS_SHADER_READ_BIT,
+			vk::ImageLayout::ShaderReadOnlyOptimal,
+			vk::PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			Some(cmd_buf),
 		);
 
 		// Begin renderpass
 		let render_pass_begin_info = vk::RenderPassBeginInfo {
-			s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+			s_type: vk::StructureType::RenderPassBeginInfo,
 			p_next: ptr::null(),
 			render_pass: self.renderpass,
 			framebuffer: self.framebuffers[self.current_present_idx],
@@ -785,13 +772,13 @@ impl PresentPass
 		};
 		unsafe {
 			// Start the render pass
-			rs.device.cmd_begin_render_pass(cmd_buf, &render_pass_begin_info, vk::SubpassContents::INLINE);
+			rs.device.cmd_begin_render_pass(cmd_buf, &render_pass_begin_info, vk::SubpassContents::Inline);
 
 			// Bind pipeline
-			rs.device.cmd_bind_pipeline(cmd_buf, vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+			rs.device.cmd_bind_pipeline(cmd_buf, vk::PipelineBindPoint::Graphics, self.pipeline);
 
-			rs.device.cmd_set_viewport(cmd_buf, 0, &[self.viewport]);
-			rs.device.cmd_set_scissor(cmd_buf, 0, &[self.scissor]);
+			rs.device.cmd_set_viewport(cmd_buf, &[self.viewport]);
+			rs.device.cmd_set_scissor(cmd_buf, &[self.scissor]);
 		}
 
 		Some(cmd_buf)
@@ -813,7 +800,7 @@ impl PresentPass
 
 		// Send the work off to the GPU
 		let fence_create_info = vk::FenceCreateInfo {
-			s_type: vk::StructureType::FENCE_CREATE_INFO,
+			s_type: vk::StructureType::FenceCreateInfo,
 			p_next: ptr::null(),
 			flags: vk::FenceCreateFlags::empty(),
 		};
@@ -822,11 +809,11 @@ impl PresentPass
 			submit_fence = rs.device.create_fence(&fence_create_info, None).expect("Create fence failed.");
 		}
 		let submit_info = vk::SubmitInfo {
-			s_type: vk::StructureType::SUBMIT_INFO,
+			s_type: vk::StructureType::SubmitInfo,
 			p_next: ptr::null(),
 			wait_semaphore_count: 1,
 			p_wait_semaphores: &self.image_available_sem,
-			p_wait_dst_stage_mask: &vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+			p_wait_dst_stage_mask: &vk::PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			command_buffer_count: 1,
 			p_command_buffers: &cmd_buf,
 			signal_semaphore_count: 1,
@@ -839,7 +826,7 @@ impl PresentPass
 		}
 
 		let present_info = vk::PresentInfoKHR {
-			s_type: vk::StructureType::PRESENT_INFO_KHR,
+			s_type: vk::StructureType::PresentInfoKhr,
 			p_next: ptr::null(),
 			wait_semaphore_count: 1,
 			p_wait_semaphores: &self.rendering_finished_sem,
@@ -849,7 +836,7 @@ impl PresentPass
 			p_results: ptr::null_mut(),
 		};
 		unsafe {
-			self.swapchain_loader.queue_present(rs.graphics_queue, &present_info).unwrap();
+			self.swapchain_loader.queue_present_khr(rs.graphics_queue, &present_info).unwrap();
 		}
 
 		// Make sure we call begin_frame() before calling this function again
@@ -884,13 +871,13 @@ impl PresentPass
 		};
 		let write_desc_sets = [
 			vk::WriteDescriptorSet {
-				s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+				s_type: vk::StructureType::WriteDescriptorSet,
 				p_next: ptr::null(),
 				dst_set: self.descriptor_sets[0],
 				dst_binding: 0,
 				dst_array_element: 0,
 				descriptor_count: 1,
-				descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+				descriptor_type: vk::DescriptorType::CombinedImageSampler,
 				p_image_info: &image_descriptor,
 				p_buffer_info: ptr::null(),
 				p_texel_buffer_view: ptr::null(),
@@ -902,7 +889,7 @@ impl PresentPass
 			// ...and bind it
 			rs.device.cmd_bind_descriptor_sets(
 				cmd_buf,
-				vk::PipelineBindPoint::GRAPHICS,
+				vk::PipelineBindPoint::Graphics,
 				self.pipeline_layout,
 				0,
 				&self.descriptor_sets[..],
@@ -931,7 +918,7 @@ impl Drop for PresentPass
 		unsafe {
 			self.device.destroy_semaphore(self.rendering_finished_sem, None);
 			self.device.destroy_semaphore(self.image_available_sem, None);
-			self.surface_loader.destroy_surface(self.surface, None);
+			self.surface_loader.destroy_surface_khr(self.surface, None);
 		}
 	}
 }

@@ -210,7 +210,7 @@ fn main()
 				..
 			} => match event
 			{
-				winit::WindowEvent::CloseRequested => running = false,
+				winit::WindowEvent::Closed => running = false,
 				winit::WindowEvent::Focused(has_focus) =>
 				{
 					cursor_captured = has_focus;
@@ -379,13 +379,13 @@ fn main()
 		{
 			if cursor_captured
 			{
-				renderstate.window.grab_cursor(true).expect("Failed to grab pointer");
-				renderstate.window.hide_cursor(true);
+				renderstate.window.set_cursor_state(winit::CursorState::Grab).expect("Failed to grab pointer");
+				renderstate.window.set_cursor(winit::MouseCursor::NoneCursor);
 			}
 			else
 			{
-				renderstate.window.grab_cursor(false).expect("Failed to return pointer");
-				renderstate.window.hide_cursor(false);
+				renderstate.window.set_cursor_state(winit::CursorState::Normal).expect("Failed to return pointer");
+				renderstate.window.set_cursor(winit::MouseCursor::Default);
 			}
 			cursor_dirty = false;
 		}
