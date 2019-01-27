@@ -1,5 +1,5 @@
-use cgmath::{Deg, Euler, Matrix4, Point3, Quaternion, Vector3};
 use cgmath::prelude::*;
+use cgmath::{Deg, Euler, Matrix4, Point3, Quaternion, Vector3};
 use object::{Position, Rotation};
 
 pub struct Camera

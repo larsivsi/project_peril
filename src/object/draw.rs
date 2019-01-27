@@ -1,11 +1,11 @@
-use ash::Device;
-use ash::version::{DeviceV1_0, V1_0};
+use ash::version::DeviceV1_0;
 use ash::vk;
+use ash::Device;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Rotation3, Vector3};
 use object::{Drawable, Position, Rotation};
 use renderer::{MainPass, RenderState, Texture};
-use std::{mem, ptr, slice, f32};
 use std::rc::Rc;
+use std::{f32, mem, ptr, slice};
 
 #[derive(Clone, Copy)]
 #[allow(dead_code)] // not going to change vertices after creation
@@ -34,7 +34,7 @@ pub struct DrawObject
 	normal_map: Texture,
 
 	// Keep a pointer to the device for cleanup
-	device: Rc<Device<V1_0>>,
+	device: Rc<Device>,
 }
 
 impl Drawable for DrawObject
@@ -54,21 +54,21 @@ impl Drawable for DrawObject
 
 		let matrices_bytes;
 		unsafe {
-			matrices_bytes = slice::from_raw_parts(matrices.as_ptr() as *const u32, mem::size_of_val(&matrices));
+			matrices_bytes = slice::from_raw_parts(matrices.as_ptr() as *const u8, mem::size_of_val(&matrices));
 		}
 
 		unsafe {
-			self.device.cmd_push_constants(cmd_buf, pipeline_layout, vk::SHADER_STAGE_VERTEX_BIT, 0, matrices_bytes);
+			self.device.cmd_push_constants(cmd_buf, pipeline_layout, vk::ShaderStageFlags::VERTEX, 0, matrices_bytes);
 			self.device.cmd_bind_descriptor_sets(
 				cmd_buf,
-				vk::PipelineBindPoint::Graphics,
+				vk::PipelineBindPoint::GRAPHICS,
 				pipeline_layout,
 				0,
 				&self.descriptor_sets[..],
 				&[],
 			);
 			self.device.cmd_bind_vertex_buffers(cmd_buf, 0, &[self.vertices], &[0]);
-			self.device.cmd_bind_index_buffer(cmd_buf, self.indices, 0, vk::IndexType::Uint16);
+			self.device.cmd_bind_index_buffer(cmd_buf, self.indices, 0, vk::IndexType::UINT16);
 			self.device.cmd_draw_indexed(cmd_buf, self.num_indices, 1, 0, 0, 1);
 		}
 	}
@@ -109,22 +109,22 @@ impl DrawObject
 	{
 		// Create buffer for vertices
 		let (vert_buffer, vert_mem) = rs.create_buffer_and_upload(
-			vk::BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			vk::BufferUsageFlags::VERTEX_BUFFER,
+			vk::MemoryPropertyFlags::DEVICE_LOCAL,
 			&vertices,
 			true,
 		);
 
 		// Create buffer for indices
 		let (idx_buffer, idx_mem) = rs.create_buffer_and_upload(
-			vk::BUFFER_USAGE_INDEX_BUFFER_BIT,
-			vk::MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			vk::BufferUsageFlags::INDEX_BUFFER,
+			vk::MemoryPropertyFlags::DEVICE_LOCAL,
 			&indices,
 			true,
 		);
 
 		let desc_alloc_info = vk::DescriptorSetAllocateInfo {
-			s_type: vk::StructureType::DescriptorSetAllocateInfo,
+			s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
 			p_next: ptr::null(),
 			descriptor_pool: mp.descriptor_pool,
 			descriptor_set_count: 1,
@@ -151,25 +151,25 @@ impl DrawObject
 
 		let write_desc_sets = [
 			vk::WriteDescriptorSet {
-				s_type: vk::StructureType::WriteDescriptorSet,
+				s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
 				p_next: ptr::null(),
 				dst_set: descriptor_sets[0],
 				dst_binding: 0,
 				dst_array_element: 0,
 				descriptor_count: 1,
-				descriptor_type: vk::DescriptorType::CombinedImageSampler,
+				descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
 				p_image_info: &texture_descriptor,
 				p_buffer_info: ptr::null(),
 				p_texel_buffer_view: ptr::null(),
 			},
 			vk::WriteDescriptorSet {
-				s_type: vk::StructureType::WriteDescriptorSet,
+				s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
 				p_next: ptr::null(),
 				dst_set: descriptor_sets[0],
 				dst_binding: 1,
 				dst_array_element: 0,
 				descriptor_count: 1,
-				descriptor_type: vk::DescriptorType::CombinedImageSampler,
+				descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
 				p_image_info: &normal_descriptor,
 				p_buffer_info: ptr::null(),
 				p_texel_buffer_view: ptr::null(),
@@ -241,7 +241,7 @@ impl DrawObject
 	}
 
 	pub fn new_cuboid(
-		rs: &RenderState, mp: &MainPass, position: Point3<f32>, width: f32, height: f32, depth: f32
+		rs: &RenderState, mp: &MainPass, position: Point3<f32>, width: f32, height: f32, depth: f32,
 	) -> DrawObject
 	{
 		let h_width = width / 2.0;
@@ -424,9 +424,12 @@ impl DrawObject
 			},
 		];
 		let indices = [
-			/* Front */ 0u16, 1, 2, 2, 1, 3, /* Back */ 4, 5, 6, 6, 5, 7, /* Top */ 8, 9, 10, 10, 9, 11,
-			/* Bottom */ 12, 13, 14, 14, 13, 15, /* Right */ 16, 17, 18, 18, 17, 19, /* Left */ 20, 21,
-			22, 22, 21, 23,
+			0u16, 1, 2, 2, 1, 3, // Front
+			4, 5, 6, 6, 5, 7, // Back
+			8, 9, 10, 10, 9, 11, // Top
+			12, 13, 14, 14, 13, 15, // Bottom
+			16, 17, 18, 18, 17, 19, // Right
+			20, 21, 22, 22, 21, 23, // Left
 		];
 
 		DrawObject::new(
