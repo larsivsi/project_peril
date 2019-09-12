@@ -85,8 +85,8 @@ impl PresentPass
 				surface_loader.get_physical_device_surface_capabilities(rs.pdevice, *surface).unwrap();
 		}
 
-		// TODO double-buffering for now
-		let mut desired_image_count = 2;
+		// TODO tipple-buffering for now?
+		let mut desired_image_count = 3;
 		debug_assert!(desired_image_count >= surface_capabilities.min_image_count);
 		if surface_capabilities.max_image_count > 0 && desired_image_count > surface_capabilities.max_image_count
 		{
