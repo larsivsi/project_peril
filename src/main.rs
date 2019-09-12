@@ -23,6 +23,7 @@ use nurbs::{NURBSpline, Order};
 use object::{Camera, Position};
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
+use std::io::Write;
 use std::mem::{align_of, size_of};
 use std::time::{Duration, SystemTime};
 
@@ -41,6 +42,9 @@ const ESC_SCAN_CODE: u32 = 1;
 const SPACE_SCAN_CODE: u32 = 57;
 const LSHIFT_SCAN_CODE: u32 = 42;
 const LCTRL_SCAN_CODE: u32 = 29;
+
+const ENGINE_TARGET_FPS: u64 = 60;
+const ENGINE_TIMESTEP: Duration = Duration::from_nanos(1_000_000_000 / ENGINE_TARGET_FPS);
 
 fn main()
 {
@@ -94,12 +98,10 @@ fn main()
 
 	// main loop
 	let mut running = true;
-	let mut framecount: u64 = 0;
-	// aim for 60fps = 16.66666... ms
-	let delta_time = Duration::from_millis(17);
-	let mut elapsed_time = Duration::new(0, 0);
-	let mut accumulator = Duration::new(0, 0);
-	let mut current_time = SystemTime::now();
+	let mut frames_per_second: u32 = 0;
+	let mut second_accumulator = Duration::new(0, 0);
+	let mut engine_accumulator = Duration::new(0, 0);
+	let mut last_timestamp = SystemTime::now();
 
 	let mut last_mouse_position = Vector2 {
 		x: 0.0 as f64,
@@ -120,12 +122,13 @@ fn main()
 
 	while running
 	{
-		let new_time = SystemTime::now();
-		let frame_time = new_time.duration_since(current_time).expect("duration_since failed :(");
-		current_time = new_time;
-		accumulator += frame_time;
+		let current_timestamp = SystemTime::now();
+		let frame_time = current_timestamp.duration_since(last_timestamp).unwrap();
+		engine_accumulator += frame_time;
+		second_accumulator += frame_time;
 
-		while accumulator >= delta_time
+		// Fixed engine timestep
+		while engine_accumulator >= ENGINE_TIMESTEP
 		{
 			// Update Input.
 			let mut move_speed = move_sensitivity;
@@ -167,8 +170,7 @@ fn main()
 			// animation, physics engine, scene progression etc. goes here
 			scene.update();
 
-			accumulator -= delta_time;
-			elapsed_time += delta_time;
+			engine_accumulator -= ENGINE_TIMESTEP;
 		}
 
 		// Update the view matrix uniform buffer
@@ -191,16 +193,16 @@ fn main()
 
 		// Present the rendered image
 		presentpass.present_image(&renderstate, &mut mainpass.render_image);
-		framecount += 1;
 
-		if framecount % 100 == 0
+		// Update and potentially print FPS
+		frames_per_second += 1;
+		if second_accumulator > Duration::from_secs(1)
 		{
-			// let frame_time_ms = frame_time.subsec_nanos() as f64 / 1_000_000.0;
-			// println!(
-			//    "frametime: {}ms => {} FPS",
-			//    frame_time_ms,
-			//    1_000.0 / frame_time_ms
-			// );
+			let term_fps = format!("\r{} FPS", frames_per_second).into_bytes();
+			std::io::stdout().write(&term_fps).unwrap();
+			std::io::stdout().flush().unwrap();
+			frames_per_second = 0;
+			second_accumulator = Duration::new(0, 0);
 		}
 
 		renderstate.event_loop.poll_events(|ev| match ev
@@ -395,7 +397,10 @@ fn main()
 			}
 			cursor_dirty = false;
 		}
+
+		last_timestamp = current_timestamp;
 	}
 
-	// cleanup
+	// Cleanup terminal
+	print!("\n");
 }
