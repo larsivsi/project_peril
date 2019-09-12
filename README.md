@@ -8,9 +8,9 @@ HowTos:
 
 Prerequisites:
 --------------
-#### glslangValidator
+### glslangValidator
 The glslangValidator is used for compiling [GLSL into SPIR-V](https://www.khronos.org/spir/).  
-For more details, check [Khronos' OpenGL ES reference compiler webpage](https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/)
+For more details, check [Khronos' OpenGL ES reference compiler webpage](https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/).
 
 glslangValidator can be installed using your favorite package manager:
 ~~~bash
@@ -33,7 +33,7 @@ ARB_GL_gl_spirv version 100
 
 Compilation of the [glsl files in this project](shaders) is done automatically when building (see [build.rs](build.rs)).
 
-#### Vulkan validation layers
+### Vulkan validation layers
 Though not strictly required, it's highly recommended to use the validation layers during development to find bugs.
 
 Again, use your favorite package manager to install them:
