@@ -5,41 +5,69 @@ Will probably result in a game or so, we'll see.
 
 HowTos:
 =======
-## Prerequisites:
-Get glslangValidator from https://cvs.khronos.org/svn/repos/ogl/trunk/ecosystem/public/sdk/tools/glslang/Install/  
-Add it to your PATH and check that it works as intended:
 
+Prerequisites:
+--------------
+#### glslangValidator
+The glslangValidator is used for compiling [GLSL into SPIR-V](https://www.khronos.org/spir/).  
+For more details, check [Khronos' OpenGL ES reference compiler webpage](https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/)
+
+glslangValidator can be installed using your favorite package manager:
 ~~~bash
-$ glslangValidator -v
-Glslang Version: SPIRV99.947 15-Feb-2016
-ESSL Version: OpenGL ES GLSL 3.00 glslang LunarG Khronos.SPIRV99.947 15-Feb-2016
-GLSL Version: 4.20 glslang LunarG Khronos.SPIRV99.947 15-Feb-2016
-SPIR-V Version 0x00010000, Revision 6
-GLSL.std.450 Version 100, Revision 1
-Khronos Tool ID 8
+$ sudo apt install glslang-tools
 ~~~
 
-Compilation of the glsl files is done automatically on regular compilation.  
-For more details, check https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/
+Once installed, check that the binary is available in your PATH:
+~~~bash
+$ glslangValidator -v
+Glslang Version: 7.11.3214
+ESSL Version: OpenGL ES GLSL 3.20 glslang Khronos. 11.3214
+GLSL Version: 4.60 glslang Khronos. 11.3214
+SPIR-V Version 0x00010300, Revision 7
+GLSL.std.450 Version 100, Revision 1
+Khronos Tool ID 8
+SPIR-V Generator Version 7
+GL_KHR_vulkan_glsl version 100
+ARB_GL_gl_spirv version 100
+~~~
 
-## Compile:
+Compilation of the [glsl files in this project](shaders) is done automatically when building (see [build.rs](build.rs)).
+
+#### Vulkan validation layers
+Though not strictly required, it's highly recommended to use the validation layers during development to find bugs.
+
+Again, use your favorite package manager to install them:
+~~~bash
+$ sudo apt install vulkan-validationlayers vulkan-tools
+~~~
+
+Then verify that they are available to your vulkan instance:
+~~~bash
+$ vulkaninfo | grep VK_LAYER_LUNARG_standard_validation
+VK_LAYER_LUNARG_standard_validation (LunarG Standard Validation) Vulkan version 1.1.101, layer version 1
+~~~
+
+Compile:
+--------
 ~~~bash
 $ cargo build [--release]
 ~~~
 
-## Run
+Run:
+----
 ~~~bash
 $ ./target/(debug|release)/project_peril
 ~~~
 
-## Compile and run!:
+Compile and run!:
+-----------------
 ~~~bash
 $ cargo run [--release]
 ~~~
 
-## Vulkan debug layer:
-Add --features debug\_layer to your build line, like so:
-
+Vulkan debug layer:
+-------------------
+Add --features debug\_layer to your build/run line, like so:
 ~~~bash
 $ cargo run [--release] --features debug_layer
 ~~~
