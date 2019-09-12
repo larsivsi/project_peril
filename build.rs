@@ -1,7 +1,6 @@
 extern crate glob;
 
 use glob::glob;
-use std::env;
 use std::path;
 use std::process::Command;
 
@@ -23,30 +22,17 @@ fn compile_shader(shaderpath: path::PathBuf)
 
 fn main()
 {
-	let shaderdir = "shaders";
-
 	// Only run if shaders have changed
-	println!("cargo:rerun-if-changed={}", shaderdir);
-
-	// Get CWD
-	let mut path = env::current_dir().unwrap();
-
-	// Change path to the shaders-directory and generate shaders
-	path.push(shaderdir);
-	env::set_current_dir(&path).unwrap();
+	println!("cargo:rerun-if-changed=shaders");
 
 	// Build shaders
-	for vertpath in glob("*.vert").unwrap().filter_map(Result::ok)
+	for vertpath in glob("shaders/*.vert").unwrap().filter_map(Result::ok)
 	{
 		compile_shader(vertpath);
 	}
 
-	for fragpath in glob("*.frag").unwrap().filter_map(Result::ok)
+	for fragpath in glob("shaders/*.frag").unwrap().filter_map(Result::ok)
 	{
 		compile_shader(fragpath);
 	}
-
-	// Return to first directory
-	path.pop();
-	env::set_current_dir(&path).unwrap();
 }
