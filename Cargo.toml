@@ -5,16 +5,16 @@ authors = ["Lars-Ivar Hesselberg Simonsen <larsivarhs@gmail.com>","Matthew Guise
 build = "build.rs"
 
 [build-dependencies]
-glob = "0.2.11"
+glob = "0.3.0"
 
 [features]
 debug_layer = [] # enables debug layer
 
 [dependencies]
-ash = "0.27.1"
+ash = "0.29.0"
 cgmath = "0.17.0"
-image = "0.21.0"
-serde = "1.0.85"
-serde_derive = "1.0.85"
-serde_json = "1.0.36"
-winit = "0.18.1"
+image = "0.22.2"
+serde = "1.0.100"
+serde_derive = "1.0.100"
+serde_json = "1.0.40"
+winit = "0.19.3"
