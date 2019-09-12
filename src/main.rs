@@ -25,6 +25,7 @@ use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::io::Write;
 use std::mem::{align_of, size_of};
+use std::thread;
 use std::time::{Duration, SystemTime};
 
 const W_SCAN_CODE: u32 = 17;
@@ -43,8 +44,10 @@ const SPACE_SCAN_CODE: u32 = 57;
 const LSHIFT_SCAN_CODE: u32 = 42;
 const LCTRL_SCAN_CODE: u32 = 29;
 
-const ENGINE_TARGET_FPS: u64 = 60;
-const ENGINE_TIMESTEP: Duration = Duration::from_nanos(1_000_000_000 / ENGINE_TARGET_FPS);
+const ENGINE_TARGET_HZ: u64 = 60;
+const ENGINE_TIMESTEP: Duration = Duration::from_nanos(1_000_000_000 / ENGINE_TARGET_HZ);
+const RENDER_TARGET_FPS: u64 = 144;
+const RENDER_TIMESTEP: Duration = Duration::from_nanos(1_000_000_000 / RENDER_TARGET_FPS);
 
 fn main()
 {
@@ -124,10 +127,12 @@ fn main()
 	{
 		let current_timestamp = SystemTime::now();
 		let frame_time = current_timestamp.duration_since(last_timestamp).unwrap();
+		last_timestamp = current_timestamp;
 		engine_accumulator += frame_time;
 		second_accumulator += frame_time;
 
-		// Fixed engine timestep
+		// ENGINE
+		//   Fixed engine timestep
 		while engine_accumulator >= ENGINE_TIMESTEP
 		{
 			// Update Input.
@@ -173,7 +178,8 @@ fn main()
 			engine_accumulator -= ENGINE_TIMESTEP;
 		}
 
-		// Update the view matrix uniform buffer
+		// RENDER
+		//   Update the view matrix uniform buffer
 		let view_matrix = camera.generate_view_matrix();
 		let view_matrix_buf_size = size_of::<Matrix4<f32>>() as u64;
 		unsafe {
@@ -186,15 +192,15 @@ fn main()
 			renderstate.device.unmap_memory(mainpass.view_matrix_ub_mem);
 		}
 
-		// Do the main rendering
+		//   Do the main rendering
 		let main_cmd_buf = mainpass.begin_frame(&renderstate);
 		scene.draw(main_cmd_buf, mainpass.pipeline_layout, &view_matrix, &projection_matrix);
 		mainpass.end_frame(&renderstate);
 
-		// Present the rendered image
+		//   Present the rendered image
 		presentpass.present_image(&renderstate, &mut mainpass.render_image);
 
-		// Update and potentially print FPS
+		//   Update and potentially print FPS
 		frames_per_second += 1;
 		if second_accumulator > Duration::from_secs(1)
 		{
@@ -205,6 +211,7 @@ fn main()
 			second_accumulator = Duration::new(0, 0);
 		}
 
+		// INPUT
 		renderstate.event_loop.poll_events(|ev| match ev
 		{
 			winit::Event::WindowEvent {
@@ -398,7 +405,11 @@ fn main()
 			cursor_dirty = false;
 		}
 
-		last_timestamp = current_timestamp;
+		let render_time = SystemTime::now().duration_since(current_timestamp).unwrap();
+		if render_time < RENDER_TIMESTEP
+		{
+			thread::sleep(RENDER_TIMESTEP - render_time);
+		}
 	}
 
 	// Cleanup terminal
