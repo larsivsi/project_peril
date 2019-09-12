@@ -12,7 +12,7 @@ binop_separator = "Back"
 use_small_heuristics = "Off"
 
 # Function arguments shouldn't take up one line each
-fn_args_density = "Compressed"
+fn_args_layout = "Compressed"
 
 # Most people have wide screen monitors these days
 max_width = 120
