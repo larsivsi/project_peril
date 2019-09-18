@@ -85,7 +85,7 @@ impl PresentPass
 				surface_loader.get_physical_device_surface_capabilities(rs.pdevice, *surface).unwrap();
 		}
 
-		// TODO tripple-buffering for now?
+		// TODO Find out why our surface wants triple buffering. Such latency, much lag.
 		let mut desired_image_count = 3;
 		debug_assert!(desired_image_count >= surface_capabilities.min_image_count);
 		if surface_capabilities.max_image_count > 0 && desired_image_count > surface_capabilities.max_image_count
@@ -107,11 +107,8 @@ impl PresentPass
 		unsafe {
 			present_modes = surface_loader.get_physical_device_surface_present_modes(rs.pdevice, *surface).unwrap();
 		}
-		let present_mode = present_modes
-			.iter()
-			.cloned()
-			.find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
-			.unwrap_or(vk::PresentModeKHR::FIFO);
+		// Use FIFO presentmode to block on acquire_next_image, thus enabling vsync.
+		let present_mode = present_modes.iter().cloned().find(|&mode| mode == vk::PresentModeKHR::FIFO).unwrap();
 		let swapchain_create_info = vk::SwapchainCreateInfoKHR {
 			s_type: vk::StructureType::SWAPCHAIN_CREATE_INFO_KHR,
 			p_next: ptr::null(),

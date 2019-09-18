@@ -25,7 +25,6 @@ use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::io::Write;
 use std::mem::{align_of, size_of};
-use std::thread;
 use std::time::{Duration, SystemTime};
 
 const W_SCAN_CODE: u32 = 17;
@@ -46,8 +45,6 @@ const LCTRL_SCAN_CODE: u32 = 29;
 
 const ENGINE_TARGET_HZ: u64 = 60;
 const ENGINE_TIMESTEP: Duration = Duration::from_nanos(1_000_000_000 / ENGINE_TARGET_HZ);
-const RENDER_TARGET_FPS: u64 = 144;
-const RENDER_TIMESTEP: Duration = Duration::from_nanos(1_000_000_000 / RENDER_TARGET_FPS);
 
 fn main()
 {
@@ -403,12 +400,6 @@ fn main()
 				renderstate.window.hide_cursor(false);
 			}
 			cursor_dirty = false;
-		}
-
-		let render_time = SystemTime::now().duration_since(current_timestamp).unwrap();
-		if render_time < RENDER_TIMESTEP
-		{
-			thread::sleep(RENDER_TIMESTEP - render_time);
 		}
 	}
 
