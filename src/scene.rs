@@ -59,7 +59,7 @@ impl Scene
 
 	pub fn update(&mut self)
 	{
-		for (i, mut object) in self.objects.iter_mut().enumerate()
+		for (i, object) in self.objects.iter_mut().enumerate()
 		{
 			if i > 0
 			{
