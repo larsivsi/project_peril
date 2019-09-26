@@ -18,10 +18,8 @@ impl Camera
 	fn update(&mut self)
 	{
 		self.front = self.get_front_vector();
-		self.right = self.front.cross(self.world_up);
-		self.right.normalize();
-		self.up = self.right.cross(self.front);
-		self.up.normalize();
+		self.right = self.front.cross(self.world_up).normalize();
+		self.up = self.right.cross(self.front).normalize();
 	}
 
 	/// Creates a new Camera struct
