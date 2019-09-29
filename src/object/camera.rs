@@ -1,5 +1,5 @@
 use cgmath::prelude::*;
-use cgmath::{Deg, Euler, Matrix4, Point3, Quaternion, Vector3};
+use cgmath::{Deg, Euler, Matrix4, Point3, Quaternion, Rad, Vector3};
 use object::{Position, Rotation};
 
 pub struct Camera
@@ -81,6 +81,16 @@ impl Camera
 
 	pub fn pitch(&mut self, angle: f32)
 	{
+		// Ignore if camera would point to directly up
+		if angle > 0.0 && self.front.angle(self.world_up) <= Rad::from(Deg(angle))
+		{
+			return;
+		}
+		// Ignore if camera would point directly down
+		else if angle < 0.0 && self.front.angle(self.world_up * -1.0) <= Rad::from(Deg(angle.abs()))
+		{
+			return;
+		}
 		let pitch = Quaternion::from(Euler::new(Deg(0.0), Deg(angle), Deg(0.0)));
 		// local pitch
 		self.locally_rotate(pitch);
