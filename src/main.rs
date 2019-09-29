@@ -17,7 +17,7 @@ mod scene;
 use ash::util::Align;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use cgmath::{Deg, Matrix4, Point3, Rad, Vector2};
+use cgmath::{Deg, Matrix4, Point3, Rad, Vector2, Vector3};
 use config::Config;
 use nurbs::{NURBSpline, Order};
 use object::{Camera, Position};
@@ -160,12 +160,12 @@ fn main()
 			}
 			if key_up
 			{
-				let translation = camera.get_world_up_vector();
+				let translation = Vector3::unit_y();
 				camera.translate(translation * move_speed);
 			}
 			if key_down
 			{
-				let translation = camera.get_world_up_vector() * -1.0;
+				let translation = Vector3::unit_y() * -1.0;
 				camera.translate(translation * move_speed);
 			}
 
@@ -265,7 +265,7 @@ fn main()
 						}
 						LEFT_SCAN_CODE =>
 						{
-							camera.yaw(-5.0);
+							camera.yaw(5.0);
 						}
 						DOWN_SCAN_CODE =>
 						{
@@ -273,7 +273,7 @@ fn main()
 						}
 						RIGHT_SCAN_CODE =>
 						{
-							camera.yaw(5.0);
+							camera.yaw(-5.0);
 						}
 						ESC_SCAN_CODE =>
 						{
@@ -372,8 +372,8 @@ fn main()
 						dir_change *= mouse_sensitivity;
 						camera.yaw(match cfg.mouse_invert_x
 						{
-							true => -dir_change.x,
-							false => dir_change.x,
+							true => dir_change.x,
+							false => -dir_change.x,
 						} as f32);
 						camera.pitch(match cfg.mouse_invert_y
 						{
