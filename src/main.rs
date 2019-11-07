@@ -21,8 +21,7 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use cgmath::{Deg, Matrix4, Point3, Rad, Vector2, Vector3};
 use config::Config;
-use input::InputState;
-use input::KeyIndex;
+use input::{Action, InputState};
 use nurbs::{NURBSpline, Order};
 use object::{Camera, Position};
 use renderer::{MainPass, PresentPass, RenderState};
@@ -100,7 +99,7 @@ fn main()
 
 	let mut input_state = InputState::new();
 	let mut cursor_captured = false;
-	let mut cursor_dirty = true;
+	let mut cursor_state_dirty = true;
 
 	while running
 	{
@@ -115,40 +114,59 @@ fn main()
 		while engine_accumulator >= ENGINE_TIMESTEP
 		{
 			// Update Input.
-			let mut move_speed = move_sensitivity;
-			if input_state.get(KeyIndex::SPRINT)
+			if input_state.has_actions()
 			{
-				move_speed *= 10.0;
-			}
-			if input_state.get(KeyIndex::FORWARD)
-			{
-				let translation = camera.get_cam_front();
-				camera.translate(translation * move_speed);
-			}
-			if input_state.get(KeyIndex::LEFT)
-			{
-				let translation = camera.get_cam_right() * -1.0;
-				camera.translate(translation * move_speed);
-			}
-			if input_state.get(KeyIndex::BACK)
-			{
-				let translation = camera.get_cam_front() * -1.0;
-				camera.translate(translation * move_speed);
-			}
-			if input_state.get(KeyIndex::RIGHT)
-			{
-				let translation = camera.get_cam_right();
-				camera.translate(translation * move_speed);
-			}
-			if input_state.get(KeyIndex::UP)
-			{
-				let translation = Vector3::unit_y();
-				camera.translate(translation * move_speed);
-			}
-			if input_state.get(KeyIndex::DOWN)
-			{
-				let translation = Vector3::unit_y() * -1.0;
-				camera.translate(translation * move_speed);
+				let mut move_speed = move_sensitivity;
+				if input_state.action_requested(Action::SPRINT)
+				{
+					move_speed *= 10.0;
+				}
+				if input_state.action_requested(Action::FORWARD)
+				{
+					let translation = camera.get_cam_front();
+					camera.translate(translation * move_speed);
+				}
+				if input_state.action_requested(Action::LEFT)
+				{
+					let translation = camera.get_cam_right() * -1.0;
+					camera.translate(translation * move_speed);
+				}
+				if input_state.action_requested(Action::BACK)
+				{
+					let translation = camera.get_cam_front() * -1.0;
+					camera.translate(translation * move_speed);
+				}
+				if input_state.action_requested(Action::RIGHT)
+				{
+					let translation = camera.get_cam_right();
+					camera.translate(translation * move_speed);
+				}
+				if input_state.action_requested(Action::UP)
+				{
+					let translation = Vector3::unit_y();
+					camera.translate(translation * move_speed);
+				}
+				if input_state.action_requested(Action::DOWN)
+				{
+					let translation = Vector3::unit_y() * -1.0;
+					camera.translate(translation * move_speed);
+				}
+				if input_state.action_requested(Action::CAM_UP)
+				{
+					camera.pitch(5.0);
+				}
+				if input_state.action_requested(Action::LEFT)
+				{
+					camera.yaw(5.0);
+				}
+				if input_state.action_requested(Action::CAM_DOWN)
+				{
+					camera.pitch(-5.0);
+				}
+				if input_state.action_requested(Action::CAM_RIGHT)
+				{
+					camera.yaw(-5.0);
+				}
 			}
 
 			// animation, physics engine, scene progression etc. goes here
@@ -202,7 +220,7 @@ fn main()
 				winit::WindowEvent::Focused(has_focus) =>
 				{
 					cursor_captured = has_focus;
-					cursor_dirty = true;
+					cursor_state_dirty = true;
 				}
 				// Keyboard events
 				winit::WindowEvent::KeyboardInput {
@@ -211,33 +229,23 @@ fn main()
 				} =>
 				{
 					input_state.update_key(input);
-					if input_state.get(KeyIndex::TERMINATE)
+					// Handle some state that should not wait for another frame
+					if input_state.action_requested(Action::TERMINATE)
 					{
 						running = false;
+					}
+					if input_state.action_requested(Action::CURSOR_CAPTURE_TOGGLE)
+					{
+						cursor_captured = !cursor_captured;
+						cursor_state_dirty = true;
 					}
 				}
 				// Mouse presses
 				winit::WindowEvent::MouseInput {
 					button,
+					state,
 					..
-				} =>
-				{
-					if cursor_captured
-					{
-						match button
-						{
-							winit::MouseButton::Left =>
-							{
-								println!("Left mouse!");
-							}
-							winit::MouseButton::Right =>
-							{
-								println!("Right mouse!");
-							}
-							_ => (),
-						}
-					}
-				}
+				} => input_state.update_mouse_button(button, state),
 				_ => (),
 			},
 
@@ -282,7 +290,7 @@ fn main()
 			_ => (),
 		});
 
-		if cursor_dirty
+		if cursor_state_dirty
 		{
 			if cursor_captured
 			{
@@ -294,7 +302,7 @@ fn main()
 				renderstate.window.grab_cursor(false).expect("Failed to return pointer");
 				renderstate.window.hide_cursor(false);
 			}
-			cursor_dirty = false;
+			cursor_state_dirty = false;
 		}
 	}
 
