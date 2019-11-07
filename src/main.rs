@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate ash;
+extern crate bit_vec;
 extern crate cgmath;
 extern crate image;
 extern crate serde;
@@ -9,6 +10,7 @@ extern crate serde_json;
 extern crate winit;
 
 mod config;
+mod input;
 mod nurbs;
 mod object;
 mod renderer;
@@ -19,6 +21,8 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use cgmath::{Deg, Matrix4, Point3, Rad, Vector2, Vector3};
 use config::Config;
+use input::InputState;
+use input::KeyIndex;
 use nurbs::{NURBSpline, Order};
 use object::{Camera, Position};
 use renderer::{MainPass, PresentPass, RenderState};
@@ -26,22 +30,6 @@ use scene::Scene;
 use std::io::Write;
 use std::mem::{align_of, size_of};
 use std::time::{Duration, SystemTime};
-
-const W_SCAN_CODE: u32 = 17;
-const A_SCAN_CODE: u32 = 30;
-const S_SCAN_CODE: u32 = 31;
-const D_SCAN_CODE: u32 = 32;
-const F_SCAN_CODE: u32 = 33;
-
-const UP_SCAN_CODE: u32 = 103;
-const LEFT_SCAN_CODE: u32 = 105;
-const DOWN_SCAN_CODE: u32 = 108;
-const RIGHT_SCAN_CODE: u32 = 106;
-
-const ESC_SCAN_CODE: u32 = 1;
-const SPACE_SCAN_CODE: u32 = 57;
-const LSHIFT_SCAN_CODE: u32 = 42;
-const LCTRL_SCAN_CODE: u32 = 29;
 
 const ENGINE_TARGET_HZ: u64 = 60;
 const ENGINE_TIMESTEP: Duration = Duration::from_nanos(1_000_000_000 / ENGINE_TARGET_HZ);
@@ -110,15 +98,9 @@ fn main()
 	let mouse_sensitivity = cfg.mouse_sensitivity;
 	let move_sensitivity = 0.3;
 
-	let mut key_forward = false;
-	let mut key_left = false;
-	let mut key_back = false;
-	let mut key_right = false;
-	let mut key_up = false;
-	let mut key_down = false;
-	let mut key_sprint = false;
+	let mut input_state = InputState::new();
 	let mut cursor_captured = false;
-	let mut cursor_dirty = false;
+	let mut cursor_dirty = true;
 
 	while running
 	{
@@ -134,36 +116,36 @@ fn main()
 		{
 			// Update Input.
 			let mut move_speed = move_sensitivity;
-			if key_sprint
+			if input_state.get(KeyIndex::SPRINT)
 			{
 				move_speed *= 10.0;
 			}
-			if key_forward
+			if input_state.get(KeyIndex::FORWARD)
 			{
 				let translation = camera.get_cam_front();
 				camera.translate(translation * move_speed);
 			}
-			if key_left
+			if input_state.get(KeyIndex::LEFT)
 			{
 				let translation = camera.get_cam_right() * -1.0;
 				camera.translate(translation * move_speed);
 			}
-			if key_back
+			if input_state.get(KeyIndex::BACK)
 			{
 				let translation = camera.get_cam_front() * -1.0;
 				camera.translate(translation * move_speed);
 			}
-			if key_right
+			if input_state.get(KeyIndex::RIGHT)
 			{
 				let translation = camera.get_cam_right();
 				camera.translate(translation * move_speed);
 			}
-			if key_up
+			if input_state.get(KeyIndex::UP)
 			{
 				let translation = Vector3::unit_y();
 				camera.translate(translation * move_speed);
 			}
-			if key_down
+			if input_state.get(KeyIndex::DOWN)
 			{
 				let translation = Vector3::unit_y() * -1.0;
 				camera.translate(translation * move_speed);
@@ -226,101 +208,14 @@ fn main()
 				winit::WindowEvent::KeyboardInput {
 					input,
 					..
-				} => match input.state
+				} =>
 				{
-					winit::ElementState::Pressed => match input.scancode
+					input_state.update_key(input);
+					if input_state.get(KeyIndex::TERMINATE)
 					{
-						W_SCAN_CODE =>
-						{
-							key_forward = true;
-						}
-						A_SCAN_CODE =>
-						{
-							key_left = true;
-						}
-						S_SCAN_CODE =>
-						{
-							key_back = true;
-						}
-						D_SCAN_CODE =>
-						{
-							key_right = true;
-						}
-						SPACE_SCAN_CODE =>
-						{
-							key_up = true;
-						}
-						LCTRL_SCAN_CODE =>
-						{
-							key_down = true;
-						}
-						F_SCAN_CODE =>
-						{
-							cursor_captured = !cursor_captured;
-							cursor_dirty = true;
-						}
-						UP_SCAN_CODE =>
-						{
-							camera.pitch(5.0);
-						}
-						LEFT_SCAN_CODE =>
-						{
-							camera.yaw(5.0);
-						}
-						DOWN_SCAN_CODE =>
-						{
-							camera.pitch(-5.0);
-						}
-						RIGHT_SCAN_CODE =>
-						{
-							camera.yaw(-5.0);
-						}
-						ESC_SCAN_CODE =>
-						{
-							running = false;
-						}
-						LSHIFT_SCAN_CODE =>
-						{
-							key_sprint = true;
-						}
-						_ =>
-						{
-							println!("Pressed {}", input.scancode);
-						}
-					},
-					winit::ElementState::Released => match input.scancode
-					{
-						W_SCAN_CODE =>
-						{
-							key_forward = false;
-						}
-						A_SCAN_CODE =>
-						{
-							key_left = false;
-						}
-						S_SCAN_CODE =>
-						{
-							key_back = false;
-						}
-						D_SCAN_CODE =>
-						{
-							key_right = false;
-						}
-						SPACE_SCAN_CODE =>
-						{
-							key_up = false;
-						}
-						LCTRL_SCAN_CODE =>
-						{
-							key_down = false;
-						}
-						LSHIFT_SCAN_CODE =>
-						{
-							key_sprint = false;
-						}
-						_ => (),
-					},
-				},
+						running = false;
+					}
+				}
 				// Mouse presses
 				winit::WindowEvent::MouseInput {
 					button,
