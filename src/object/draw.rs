@@ -1,7 +1,7 @@
 use ash::version::DeviceV1_0;
 use ash::vk;
 use ash::Device;
-use cgmath::{Deg, Matrix4, Point3, Quaternion, Rotation3, Vector3};
+use cgmath::{Matrix4, Point3, Quaternion, Vector3};
 use object::{Drawable, Position, Rotation};
 use renderer::{MainPass, RenderState, Texture};
 use std::rc::Rc;
@@ -27,6 +27,7 @@ pub struct DrawObject
 	num_indices: u32,
 
 	position: Point3<f32>,
+	initial_front: Vector3<f32>,
 	rotation: Quaternion<f32>,
 
 	descriptor_sets: Vec<vk::DescriptorSet>,
@@ -89,6 +90,11 @@ impl Position for DrawObject
 
 impl Rotation for DrawObject
 {
+	fn get_initial_front(&self) -> Vector3<f32>
+	{
+		self.initial_front
+	}
+
 	fn get_rotation(&self) -> Quaternion<f32>
 	{
 		self.rotation
@@ -103,8 +109,8 @@ impl Rotation for DrawObject
 impl DrawObject
 {
 	fn new(
-		rs: &RenderState, mp: &MainPass, position: Point3<f32>, vertices: &[Vertex], indices: &[u16],
-		texture_path: &str, normalmap_path: &str,
+		rs: &RenderState, mp: &MainPass, position: Point3<f32>, initial_front: Vector3<f32>, vertices: &[Vertex],
+		indices: &[u16], texture_path: &str, normalmap_path: &str,
 	) -> DrawObject
 	{
 		// Create buffer for vertices
@@ -186,7 +192,9 @@ impl DrawObject
 			index_mem: idx_mem,
 			num_indices: indices.len() as u32,
 			position: position,
-			rotation: Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(0.0)),
+			initial_front: initial_front,
+			// Initially no rotation
+			rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
 			descriptor_sets: descriptor_sets,
 			texture: texture,
 			normal_map: normal_map,
@@ -233,6 +241,7 @@ impl DrawObject
 			rs,
 			mp,
 			position,
+			Vector3::unit_z(),
 			&vertices,
 			&indices,
 			"assets/thirdparty/textures/Metal_Panel_004/Metal_Panel_004_COLOR.jpg",
@@ -436,6 +445,7 @@ impl DrawObject
 			rs,
 			mp,
 			position,
+			Vector3::unit_z(),
 			&vertices,
 			&indices,
 			"assets/original/textures/cubemap.png",

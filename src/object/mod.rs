@@ -6,7 +6,7 @@ pub use self::draw::DrawObject;
 
 use ash::vk;
 use cgmath::prelude::*;
-use cgmath::{Euler, Matrix4, Point3, Quaternion, Vector3};
+use cgmath::{Matrix4, Point3, Quaternion, Vector3};
 
 pub trait Drawable
 {
@@ -43,6 +43,7 @@ pub trait Position
 
 pub trait Rotation
 {
+	fn get_initial_front(&self) -> Vector3<f32>;
 	fn get_rotation(&self) -> Quaternion<f32>;
 	fn set_rotation(&mut self, rotation: Quaternion<f32>);
 
@@ -64,14 +65,7 @@ pub trait Rotation
 
 	fn get_front_vector(&self) -> Vector3<f32>
 	{
-		let cur_rotation = self.get_rotation();
-
-		let euler_angles = Euler::from(cur_rotation);
-		let yaw = euler_angles.x;
-		let pitch = euler_angles.y;
-
-		let front = Vector3::new(yaw.cos() * pitch.cos(), pitch.sin(), yaw.sin() * pitch.cos());
-
-		front.normalize()
+		let front = self.get_rotation() * self.get_initial_front();
+		return front.normalize();
 	}
 }
