@@ -39,6 +39,8 @@ pub enum Action
 pub struct InputState
 {
 	actions: BitVec,
+	last_mouse_pos: (f64, f64),
+	mouse_delta: (f64, f64),
 }
 
 impl InputState
@@ -47,6 +49,8 @@ impl InputState
 	{
 		InputState {
 			actions: BitVec::from_elem(Action::LENGTH_OF_ENUM as usize, false),
+			last_mouse_pos: (0.0, 0.0),
+			mouse_delta: (0.0, 0.0),
 		}
 	}
 
@@ -114,6 +118,15 @@ impl InputState
 		}
 	}
 
+	pub fn update_mouse_movement(&mut self, mouse_delta: (f64, f64))
+	{
+		let change = (self.last_mouse_pos.0 + mouse_delta.0, self.last_mouse_pos.1 + mouse_delta.1);
+		self.last_mouse_pos.0 = mouse_delta.0;
+		self.last_mouse_pos.1 = mouse_delta.1;
+		self.mouse_delta.0 += change.0;
+		self.mouse_delta.1 += change.1;
+	}
+
 	pub fn action_requested(&self, bv_idx: Action) -> bool
 	{
 		return self.actions.get(bv_idx as usize).unwrap();
@@ -122,5 +135,12 @@ impl InputState
 	pub fn has_actions(&self) -> bool
 	{
 		return !self.actions.none();
+	}
+
+	pub fn get_and_clear_mouse_delta(&mut self) -> (f64, f64)
+	{
+		let current_delta = (self.mouse_delta.0, self.mouse_delta.1);
+		self.mouse_delta = (0.0, 0.0);
+		return current_delta;
 	}
 }
