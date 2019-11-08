@@ -95,7 +95,6 @@ fn main()
 		y: 0.0 as f64,
 	};
 	let mouse_sensitivity = cfg.mouse_sensitivity;
-	let move_sensitivity = 0.3;
 
 	let mut input_state = InputState::new();
 	let mut cursor_captured = false;
@@ -116,7 +115,7 @@ fn main()
 			// Update Input.
 			if input_state.has_actions()
 			{
-				let mut move_speed = move_sensitivity;
+				let mut move_speed = 0.3;
 				if input_state.action_requested(Action::SPRINT)
 				{
 					move_speed *= 10.0;
