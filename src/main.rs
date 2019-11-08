@@ -155,7 +155,7 @@ fn main()
 				{
 					camera.pitch(5.0);
 				}
-				if input_state.action_requested(Action::LEFT)
+				if input_state.action_requested(Action::CAM_LEFT)
 				{
 					camera.yaw(5.0);
 				}

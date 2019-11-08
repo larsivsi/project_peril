@@ -17,6 +17,7 @@ const SPACE_SCAN_CODE: u32 = 57;
 const LSHIFT_SCAN_CODE: u32 = 42;
 const LCTRL_SCAN_CODE: u32 = 29;
 
+#[allow(non_camel_case_types)]
 pub enum Action
 {
 	FORWARD,
