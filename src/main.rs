@@ -19,7 +19,7 @@ mod scene;
 use ash::util::Align;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use cgmath::{Deg, Matrix4, Point3, Rad, Vector2, Vector3};
+use cgmath::{Deg, Matrix4, Point3, Rad, Vector3};
 use config::Config;
 use input::{Action, InputState};
 use nurbs::{NURBSpline, Order};
@@ -90,13 +90,6 @@ fn main()
 	let mut engine_accumulator = Duration::new(0, 0);
 	let mut last_timestamp = SystemTime::now();
 
-	let mut last_mouse_position = Vector2 {
-		x: 0.0 as f64,
-		y: 0.0 as f64,
-	};
-	let mouse_sensitivity = cfg.mouse_sensitivity;
-	let move_sensitivity = 0.3;
-
 	let mut input_state = InputState::new();
 	let mut cursor_captured = false;
 	let mut cursor_state_dirty = true;
@@ -116,7 +109,7 @@ fn main()
 			// Update Input.
 			if input_state.has_actions()
 			{
-				let mut move_speed = move_sensitivity;
+				let mut move_speed = 0.3;
 				if input_state.action_requested(Action::SPRINT)
 				{
 					move_speed *= 10.0;
@@ -155,7 +148,7 @@ fn main()
 				{
 					camera.pitch(5.0);
 				}
-				if input_state.action_requested(Action::LEFT)
+				if input_state.action_requested(Action::CAM_LEFT)
 				{
 					camera.yaw(5.0);
 				}
@@ -167,6 +160,31 @@ fn main()
 				{
 					camera.yaw(-5.0);
 				}
+			}
+
+			let (mut mouse_yaw, mut mouse_pitch) = input_state.get_and_clear_mouse_delta();
+			if cursor_captured && (mouse_yaw != 0.0 || mouse_pitch != 0.0)
+			{
+				// Yaw and pitch will be in the opposite direction of mouse delta
+				mouse_yaw *= if cfg.mouse_invert_x
+				{
+					cfg.mouse_sensitivity
+				}
+				else
+				{
+					-cfg.mouse_sensitivity
+				};
+				mouse_pitch *= if cfg.mouse_invert_y
+				{
+					cfg.mouse_sensitivity
+				}
+				else
+				{
+					-cfg.mouse_sensitivity
+				};
+
+				camera.yaw(mouse_yaw as f32);
+				camera.pitch(mouse_pitch as f32);
 			}
 
 			// animation, physics engine, scene progression etc. goes here
@@ -259,32 +277,7 @@ fn main()
 				winit::DeviceEvent::MouseMotion {
 					delta,
 					..
-				} =>
-				{
-					if cursor_captured
-					{
-						// println!("Mouse moved x: {} y: {}", delta.0, delta.1);
-						let mut dir_change = Vector2 {
-							x: (last_mouse_position.x + delta.0),
-							y: (last_mouse_position.y + delta.1),
-						};
-						last_mouse_position.x = delta.0;
-						last_mouse_position.y = delta.1;
-
-						// Update camera.
-						dir_change *= mouse_sensitivity;
-						camera.yaw(match cfg.mouse_invert_x
-						{
-							true => dir_change.x,
-							false => -dir_change.x,
-						} as f32);
-						camera.pitch(match cfg.mouse_invert_y
-						{
-							true => dir_change.y,
-							false => -dir_change.y,
-						} as f32);
-					}
-				}
+				} => input_state.update_mouse_movement(delta),
 				_ => (),
 			},
 			_ => (),
