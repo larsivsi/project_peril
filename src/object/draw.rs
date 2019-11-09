@@ -1,8 +1,9 @@
 use ash::version::DeviceV1_0;
 use ash::vk;
 use ash::Device;
-use cgmath::{Matrix4, Point3, Quaternion, Vector3};
-use object::{Drawable, Position, Rotation};
+use cgmath::{Matrix4, Point3, Vector3};
+use object::transform::{Transform, Transformable};
+use object::Drawable;
 use renderer::{MainPass, RenderState, Texture};
 use std::rc::Rc;
 use std::{f32, mem, ptr, slice};
@@ -26,9 +27,7 @@ pub struct DrawObject
 	index_mem: vk::DeviceMemory,
 	num_indices: u32,
 
-	position: Point3<f32>,
-	initial_front: Vector3<f32>,
-	rotation: Quaternion<f32>,
+	transform: Transform,
 
 	descriptor_sets: Vec<vk::DescriptorSet>,
 	texture: Texture,
@@ -45,10 +44,7 @@ impl Drawable for DrawObject
 		projection_matrix: &Matrix4<f32>,
 	)
 	{
-		let model_rotation_matrix = Matrix4::from(self.rotation);
-		let model_translation_matrix = Matrix4::from_translation(self.get_position() - Point3::new(0.0, 0.0, 0.0));
-		// The order of multiplication here is important!
-		let model_matrix = model_translation_matrix * model_rotation_matrix;
+		let model_matrix = self.generate_transformation_matrix();
 		let mv_matrix = view_matrix * model_matrix;
 		let mvp_matrix = projection_matrix * mv_matrix;
 		let matrices = [model_matrix, mvp_matrix];
@@ -75,34 +71,16 @@ impl Drawable for DrawObject
 	}
 }
 
-impl Position for DrawObject
+impl Transformable for DrawObject
 {
-	fn get_position(&self) -> Point3<f32>
+	fn get_transform(&self) -> &Transform
 	{
-		self.position
+		return &self.transform;
 	}
 
-	fn set_position(&mut self, position: Point3<f32>)
+	fn get_mutable_transform(&mut self) -> &mut Transform
 	{
-		self.position = position;
-	}
-}
-
-impl Rotation for DrawObject
-{
-	fn get_initial_front(&self) -> Vector3<f32>
-	{
-		self.initial_front
-	}
-
-	fn get_rotation(&self) -> Quaternion<f32>
-	{
-		self.rotation
-	}
-
-	fn set_rotation(&mut self, rotation: Quaternion<f32>)
-	{
-		self.rotation = rotation;
+		return &mut self.transform;
 	}
 }
 
@@ -185,21 +163,22 @@ impl DrawObject
 			rs.device.update_descriptor_sets(&write_desc_sets, &[]);
 		}
 
-		DrawObject {
+		let mut object = DrawObject {
 			vertices: vert_buffer,
 			vertex_mem: vert_mem,
 			indices: idx_buffer,
 			index_mem: idx_mem,
 			num_indices: indices.len() as u32,
-			position: position,
-			initial_front: initial_front,
-			// Initially no rotation
-			rotation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
+			transform: Transform::new(),
 			descriptor_sets: descriptor_sets,
 			texture: texture,
 			normal_map: normal_map,
 			device: Rc::clone(&rs.device),
-		}
+		};
+		object.set_position(position);
+		object.set_initial_front_vector(initial_front);
+
+		return object;
 	}
 
 	/// Creates a new quad draw object.

@@ -1,7 +1,8 @@
 use ash::vk;
 use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
-use object::{DrawObject, Drawable, Position, Rotation};
+use object::transform::Transformable;
+use object::{DrawObject, Drawable};
 use renderer::{MainPass, RenderState};
 use std::f32;
 
@@ -45,10 +46,10 @@ impl Scene
 			let y: f32 = points[i].y;
 			let z: f32 = points[i].z;
 			let mut wall = DrawObject::new_quad(rs, mp, Point3::new(0., 0., 0.), 20.0, 20.0);
-			wall.set_rotation(Quaternion::from_axis_angle(directions[i], Deg(90.0)));
+			wall.globally_rotate(Quaternion::from_axis_angle(directions[i], Deg(90.0)));
 			if i == 5
 			{
-				wall.set_rotation(Quaternion::new(0.0, 0.0, 1.0, 0.0));
+				wall.globally_rotate(Quaternion::new(0.0, 0.0, 1.0, 0.0));
 			}
 			wall.set_position(Point3::new(20. * x, 20. * y, 20. * z));
 			scene.objects.push(wall);

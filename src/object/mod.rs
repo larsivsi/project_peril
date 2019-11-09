@@ -1,12 +1,12 @@
 mod camera;
 pub mod draw;
+pub mod transform;
 
 pub use self::camera::Camera;
 pub use self::draw::DrawObject;
 
 use ash::vk;
-use cgmath::prelude::*;
-use cgmath::{Matrix4, Point3, Quaternion, Vector3};
+use cgmath::Matrix4;
 
 pub trait Drawable
 {
@@ -15,57 +15,4 @@ pub trait Drawable
 		&self, cmd_buf: vk::CommandBuffer, pipeline_layout: vk::PipelineLayout, view_matrix: &Matrix4<f32>,
 		projection_matrix: &Matrix4<f32>,
 	);
-}
-
-pub trait Position
-{
-	/// Returns the position of the given object.
-	fn get_position(&self) -> Point3<f32>;
-
-	/// Sets the position of the given object.
-	fn set_position(&mut self, position: Point3<f32>);
-
-	/// Gets the distance between the given and passed objects.
-	fn get_distance<T: Position>(&self, other: &T) -> f32
-	{
-		let vec = other.get_position() - self.get_position();
-		vec.dot(vec).sqrt()
-	}
-
-	/// Translates the object
-	fn translate(&mut self, translation: Vector3<f32>)
-	{
-		let mut position = self.get_position();
-		position += translation;
-		self.set_position(position);
-	}
-}
-
-pub trait Rotation
-{
-	fn get_initial_front(&self) -> Vector3<f32>;
-	fn get_rotation(&self) -> Quaternion<f32>;
-	fn set_rotation(&mut self, rotation: Quaternion<f32>);
-
-	/// Visit https://gamedev.stackexchange.com/a/136175 for a good explanation of this
-	fn globally_rotate(&mut self, rotation: Quaternion<f32>)
-	{
-		let cur_rotation = self.get_rotation();
-		// global rotation, notice the order
-		let new_rotation = rotation * cur_rotation;
-		self.set_rotation(new_rotation);
-	}
-	fn locally_rotate(&mut self, rotation: Quaternion<f32>)
-	{
-		let cur_rotation = self.get_rotation();
-		// local rotation, notice the order
-		let new_rotation = cur_rotation * rotation;
-		self.set_rotation(new_rotation);
-	}
-
-	fn get_front_vector(&self) -> Vector3<f32>
-	{
-		let front = self.get_rotation() * self.get_initial_front();
-		return front.normalize();
-	}
 }
