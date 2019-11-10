@@ -210,7 +210,7 @@ fn main()
 
 		//   Do the main rendering
 		let main_cmd_buf = mainpass.begin_frame(&renderstate);
-		scene.draw(main_cmd_buf, mainpass.pipeline_layout, &view_matrix, &projection_matrix);
+		scene.draw(&renderstate.device, main_cmd_buf, mainpass.pipeline_layout, &view_matrix, &projection_matrix);
 		mainpass.end_frame(&renderstate);
 
 		//   Present the rendered image

@@ -1,18 +1,23 @@
 mod camera;
-pub mod draw;
+mod draw;
+mod material;
+pub mod mesh;
 pub mod transform;
 
 pub use self::camera::Camera;
 pub use self::draw::DrawObject;
+pub use self::material::Material;
+pub use self::mesh::Mesh;
 
-use ash::vk;
+use ash::{vk, Device};
 use cgmath::Matrix4;
 
 pub trait Drawable
 {
-	/// Draws the given object.
+	fn get_mesh(&self) -> &Mesh;
+	fn get_material(&self) -> &Material;
 	fn draw(
-		&self, cmd_buf: vk::CommandBuffer, pipeline_layout: vk::PipelineLayout, view_matrix: &Matrix4<f32>,
-		projection_matrix: &Matrix4<f32>,
+		&self, device: &Device, cmd_buf: vk::CommandBuffer, pipeline_layout: vk::PipelineLayout,
+		view_matrix: &Matrix4<f32>, projection_matrix: &Matrix4<f32>,
 	);
 }

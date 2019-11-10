@@ -7,7 +7,7 @@ use std::mem::size_of;
 use std::ptr;
 use std::rc::Rc;
 
-use object::draw::Vertex;
+use object::mesh::Vertex;
 use renderer::{RenderState, Texture};
 
 use config::Config;

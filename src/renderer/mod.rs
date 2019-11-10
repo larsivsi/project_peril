@@ -769,7 +769,7 @@ impl RenderState
 			sampler = self.device.create_sampler(&sampler_info, None).unwrap();
 		}
 
-		Texture {
+		return Texture {
 			image: texture_image,
 			memory: texture_memory,
 			view: texture_view,
@@ -777,7 +777,7 @@ impl RenderState
 			current_access_mask: initial_access_mask,
 			current_layout: initial_layout,
 			current_stage: initial_stage,
-		}
+		};
 	}
 
 	/// Loads the image given by the path into read only texture.
