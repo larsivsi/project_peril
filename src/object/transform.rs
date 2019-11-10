@@ -46,6 +46,16 @@ pub trait Transformable
 		self.get_mutable_transform().pitch(angle);
 	}
 
+	fn set_scale(&mut self, scale: f32)
+	{
+		self.get_mutable_transform().set_scale(scale);
+	}
+
+	fn scale(&mut self, factor: f32)
+	{
+		self.get_mutable_transform().scale(factor);
+	}
+
 	fn generate_transformation_matrix(&self) -> Matrix4<f32>
 	{
 		return self.get_transform().generate_transformation_matrix();
@@ -182,6 +192,11 @@ impl Transform
 	fn set_scale(&mut self, scale: f32)
 	{
 		self.scale = scale;
+	}
+
+	fn scale(&mut self, factor: f32)
+	{
+		self.set_scale(self.get_scale() * factor);
 	}
 
 	fn generate_transformation_matrix(&self) -> Matrix4<f32>

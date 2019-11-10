@@ -19,7 +19,7 @@ impl Scene
 			objects: Vec::new(),
 		};
 
-		let cuboid = DrawObject::new_cuboid(rs, mp, Point3::new(1.0, 0.0, -4.0), 2.0, 2.0, 2.0);
+		let mut cuboid = DrawObject::new_cuboid(rs, mp, Point3::new(0.0, 0.0, -4.0), 2.0, 2.0, 2.0);
 		scene.objects.push(cuboid);
 
 		let points = vec![
@@ -68,6 +68,7 @@ impl Scene
 			}
 			// TODO: Move this.
 			object.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-0.5)));
+			object.scale(1.001);
 		}
 	}
 
