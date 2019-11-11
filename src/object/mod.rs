@@ -1,34 +1,35 @@
 mod camera;
-mod draw;
+mod component;
+mod game_object;
 mod material;
-pub mod mesh;
-pub mod transform;
+mod mesh;
+mod transform;
 
 pub use self::camera::Camera;
-pub use self::draw::DrawObject;
+pub use self::component::{Component, ComponentType, DrawComponent, TransformComponent};
+pub use self::game_object::GameObject;
 pub use self::material::Material;
-pub use self::mesh::Mesh;
+pub use self::mesh::{Mesh, Vertex};
+pub use self::transform::{Transform, Transformable};
 
-use self::transform::Transformable;
 use ash::version::DeviceV1_0;
 use ash::{vk, Device};
 use cgmath::Matrix4;
 use std::{mem, slice};
 
-pub trait Drawable: Transformable
+pub trait Drawable
 {
 	fn get_mesh(&self) -> &Mesh;
 	fn get_material(&self) -> &Material;
 
 	fn draw(
 		&self, device: &Device, cmd_buf: vk::CommandBuffer, pipeline_layout: vk::PipelineLayout,
-		view_matrix: &Matrix4<f32>, projection_matrix: &Matrix4<f32>,
+		model_matrix: &Matrix4<f32>, view_matrix: &Matrix4<f32>, projection_matrix: &Matrix4<f32>,
 	)
 	{
-		let model_matrix = self.generate_transformation_matrix();
 		let mv_matrix = view_matrix * model_matrix;
 		let mvp_matrix = projection_matrix * mv_matrix;
-		let matrices = [model_matrix, mvp_matrix];
+		let matrices = [model_matrix.clone(), mvp_matrix];
 
 		self.get_mesh().bind_buffers(cmd_buf);
 		self.get_material().bind_descriptor_sets(cmd_buf, pipeline_layout);
