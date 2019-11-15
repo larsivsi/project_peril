@@ -90,6 +90,8 @@ fn main()
 
 	let mut renderstate = RenderState::init(&cfg);
 	let mut presentpass = PresentPass::init(&renderstate);
+	let mut loading_image = renderstate.load_image("assets/original/textures/project_peril_logo.png", true);
+	presentpass.present_image(&renderstate, &mut loading_image);
 	let mut mainpass = MainPass::init(&renderstate, &cfg);
 	let mut input_handler = InputHandler::new();
 	let engine_state = Rc::new(RefCell::new(EngineState::new()));
@@ -234,6 +236,7 @@ fn main()
 		}
 	}
 
-	// Cleanup terminal
+	// Cleanup
+	loading_image.destroy(&renderstate.device);
 	print!("\n");
 }

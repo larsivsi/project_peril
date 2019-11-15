@@ -105,17 +105,7 @@ impl Drop for Material
 	{
 		// We cannot have the last reference to device at this point
 		debug_assert!(1 < Rc::strong_count(&self.device));
-
-		unsafe {
-			self.device.destroy_sampler(self.texture.sampler, None);
-			self.device.destroy_image_view(self.texture.view, None);
-			self.device.destroy_image(self.texture.image, None);
-			self.device.free_memory(self.texture.memory, None);
-
-			self.device.destroy_sampler(self.normal_map.sampler, None);
-			self.device.destroy_image_view(self.normal_map.view, None);
-			self.device.destroy_image(self.normal_map.image, None);
-			self.device.free_memory(self.normal_map.memory, None);
-		}
+		self.texture.destroy(&self.device);
+		self.normal_map.destroy(&self.device);
 	}
 }

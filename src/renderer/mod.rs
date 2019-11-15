@@ -37,6 +37,19 @@ pub struct Texture
 	current_stage: vk::PipelineStageFlags,
 }
 
+impl Texture
+{
+	pub fn destroy(&mut self, device: &Device)
+	{
+		unsafe {
+			device.destroy_sampler(self.sampler, None);
+			device.destroy_image_view(self.view, None);
+			device.destroy_image(self.image, None);
+			device.free_memory(self.memory, None);
+		}
+	}
+}
+
 pub struct RenderState
 {
 	// Vulkan device
