@@ -1,4 +1,7 @@
 use bit_vec::BitVec;
+use object::{InputConsumer, MouseConsumer};
+use std::cell::RefCell;
+use std::rc::Rc;
 use winit::{ElementState, KeyboardInput, MouseButton};
 
 const W_SCAN_CODE: u32 = 17;
@@ -36,21 +39,47 @@ pub enum Action
 	LENGTH_OF_ENUM,
 }
 
+pub enum ActionType
+{
+	IMMEDIATE,
+	TICK,
+}
+
+struct Consumer
+{
+	actions: BitVec,
+	ptr: Rc<RefCell<dyn InputConsumer>>,
+}
+
 pub struct InputState
 {
 	actions: BitVec,
-	last_mouse_pos: (f64, f64),
 	mouse_delta: (f64, f64),
 }
 
-impl InputState
+pub struct InputHandler
 {
-	pub fn new() -> InputState
+	state: InputState,
+	last_mouse_pos: (f64, f64),
+	tick_action_consumers: Vec<Consumer>,
+	immediate_action_consumers: Vec<Consumer>,
+	mouse_consumer: Option<Rc<RefCell<dyn MouseConsumer>>>,
+}
+
+impl InputHandler
+{
+	pub fn new() -> InputHandler
 	{
-		InputState {
-			actions: BitVec::from_elem(Action::LENGTH_OF_ENUM as usize, false),
+		InputHandler {
+			state: InputState {
+				actions: BitVec::from_elem(Action::LENGTH_OF_ENUM as usize, false),
+				mouse_delta: (0.0, 0.0),
+			},
 			last_mouse_pos: (0.0, 0.0),
-			mouse_delta: (0.0, 0.0),
+			// Can at most have LENGTH_OF_ENUM different consumers
+			tick_action_consumers: Vec::with_capacity(Action::LENGTH_OF_ENUM as usize),
+			immediate_action_consumers: Vec::with_capacity(Action::LENGTH_OF_ENUM as usize),
+			mouse_consumer: None,
 		}
 	}
 
@@ -58,21 +87,21 @@ impl InputState
 	{
 		match event.scancode
 		{
-			W_SCAN_CODE => self.actions.set(Action::FORWARD as usize, event.state == ElementState::Pressed),
-			A_SCAN_CODE => self.actions.set(Action::LEFT as usize, event.state == ElementState::Pressed),
-			S_SCAN_CODE => self.actions.set(Action::BACK as usize, event.state == ElementState::Pressed),
-			D_SCAN_CODE => self.actions.set(Action::RIGHT as usize, event.state == ElementState::Pressed),
-			SPACE_SCAN_CODE => self.actions.set(Action::UP as usize, event.state == ElementState::Pressed),
-			LCTRL_SCAN_CODE => self.actions.set(Action::DOWN as usize, event.state == ElementState::Pressed),
-			LSHIFT_SCAN_CODE => self.actions.set(Action::SPRINT as usize, event.state == ElementState::Pressed),
-			UP_SCAN_CODE => self.actions.set(Action::CAM_UP as usize, event.state == ElementState::Pressed),
-			LEFT_SCAN_CODE => self.actions.set(Action::CAM_LEFT as usize, event.state == ElementState::Pressed),
-			DOWN_SCAN_CODE => self.actions.set(Action::CAM_DOWN as usize, event.state == ElementState::Pressed),
-			RIGHT_SCAN_CODE => self.actions.set(Action::CAM_RIGHT as usize, event.state == ElementState::Pressed),
-			ESC_SCAN_CODE => self.actions.set(Action::TERMINATE as usize, event.state == ElementState::Pressed),
+			W_SCAN_CODE => self.state.actions.set(Action::FORWARD as usize, event.state == ElementState::Pressed),
+			A_SCAN_CODE => self.state.actions.set(Action::LEFT as usize, event.state == ElementState::Pressed),
+			S_SCAN_CODE => self.state.actions.set(Action::BACK as usize, event.state == ElementState::Pressed),
+			D_SCAN_CODE => self.state.actions.set(Action::RIGHT as usize, event.state == ElementState::Pressed),
+			SPACE_SCAN_CODE => self.state.actions.set(Action::UP as usize, event.state == ElementState::Pressed),
+			LCTRL_SCAN_CODE => self.state.actions.set(Action::DOWN as usize, event.state == ElementState::Pressed),
+			LSHIFT_SCAN_CODE => self.state.actions.set(Action::SPRINT as usize, event.state == ElementState::Pressed),
+			UP_SCAN_CODE => self.state.actions.set(Action::CAM_UP as usize, event.state == ElementState::Pressed),
+			LEFT_SCAN_CODE => self.state.actions.set(Action::CAM_LEFT as usize, event.state == ElementState::Pressed),
+			DOWN_SCAN_CODE => self.state.actions.set(Action::CAM_DOWN as usize, event.state == ElementState::Pressed),
+			RIGHT_SCAN_CODE => self.state.actions.set(Action::CAM_RIGHT as usize, event.state == ElementState::Pressed),
+			ESC_SCAN_CODE => self.state.actions.set(Action::TERMINATE as usize, event.state == ElementState::Pressed),
 			F_SCAN_CODE =>
 			{
-				self.actions.set(Action::CURSOR_CAPTURE_TOGGLE as usize, event.state == ElementState::Pressed)
+				self.state.actions.set(Action::CURSOR_CAPTURE_TOGGLE as usize, event.state == ElementState::Pressed)
 			}
 			_ =>
 			{
@@ -84,7 +113,24 @@ impl InputState
 				{
 					"released"
 				};
-				println!("Unmapped key {} {}", event.scancode, statestr);
+				println!("Unmapped key {} ({:?}) {}", event.scancode, event.virtual_keycode.unwrap(), statestr);
+			}
+		}
+
+		// Early out if there's nothing to do
+		if self.state.actions.none()
+		{
+			return;
+		}
+
+		// Handle immediate consumers
+		for consumer in self.immediate_action_consumers.iter()
+		{
+			let mut intersection = self.state.actions.clone();
+			intersection.intersect(&consumer.actions);
+			if intersection.any()
+			{
+				consumer.ptr.borrow_mut().consume(intersection);
 			}
 		}
 	}
@@ -118,29 +164,95 @@ impl InputState
 		}
 	}
 
+	pub fn register_actions<T: InputConsumer + 'static>(
+		&mut self, actions_consumed: BitVec, action_type: ActionType, consumer: Rc<RefCell<T>>,
+	)
+	{
+		debug_assert_eq!(actions_consumed.len(), Action::LENGTH_OF_ENUM as usize);
+
+		// Cannot register same action twice
+		if cfg!(debug_assertions)
+		{
+			for consumer in self.immediate_action_consumers.iter()
+			{
+				let mut intersection = actions_consumed.clone();
+				intersection.intersect(&consumer.actions);
+				debug_assert!(intersection.none());
+			}
+
+			for consumer in self.tick_action_consumers.iter()
+			{
+				let mut intersection = actions_consumed.clone();
+				intersection.intersect(&consumer.actions);
+				debug_assert!(intersection.none());
+			}
+		}
+
+		match action_type
+		{
+			ActionType::IMMEDIATE => self.immediate_action_consumers.push(Consumer {
+				actions: actions_consumed,
+				ptr: consumer,
+			}),
+			ActionType::TICK => self.tick_action_consumers.push(Consumer {
+				actions: actions_consumed,
+				ptr: consumer,
+			}),
+		}
+	}
+
+	pub fn actions_tick(&self)
+	{
+		// Early out if there's nothing to do
+		if self.state.actions.none()
+		{
+			return;
+		}
+
+		for consumer in self.tick_action_consumers.iter()
+		{
+			let mut intersection = self.state.actions.clone();
+			intersection.intersect(&consumer.actions);
+			if intersection.any()
+			{
+				consumer.ptr.borrow_mut().consume(intersection);
+			}
+		}
+	}
+
+	pub fn register_mouse_movement<T: MouseConsumer + 'static>(&mut self, consumer: Rc<RefCell<T>>)
+	{
+		self.mouse_consumer = Some(consumer);
+	}
+
 	pub fn update_mouse_movement(&mut self, mouse_delta: (f64, f64))
 	{
 		let change = (self.last_mouse_pos.0 + mouse_delta.0, self.last_mouse_pos.1 + mouse_delta.1);
 		self.last_mouse_pos.0 = mouse_delta.0;
 		self.last_mouse_pos.1 = mouse_delta.1;
-		self.mouse_delta.0 += change.0;
-		self.mouse_delta.1 += change.1;
+		self.state.mouse_delta.0 += change.0;
+		self.state.mouse_delta.1 += change.1;
 	}
 
-	pub fn action_requested(&self, bv_idx: Action) -> bool
+	pub fn mouse_movement_tick(&mut self, cursor_captured: bool)
 	{
-		return self.actions.get(bv_idx as usize).unwrap();
-	}
+		if self.state.mouse_delta == (0.0, 0.0)
+		{
+			return;
+		}
 
-	pub fn has_actions(&self) -> bool
-	{
-		return !self.actions.none();
-	}
+		if cursor_captured
+		{
+			match &self.mouse_consumer
+			{
+				Some(consumer) =>
+				{
+					consumer.borrow_mut().consume(self.state.mouse_delta);
+				}
+				None => (),
+			}
+		}
 
-	pub fn get_and_clear_mouse_delta(&mut self) -> (f64, f64)
-	{
-		let current_delta = (self.mouse_delta.0, self.mouse_delta.1);
-		self.mouse_delta = (0.0, 0.0);
-		return current_delta;
+		self.state.mouse_delta = (0.0, 0.0);
 	}
 }

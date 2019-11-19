@@ -14,6 +14,7 @@ pub use self::transform::{Transform, Transformable};
 
 use ash::version::DeviceV1_0;
 use ash::{vk, Device};
+use bit_vec::BitVec;
 use cgmath::Matrix4;
 use std::{mem, slice};
 
@@ -40,4 +41,16 @@ pub trait Drawable
 			device.cmd_draw_indexed(cmd_buf, self.get_mesh().get_num_indices(), 1, 0, 0, 1);
 		}
 	}
+}
+
+pub trait InputConsumer
+{
+	fn get_handled_actions(&self) -> BitVec;
+	fn consume(&mut self, actions: BitVec);
+}
+
+pub trait MouseConsumer
+{
+	fn register_mouse_settings(&mut self, mouse_invert: (bool, bool), mouse_sensitivity: f64);
+	fn consume(&mut self, mouse_delta: (f64, f64));
 }

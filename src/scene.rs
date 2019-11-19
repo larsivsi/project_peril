@@ -1,22 +1,41 @@
 use ash::{vk, Device};
 use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
-use object::{ComponentType, DrawComponent, Drawable, GameObject, Material, Mesh, TransformComponent, Transformable};
+use config::Config;
+use input::{ActionType, InputHandler};
+use object::{
+	Camera, ComponentType, DrawComponent, Drawable, GameObject, InputConsumer, Material, Mesh, MouseConsumer,
+	TransformComponent, Transformable,
+};
 use renderer::{MainPass, RenderState};
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 pub struct Scene
 {
 	root: GameObject,
+	camera: Rc<RefCell<Camera>>,
 }
 
 impl Scene
 {
-	pub fn new(rs: &RenderState, mp: &MainPass) -> Scene
+	pub fn new(rs: &RenderState, mp: &MainPass, cfg: &Config, input_handler: &mut InputHandler) -> Scene
 	{
 		let mut scene = Scene {
 			root: GameObject::new(),
+			camera: Rc::new(RefCell::new(Camera::new(Point3::new(0.0, 0.0, 0.0)))),
 		};
+		input_handler.register_actions(
+			scene.camera.borrow().get_handled_actions(),
+			ActionType::TICK,
+			scene.camera.clone(),
+		);
+		scene
+			.camera
+			.borrow_mut()
+			.register_mouse_settings((cfg.mouse_invert_x, cfg.mouse_invert_y), cfg.mouse_sensitivity);
+		input_handler.register_mouse_movement(scene.camera.clone());
 
 		let quad_mesh = Mesh::new_quad(rs, 20.0, 20.0);
 		let cuboid_mesh = Mesh::new_cuboid(rs, 2.0, 2.0, 2.0);
@@ -79,6 +98,20 @@ impl Scene
 		scene.root.add_child(logical_cube_node);
 
 		return scene;
+	}
+
+	pub fn get_view_matrix(&mut self) -> Matrix4<f32>
+	{
+		match self.camera.borrow_mut().object.get_component(ComponentType::TRANSFORM)
+		{
+			Some(comp) =>
+			{
+				let mut mutable_comp = comp.borrow_mut();
+				let transform_comp = mutable_comp.get_mutable().downcast_mut::<TransformComponent>().unwrap();
+				return transform_comp.generate_view_matrix();
+			}
+			None => panic!("impossible"),
+		}
 	}
 
 	pub fn update(&mut self)

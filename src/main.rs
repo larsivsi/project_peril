@@ -19,19 +19,66 @@ mod scene;
 use ash::util::Align;
 use ash::version::DeviceV1_0;
 use ash::vk;
-use cgmath::{Deg, Matrix4, Point3, Rad, Vector3};
+use bit_vec::BitVec;
+use cgmath::{Deg, Matrix4, Point3, Rad};
 use config::Config;
-use input::{Action, InputState};
+use input::{Action, ActionType, InputHandler};
 use nurbs::{NURBSpline, Order};
-use object::{Camera, Transformable};
+use object::InputConsumer;
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
+use std::cell::RefCell;
 use std::io::Write;
 use std::mem::{align_of, size_of};
+use std::rc::Rc;
 use std::time::{Duration, SystemTime};
 
 const ENGINE_TARGET_HZ: u64 = 60;
 const ENGINE_TIMESTEP: Duration = Duration::from_nanos(1_000_000_000 / ENGINE_TARGET_HZ);
+
+struct EngineState
+{
+	pub running: bool,
+	pub cursor_captured: bool,
+	pub cursor_state_dirty: bool,
+}
+
+impl EngineState
+{
+	fn new() -> EngineState
+	{
+		return EngineState {
+			running: true,
+			cursor_captured: false,
+			cursor_state_dirty: true,
+		};
+	}
+}
+
+impl InputConsumer for EngineState
+{
+	fn get_handled_actions(&self) -> BitVec
+	{
+		let mut handled_actions = BitVec::from_elem(Action::LENGTH_OF_ENUM as usize, false);
+
+		handled_actions.set(Action::TERMINATE as usize, true);
+		handled_actions.set(Action::CURSOR_CAPTURE_TOGGLE as usize, true);
+
+		return handled_actions;
+	}
+	fn consume(&mut self, actions: BitVec)
+	{
+		if actions.get(Action::TERMINATE as usize).unwrap()
+		{
+			self.running = false;
+		}
+		if actions.get(Action::CURSOR_CAPTURE_TOGGLE as usize).unwrap()
+		{
+			self.cursor_captured = !self.cursor_captured;
+			self.cursor_state_dirty = true;
+		}
+	}
+}
 
 fn main()
 {
@@ -50,8 +97,14 @@ fn main()
 	let mut renderstate = RenderState::init(&cfg);
 	let mut presentpass = PresentPass::init(&renderstate);
 	let mut mainpass = MainPass::init(&renderstate, &cfg);
-	let mut scene = Scene::new(&renderstate, &mainpass);
-	let mut camera = Camera::new(Point3::new(0.0, 0.0, 0.0));
+	let mut input_handler = InputHandler::new();
+	let engine_state = Rc::new(RefCell::new(EngineState::new()));
+	input_handler.register_actions(
+		engine_state.borrow().get_handled_actions(),
+		ActionType::IMMEDIATE,
+		engine_state.clone(),
+	);
+	let mut scene = Scene::new(&renderstate, &mainpass, &cfg, &mut input_handler);
 	let aspect_ratio = cfg.render_width as f32 / cfg.render_height as f32;
 	let vertical_fov = Rad::from(Deg(cfg.horizontal_fov as f32 / aspect_ratio));
 	let near = 1.0;
@@ -84,17 +137,12 @@ fn main()
 	}
 
 	// main loop
-	let mut running = true;
 	let mut frames_per_second: u32 = 0;
 	let mut second_accumulator = Duration::new(0, 0);
 	let mut engine_accumulator = Duration::new(0, 0);
 	let mut last_timestamp = SystemTime::now();
 
-	let mut input_state = InputState::new();
-	let mut cursor_captured = false;
-	let mut cursor_state_dirty = true;
-
-	while running
+	while engine_state.borrow().running
 	{
 		let current_timestamp = SystemTime::now();
 		let frame_time = current_timestamp.duration_since(last_timestamp).unwrap();
@@ -103,89 +151,13 @@ fn main()
 		second_accumulator += frame_time;
 
 		// ENGINE
+		//   Mouse movement ticks once per frame
+		input_handler.mouse_movement_tick(engine_state.borrow().cursor_captured);
 		//   Fixed engine timestep
 		while engine_accumulator >= ENGINE_TIMESTEP
 		{
-			// Update Input.
-			if input_state.has_actions()
-			{
-				let mut move_speed = 0.3;
-				if input_state.action_requested(Action::SPRINT)
-				{
-					move_speed *= 10.0;
-				}
-				if input_state.action_requested(Action::FORWARD)
-				{
-					let translation = camera.get_front_vector();
-					camera.translate(translation * move_speed);
-				}
-				if input_state.action_requested(Action::LEFT)
-				{
-					let translation = camera.get_right_vector() * -1.0;
-					camera.translate(translation * move_speed);
-				}
-				if input_state.action_requested(Action::BACK)
-				{
-					let translation = camera.get_front_vector() * -1.0;
-					camera.translate(translation * move_speed);
-				}
-				if input_state.action_requested(Action::RIGHT)
-				{
-					let translation = camera.get_right_vector();
-					camera.translate(translation * move_speed);
-				}
-				if input_state.action_requested(Action::UP)
-				{
-					let translation = Vector3::unit_y();
-					camera.translate(translation * move_speed);
-				}
-				if input_state.action_requested(Action::DOWN)
-				{
-					let translation = Vector3::unit_y() * -1.0;
-					camera.translate(translation * move_speed);
-				}
-				if input_state.action_requested(Action::CAM_UP)
-				{
-					camera.pitch(5.0);
-				}
-				if input_state.action_requested(Action::CAM_LEFT)
-				{
-					camera.yaw(5.0);
-				}
-				if input_state.action_requested(Action::CAM_DOWN)
-				{
-					camera.pitch(-5.0);
-				}
-				if input_state.action_requested(Action::CAM_RIGHT)
-				{
-					camera.yaw(-5.0);
-				}
-			}
-
-			let (mut mouse_yaw, mut mouse_pitch) = input_state.get_and_clear_mouse_delta();
-			if cursor_captured && (mouse_yaw != 0.0 || mouse_pitch != 0.0)
-			{
-				// Yaw and pitch will be in the opposite direction of mouse delta
-				mouse_yaw *= if cfg.mouse_invert_x
-				{
-					cfg.mouse_sensitivity
-				}
-				else
-				{
-					-cfg.mouse_sensitivity
-				};
-				mouse_pitch *= if cfg.mouse_invert_y
-				{
-					cfg.mouse_sensitivity
-				}
-				else
-				{
-					-cfg.mouse_sensitivity
-				};
-
-				camera.yaw(mouse_yaw as f32);
-				camera.pitch(mouse_pitch as f32);
-			}
+			// Actions tick once per timestep.
+			input_handler.actions_tick();
 
 			// animation, physics engine, scene progression etc. goes here
 			scene.update();
@@ -195,7 +167,7 @@ fn main()
 
 		// RENDER
 		//   Update the view matrix uniform buffer
-		let view_matrix = camera.generate_view_matrix();
+		let view_matrix = scene.get_view_matrix();
 		let view_matrix_buf_size = size_of::<Matrix4<f32>>() as u64;
 		unsafe {
 			let mem_ptr = renderstate
@@ -234,11 +206,11 @@ fn main()
 				..
 			} => match event
 			{
-				winit::WindowEvent::CloseRequested => running = false,
+				winit::WindowEvent::CloseRequested => engine_state.borrow_mut().running = false,
 				winit::WindowEvent::Focused(has_focus) =>
 				{
-					cursor_captured = has_focus;
-					cursor_state_dirty = true;
+					engine_state.borrow_mut().cursor_captured = has_focus;
+					engine_state.borrow_mut().cursor_state_dirty = true;
 				}
 				// Keyboard events
 				winit::WindowEvent::KeyboardInput {
@@ -246,24 +218,14 @@ fn main()
 					..
 				} =>
 				{
-					input_state.update_key(input);
-					// Handle some state that should not wait for another frame
-					if input_state.action_requested(Action::TERMINATE)
-					{
-						running = false;
-					}
-					if input_state.action_requested(Action::CURSOR_CAPTURE_TOGGLE)
-					{
-						cursor_captured = !cursor_captured;
-						cursor_state_dirty = true;
-					}
+					input_handler.update_key(input);
 				}
 				// Mouse presses
 				winit::WindowEvent::MouseInput {
 					button,
 					state,
 					..
-				} => input_state.update_mouse_button(button, state),
+				} => input_handler.update_mouse_button(button, state),
 				_ => (),
 			},
 
@@ -277,15 +239,15 @@ fn main()
 				winit::DeviceEvent::MouseMotion {
 					delta,
 					..
-				} => input_state.update_mouse_movement(delta),
+				} => input_handler.update_mouse_movement(delta),
 				_ => (),
 			},
 			_ => (),
 		});
 
-		if cursor_state_dirty
+		if engine_state.borrow().cursor_state_dirty
 		{
-			if cursor_captured
+			if engine_state.borrow().cursor_captured
 			{
 				renderstate.window.grab_cursor(true).expect("Failed to grab pointer");
 				renderstate.window.hide_cursor(true);
@@ -295,7 +257,7 @@ fn main()
 				renderstate.window.grab_cursor(false).expect("Failed to return pointer");
 				renderstate.window.hide_cursor(false);
 			}
-			cursor_state_dirty = false;
+			engine_state.borrow_mut().cursor_state_dirty = false;
 		}
 	}
 
