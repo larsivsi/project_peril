@@ -2,15 +2,12 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use ash::Device;
 use cgmath::Matrix4;
+use core::{Config, Vertex};
+use renderer::{RenderState, Texture};
 use std::ffi::CString;
 use std::mem::size_of;
 use std::ptr;
 use std::rc::Rc;
-
-use object::Vertex;
-use renderer::{RenderState, Texture};
-
-use config::Config;
 
 pub struct MainPass
 {

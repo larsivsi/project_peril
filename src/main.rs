@@ -9,24 +9,18 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate winit;
 
-mod config;
-mod input;
-mod nurbs;
-mod object;
+mod core;
+mod game;
 mod renderer;
-mod scene;
 
 use ash::util::Align;
 use ash::version::DeviceV1_0;
 use ash::vk;
 use bit_vec::BitVec;
-use cgmath::{Deg, Matrix4, Point3, Rad};
-use config::Config;
-use input::{Action, ActionType, InputHandler};
-use nurbs::{NURBSpline, Order};
-use object::InputConsumer;
+use cgmath::{Deg, Matrix4, Rad};
+use core::{Action, ActionType, Config, InputConsumer, InputHandler};
+use game::Scene;
 use renderer::{MainPass, PresentPass, RenderState};
-use scene::Scene;
 use std::cell::RefCell;
 use std::io::Write;
 use std::mem::{align_of, size_of};
@@ -114,27 +108,6 @@ fn main()
 	let glu_projection_matrix = cgmath::perspective(vertical_fov, aspect_ratio, near, far);
 	let vulkan_ndc = Matrix4::new(1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 1.0);
 	let projection_matrix = vulkan_ndc * glu_projection_matrix;
-
-	let points = vec![
-		Point3::new(1.0, 0.0, 0.0),
-		Point3::new(0.0, 1.0, 0.0),
-		Point3::new(-1.0, 0.0, 0.0),
-		Point3::new(0.0, -1.0, 0.0),
-		Point3::new(0.0, 0.0, 1.0),
-		Point3::new(0.0, 0.0, -1.0),
-		Point3::new(0.0, 1.0, -1.0),
-		Point3::new(1.0, 0.0, -1.0),
-	];
-
-	let mut u = 0.0;
-	let step = 0.1;
-	let spline = NURBSpline::new(Order::CUBIC, points);
-
-	while u < spline.eval_limit()
-	{
-		let _point = spline.evaluate_at(u);
-		u += step;
-	}
 
 	// main loop
 	let mut frames_per_second: u32 = 0;

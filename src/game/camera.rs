@@ -1,7 +1,6 @@
 use bit_vec::BitVec;
 use cgmath::{Point3, Vector3};
-use input::Action;
-use object::{ComponentType, GameObject, InputConsumer, MouseConsumer, TransformComponent, Transformable};
+use core::{Action, ComponentType, GameObject, InputConsumer, MouseConsumer, TransformComponent, Transformable};
 
 pub struct Camera
 {

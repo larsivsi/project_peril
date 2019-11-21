@@ -1,13 +1,15 @@
-mod camera;
 mod component;
+mod config;
 mod game_object;
+mod input;
 mod material;
 mod mesh;
 mod transform;
 
-pub use self::camera::Camera;
 pub use self::component::{Component, ComponentType, DrawComponent, TransformComponent};
+pub use self::config::Config;
 pub use self::game_object::GameObject;
+pub use self::input::{Action, ActionType, InputHandler};
 pub use self::material::Material;
 pub use self::mesh::{Mesh, Vertex};
 pub use self::transform::{Transform, Transformable};

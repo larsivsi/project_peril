@@ -1,12 +1,11 @@
 use ash::{vk, Device};
 use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
-use config::Config;
-use input::{ActionType, InputHandler};
-use object::{
-	Camera, ComponentType, DrawComponent, Drawable, GameObject, InputConsumer, Material, Mesh, MouseConsumer,
-	TransformComponent, Transformable,
+use core::{
+	ActionType, ComponentType, Config, DrawComponent, Drawable, GameObject, InputConsumer, InputHandler, Material,
+	Mesh, MouseConsumer, TransformComponent, Transformable,
 };
+use game::{Camera, NURBSpline, Order};
 use renderer::{MainPass, RenderState};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -96,6 +95,28 @@ impl Scene
 			logical_cube_node.add_child(wall);
 		}
 		scene.root.add_child(logical_cube_node);
+
+		// For now, this is just done to not have the code unused.
+		let points = vec![
+			Point3::new(1.0, 0.0, 0.0),
+			Point3::new(0.0, 1.0, 0.0),
+			Point3::new(-1.0, 0.0, 0.0),
+			Point3::new(0.0, -1.0, 0.0),
+			Point3::new(0.0, 0.0, 1.0),
+			Point3::new(0.0, 0.0, -1.0),
+			Point3::new(0.0, 1.0, -1.0),
+			Point3::new(1.0, 0.0, -1.0),
+		];
+
+		let mut u = 0.0;
+		let step = 0.1;
+		let spline = NURBSpline::new(Order::CUBIC, points);
+
+		while u < spline.eval_limit()
+		{
+			let _point = spline.evaluate_at(u);
+			u += step;
+		}
 
 		return scene;
 	}

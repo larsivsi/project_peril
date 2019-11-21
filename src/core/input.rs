@@ -1,5 +1,5 @@
 use bit_vec::BitVec;
-use object::{InputConsumer, MouseConsumer};
+use core::{InputConsumer, MouseConsumer};
 use std::cell::RefCell;
 use std::rc::Rc;
 use winit::{ElementState, KeyboardInput, MouseButton};

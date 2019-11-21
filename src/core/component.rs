@@ -1,5 +1,4 @@
-use object::transform::{Transform, Transformable};
-use object::{Drawable, Material, Mesh};
+use core::{Drawable, Material, Mesh, Transform, Transformable};
 use std::any::Any;
 use std::rc::Rc;
 
