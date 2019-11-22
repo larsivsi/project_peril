@@ -3,7 +3,7 @@ use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
 use core::{
 	ActionType, ComponentType, Config, DrawComponent, Drawable, GameObject, InputConsumer, InputHandler, Material,
-	Mesh, MouseConsumer, TransformComponent, Transformable,
+	Mesh, TransformComponent, Transformable,
 };
 use game::{Camera, NURBSpline, Order};
 use renderer::{MainPass, RenderState};
@@ -30,11 +30,11 @@ impl Scene
 			ActionType::TICK,
 			scene.camera.clone(),
 		);
-		scene
-			.camera
-			.borrow_mut()
-			.register_mouse_settings((cfg.mouse_invert_x, cfg.mouse_invert_y), cfg.mouse_sensitivity);
-		input_handler.register_mouse_movement(scene.camera.clone());
+		input_handler.register_mouse_movement(
+			scene.camera.clone(),
+			(cfg.mouse_invert_x, cfg.mouse_invert_y),
+			cfg.mouse_sensitivity,
+		);
 
 		let quad_mesh = Mesh::new_quad(rs, 20.0, 20.0);
 		let cuboid_mesh = Mesh::new_cuboid(rs, 2.0, 2.0, 2.0);

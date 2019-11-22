@@ -220,8 +220,11 @@ impl InputHandler
 		}
 	}
 
-	pub fn register_mouse_movement<T: MouseConsumer + 'static>(&mut self, consumer: Rc<RefCell<T>>)
+	pub fn register_mouse_movement<T: MouseConsumer + 'static>(
+		&mut self, consumer: Rc<RefCell<T>>, mouse_invert: (bool, bool), mouse_sensitivity: f64,
+	)
 	{
+		consumer.borrow_mut().register_mouse_settings(mouse_invert, mouse_sensitivity);
 		self.mouse_consumer = Some(consumer);
 	}
 
