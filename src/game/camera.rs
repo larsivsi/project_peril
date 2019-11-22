@@ -59,7 +59,7 @@ impl InputConsumer for Camera
 			Some(comp) =>
 			{
 				let mut mutable_comp = comp.borrow_mut();
-				let transform_comp = mutable_comp.get_mutable().downcast_mut::<TransformComponent>().unwrap();
+				let transform_comp = mutable_comp.as_mutable_any().downcast_mut::<TransformComponent>().unwrap();
 
 				if actions.get(Action::FORWARD as usize).unwrap()
 				{
@@ -148,7 +148,7 @@ impl MouseConsumer for Camera
 			Some(comp) =>
 			{
 				let mut mutable_comp = comp.borrow_mut();
-				let transform_comp = mutable_comp.get_mutable().downcast_mut::<TransformComponent>().unwrap();
+				let transform_comp = mutable_comp.as_mutable_any().downcast_mut::<TransformComponent>().unwrap();
 				transform_comp.yaw(mouse_yaw as f32);
 				transform_comp.pitch(mouse_pitch as f32);
 			}

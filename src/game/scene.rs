@@ -127,8 +127,8 @@ impl Scene
 		{
 			Some(comp) =>
 			{
-				let mut mutable_comp = comp.borrow_mut();
-				let transform_comp = mutable_comp.get_mutable().downcast_mut::<TransformComponent>().unwrap();
+				let immutable_comp = comp.borrow();
+				let transform_comp = immutable_comp.as_any().downcast_ref::<TransformComponent>().unwrap();
 				return transform_comp.generate_view_matrix();
 			}
 			None => panic!("impossible"),
@@ -143,7 +143,7 @@ impl Scene
 			Some(comp) =>
 			{
 				let mut mutable_comp = comp.borrow_mut();
-				let transform_comp = mutable_comp.get_mutable().downcast_mut::<TransformComponent>().unwrap();
+				let transform_comp = mutable_comp.as_mutable_any().downcast_mut::<TransformComponent>().unwrap();
 				transform_comp.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-0.5)));
 				transform_comp.scale(1.001);
 			}
@@ -172,7 +172,7 @@ impl Scene
 					Some(comp) =>
 					{
 						let immutable_comp = comp.borrow();
-						let transform_comp = immutable_comp.get().downcast_ref::<TransformComponent>().unwrap();
+						let transform_comp = immutable_comp.as_any().downcast_ref::<TransformComponent>().unwrap();
 						model_matrix = transform_comp.generate_transformation_matrix();
 					}
 					None => panic!("Draw without transform!"),
@@ -183,7 +183,7 @@ impl Scene
 					Some(comp) =>
 					{
 						let mut mutable_comp = comp.borrow_mut();
-						let draw_comp = mutable_comp.get_mutable().downcast_mut::<DrawComponent>().unwrap();
+						let draw_comp = mutable_comp.as_mutable_any().downcast_mut::<DrawComponent>().unwrap();
 						draw_comp.draw(device, cmd_buf, pipeline_layout, &model_matrix, view_matrix, projection_matrix);
 					}
 					None => (),
