@@ -23,7 +23,7 @@ use cgmath::{Deg, Matrix4, Point3, Rad, Vector3};
 use config::Config;
 use input::{Action, InputState};
 use nurbs::{NURBSpline, Order};
-use object::{Camera, Position};
+use object::{Camera, Transformable};
 use renderer::{MainPass, PresentPass, RenderState};
 use scene::Scene;
 use std::io::Write;
@@ -116,22 +116,22 @@ fn main()
 				}
 				if input_state.action_requested(Action::FORWARD)
 				{
-					let translation = camera.get_cam_front();
+					let translation = camera.get_front_vector();
 					camera.translate(translation * move_speed);
 				}
 				if input_state.action_requested(Action::LEFT)
 				{
-					let translation = camera.get_cam_right() * -1.0;
+					let translation = camera.get_right_vector() * -1.0;
 					camera.translate(translation * move_speed);
 				}
 				if input_state.action_requested(Action::BACK)
 				{
-					let translation = camera.get_cam_front() * -1.0;
+					let translation = camera.get_front_vector() * -1.0;
 					camera.translate(translation * move_speed);
 				}
 				if input_state.action_requested(Action::RIGHT)
 				{
-					let translation = camera.get_cam_right();
+					let translation = camera.get_right_vector();
 					camera.translate(translation * move_speed);
 				}
 				if input_state.action_requested(Action::UP)
@@ -209,7 +209,7 @@ fn main()
 
 		//   Do the main rendering
 		let main_cmd_buf = mainpass.begin_frame(&renderstate);
-		scene.draw(main_cmd_buf, mainpass.pipeline_layout, &view_matrix, &projection_matrix);
+		scene.draw(&renderstate.device, main_cmd_buf, mainpass.pipeline_layout, &view_matrix, &projection_matrix);
 		mainpass.end_frame(&renderstate);
 
 		//   Present the rendered image
