@@ -6,6 +6,7 @@ use ash::util::Align;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::vk;
 use ash::{Device, Entry, Instance};
+use core::Config;
 use image;
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -25,8 +26,6 @@ mod presentpass;
 pub use self::mainpass::MainPass;
 pub use self::presentpass::PresentPass;
 
-use config::Config;
-
 pub struct Texture
 {
 	pub image: vk::Image,
@@ -36,6 +35,19 @@ pub struct Texture
 	current_access_mask: vk::AccessFlags,
 	pub current_layout: vk::ImageLayout,
 	current_stage: vk::PipelineStageFlags,
+}
+
+impl Texture
+{
+	pub fn destroy(&mut self, device: &Device)
+	{
+		unsafe {
+			device.destroy_sampler(self.sampler, None);
+			device.destroy_image_view(self.view, None);
+			device.destroy_image(self.image, None);
+			device.free_memory(self.memory, None);
+		}
+	}
 }
 
 pub struct RenderState

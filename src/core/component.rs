@@ -1,5 +1,4 @@
-use object::transform::{Transform, Transformable};
-use object::{Drawable, Material, Mesh};
+use core::{Drawable, Material, Mesh, Transform, Transformable};
 use std::any::Any;
 use std::rc::Rc;
 
@@ -12,11 +11,11 @@ pub enum ComponentType
 	LENGTH_OF_ENUM,
 }
 
-pub trait Component: Any
+pub trait Component
 {
 	fn get_component_type(&self) -> ComponentType;
-	fn get(&self) -> &dyn Any;
-	fn get_mutable(&mut self) -> &mut dyn Any;
+	fn as_any(&self) -> &dyn Any;
+	fn as_mutable_any(&mut self) -> &mut dyn Any;
 }
 
 pub struct DrawComponent
@@ -42,11 +41,11 @@ impl Component for DrawComponent
 	{
 		return ComponentType::DRAW;
 	}
-	fn get(&self) -> &dyn Any
+	fn as_any(&self) -> &dyn Any
 	{
 		return self;
 	}
-	fn get_mutable(&mut self) -> &mut dyn Any
+	fn as_mutable_any(&mut self) -> &mut dyn Any
 	{
 		return self;
 	}
@@ -85,11 +84,11 @@ impl Component for TransformComponent
 	{
 		return ComponentType::TRANSFORM;
 	}
-	fn get(&self) -> &dyn Any
+	fn as_any(&self) -> &dyn Any
 	{
 		return self;
 	}
-	fn get_mutable(&mut self) -> &mut dyn Any
+	fn as_mutable_any(&mut self) -> &mut dyn Any
 	{
 		return self;
 	}

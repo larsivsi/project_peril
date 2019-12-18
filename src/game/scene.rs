@@ -1,22 +1,40 @@
 use ash::{vk, Device};
 use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
-use object::{ComponentType, DrawComponent, Drawable, GameObject, Material, Mesh, TransformComponent, Transformable};
+use core::{
+	ActionType, ComponentType, Config, DrawComponent, Drawable, GameObject, InputConsumer, InputHandler, Material,
+	Mesh, TransformComponent, Transformable,
+};
+use game::{Camera, NURBSpline, Order};
 use renderer::{MainPass, RenderState};
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 pub struct Scene
 {
 	root: GameObject,
+	camera: Rc<RefCell<Camera>>,
 }
 
 impl Scene
 {
-	pub fn new(rs: &RenderState, mp: &MainPass) -> Scene
+	pub fn new(rs: &RenderState, mp: &MainPass, cfg: &Config, input_handler: &mut InputHandler) -> Scene
 	{
 		let mut scene = Scene {
 			root: GameObject::new(),
+			camera: Rc::new(RefCell::new(Camera::new(Point3::new(0.0, 0.0, 0.0)))),
 		};
+		input_handler.register_actions(
+			scene.camera.borrow().get_handled_actions(),
+			ActionType::TICK,
+			scene.camera.clone(),
+		);
+		input_handler.register_mouse_movement(
+			scene.camera.clone(),
+			(cfg.mouse_invert_x, cfg.mouse_invert_y),
+			cfg.mouse_sensitivity,
+		);
 
 		let quad_mesh = Mesh::new_quad(rs, 20.0, 20.0);
 		let cuboid_mesh = Mesh::new_cuboid(rs, 2.0, 2.0, 2.0);
@@ -78,7 +96,43 @@ impl Scene
 		}
 		scene.root.add_child(logical_cube_node);
 
+		// For now, this is just done to not have the code unused.
+		let points = vec![
+			Point3::new(1.0, 0.0, 0.0),
+			Point3::new(0.0, 1.0, 0.0),
+			Point3::new(-1.0, 0.0, 0.0),
+			Point3::new(0.0, -1.0, 0.0),
+			Point3::new(0.0, 0.0, 1.0),
+			Point3::new(0.0, 0.0, -1.0),
+			Point3::new(0.0, 1.0, -1.0),
+			Point3::new(1.0, 0.0, -1.0),
+		];
+
+		let mut u = 0.0;
+		let step = 0.1;
+		let spline = NURBSpline::new(Order::CUBIC, points);
+
+		while u < spline.eval_limit()
+		{
+			let _point = spline.evaluate_at(u);
+			u += step;
+		}
+
 		return scene;
+	}
+
+	pub fn get_view_matrix(&mut self) -> Matrix4<f32>
+	{
+		match self.camera.borrow_mut().object.get_component(ComponentType::TRANSFORM)
+		{
+			Some(comp) =>
+			{
+				let immutable_comp = comp.borrow();
+				let transform_comp = immutable_comp.as_any().downcast_ref::<TransformComponent>().unwrap();
+				return transform_comp.generate_view_matrix();
+			}
+			None => panic!("impossible"),
+		}
 	}
 
 	pub fn update(&mut self)
@@ -89,7 +143,7 @@ impl Scene
 			Some(comp) =>
 			{
 				let mut mutable_comp = comp.borrow_mut();
-				let transform_comp = mutable_comp.get_mutable().downcast_mut::<TransformComponent>().unwrap();
+				let transform_comp = mutable_comp.as_mutable_any().downcast_mut::<TransformComponent>().unwrap();
 				transform_comp.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-0.5)));
 				transform_comp.scale(1.001);
 			}
@@ -118,7 +172,7 @@ impl Scene
 					Some(comp) =>
 					{
 						let immutable_comp = comp.borrow();
-						let transform_comp = immutable_comp.get().downcast_ref::<TransformComponent>().unwrap();
+						let transform_comp = immutable_comp.as_any().downcast_ref::<TransformComponent>().unwrap();
 						model_matrix = transform_comp.generate_transformation_matrix();
 					}
 					None => panic!("Draw without transform!"),
@@ -129,7 +183,7 @@ impl Scene
 					Some(comp) =>
 					{
 						let mut mutable_comp = comp.borrow_mut();
-						let draw_comp = mutable_comp.get_mutable().downcast_mut::<DrawComponent>().unwrap();
+						let draw_comp = mutable_comp.as_mutable_any().downcast_mut::<DrawComponent>().unwrap();
 						draw_comp.draw(device, cmd_buf, pipeline_layout, &model_matrix, view_matrix, projection_matrix);
 					}
 					None => (),
