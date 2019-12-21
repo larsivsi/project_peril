@@ -182,8 +182,8 @@ impl Scene
 				{
 					Some(comp) =>
 					{
-						let mut mutable_comp = comp.borrow_mut();
-						let draw_comp = mutable_comp.as_mutable_any().downcast_mut::<DrawComponent>().unwrap();
+						let immutable_comp = comp.borrow();
+						let draw_comp = immutable_comp.as_any().downcast_ref::<DrawComponent>().unwrap();
 						draw_comp.draw(device, cmd_buf, pipeline_layout, &model_matrix, view_matrix, projection_matrix);
 					}
 					None => (),
