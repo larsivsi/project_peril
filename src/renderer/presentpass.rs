@@ -8,7 +8,7 @@ use std::ptr;
 use std::rc::Rc;
 use winit;
 
-use renderer::{RenderState, Texture};
+use crate::renderer::{RenderState, Texture};
 
 pub struct PresentPass
 {
