@@ -1,3 +1,4 @@
+use crate::core::Config;
 use ash::extensions::{
 	ext::DebugReport,
 	khr::{Surface, Swapchain, XlibSurface},
@@ -7,7 +8,6 @@ use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::vk;
 use ash::vk_make_version;
 use ash::{Device, Entry, Instance};
-use crate::core::Config;
 use image;
 use std::ffi::{CStr, CString};
 use std::fs::File;

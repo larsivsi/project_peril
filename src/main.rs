@@ -2,14 +2,14 @@ mod core;
 mod game;
 mod renderer;
 
+use crate::core::{Action, ActionType, Config, InputConsumer, InputHandler};
+use crate::game::Scene;
+use crate::renderer::{MainPass, PresentPass, RenderState};
 use ash::util::Align;
 use ash::version::DeviceV1_0;
 use ash::vk;
 use bit_vec::BitVec;
 use cgmath::{Deg, Matrix4, Rad};
-use crate::core::{Action, ActionType, Config, InputConsumer, InputHandler};
-use crate::game::Scene;
-use crate::renderer::{MainPass, PresentPass, RenderState};
 use std::cell::RefCell;
 use std::io::Write;
 use std::mem::{align_of, size_of};

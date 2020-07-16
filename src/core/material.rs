@@ -1,6 +1,6 @@
+use crate::renderer::{MainPass, RenderState, Texture};
 use ash::version::DeviceV1_0;
 use ash::{vk, Device};
-use crate::renderer::{MainPass, RenderState, Texture};
 use std::ptr;
 use std::rc::Rc;
 
