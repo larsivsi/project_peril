@@ -1,14 +1,3 @@
-#[macro_use]
-extern crate ash;
-extern crate bit_vec;
-extern crate cgmath;
-extern crate image;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-extern crate winit;
-
 mod core;
 mod game;
 mod renderer;
@@ -18,9 +7,9 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use bit_vec::BitVec;
 use cgmath::{Deg, Matrix4, Rad};
-use core::{Action, ActionType, Config, InputConsumer, InputHandler};
-use game::Scene;
-use renderer::{MainPass, PresentPass, RenderState};
+use crate::core::{Action, ActionType, Config, InputConsumer, InputHandler};
+use crate::game::Scene;
+use crate::renderer::{MainPass, PresentPass, RenderState};
 use std::cell::RefCell;
 use std::io::Write;
 use std::mem::{align_of, size_of};

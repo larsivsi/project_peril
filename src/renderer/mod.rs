@@ -5,8 +5,9 @@ use ash::extensions::{
 use ash::util::Align;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::vk;
+use ash::vk_make_version;
 use ash::{Device, Entry, Instance};
-use core::Config;
+use crate::core::Config;
 use image;
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -258,7 +259,7 @@ impl RenderState
 	}
 
 	/// Creates various pools required by the RenderState.
-	fn create_pools(device: &Device, queue_family_index: u32) -> (vk::CommandPool)
+	fn create_pools(device: &Device, queue_family_index: u32) -> vk::CommandPool
 	{
 		let cmd_pool_create_info = vk::CommandPoolCreateInfo {
 			s_type: vk::StructureType::COMMAND_POOL_CREATE_INFO,
@@ -269,7 +270,7 @@ impl RenderState
 		let commandpool;
 		unsafe { commandpool = device.create_command_pool(&cmd_pool_create_info, None).unwrap() }
 
-		(commandpool)
+		commandpool
 	}
 
 	/// Initializes the RenderState based in the passed Config.

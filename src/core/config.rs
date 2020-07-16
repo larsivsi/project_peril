@@ -1,11 +1,12 @@
+use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
 
-const APP_NAME: &'static str = "ProjectPeril";
-const APP_VERSION_MAJOR: &'static str = env!("CARGO_PKG_VERSION_MAJOR");
-const APP_VERSION_MINOR: &'static str = env!("CARGO_PKG_VERSION_MINOR");
-const APP_VERSION_PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
+const APP_NAME: &str = "ProjectPeril";
+const APP_VERSION_MAJOR: &str = env!("CARGO_PKG_VERSION_MAJOR");
+const APP_VERSION_MINOR: &str = env!("CARGO_PKG_VERSION_MINOR");
+const APP_VERSION_PATCH: &str = env!("CARGO_PKG_VERSION_PATCH");
 
 #[derive(Serialize, Deserialize)]
 pub struct Config

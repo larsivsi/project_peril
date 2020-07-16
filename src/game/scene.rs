@@ -1,12 +1,12 @@
 use ash::{vk, Device};
 use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4, Point3, Quaternion, Vector3};
-use core::{
+use crate::core::{
 	ActionType, ComponentType, Config, DrawComponent, Drawable, GameObject, InputConsumer, InputHandler, Material,
 	Mesh, TransformComponent, Transformable,
 };
-use game::{Camera, NURBSpline, Order};
-use renderer::{MainPass, RenderState};
+use crate::game::{Camera, NURBSpline, Order};
+use crate::renderer::{MainPass, RenderState};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;

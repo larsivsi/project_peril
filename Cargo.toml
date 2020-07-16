@@ -2,6 +2,7 @@
 name = "project_peril"
 version = "0.2.1"
 authors = ["Lars-Ivar Hesselberg Simonsen <larsivarhs@gmail.com>","Matthew Guise <reaverrikku@gmail.com>"]
+edition = "2018"
 build = "build.rs"
 
 [build-dependencies]
