@@ -1,9 +1,9 @@
+use crate::core::{Config, Vertex};
+use crate::renderer::{RenderState, Texture};
 use ash::version::DeviceV1_0;
 use ash::vk;
 use ash::Device;
 use cgmath::Matrix4;
-use crate::core::{Config, Vertex};
-use crate::renderer::{RenderState, Texture};
 use std::ffi::CString;
 use std::mem::size_of;
 use std::ptr;

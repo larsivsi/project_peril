@@ -1,6 +1,6 @@
+use crate::renderer::RenderState;
 use ash::version::DeviceV1_0;
 use ash::{vk, Device};
-use crate::renderer::RenderState;
 use std::rc::Rc;
 
 // We never read the fields explicitly, hence they're counted as dead code.

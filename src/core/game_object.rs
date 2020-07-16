@@ -1,5 +1,5 @@
-use bit_vec::BitVec;
 use crate::core::{Component, ComponentType};
+use bit_vec::BitVec;
 use std::cell::RefCell;
 use std::rc::Rc;
 
