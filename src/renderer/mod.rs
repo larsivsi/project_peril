@@ -6,7 +6,6 @@ use ash::extensions::{
 use ash::util::Align;
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::vk;
-use ash::vk_make_version;
 use ash::{Device, Entry, Instance};
 use image;
 use std::ffi::{CStr, CString};
@@ -98,7 +97,7 @@ impl RenderState
 			application_version: cfg.app_version,
 			p_engine_name: raw_name,
 			engine_version: cfg.app_version,
-			api_version: vk_make_version!(1, 1, 82),
+			api_version: vk::make_version(1, 2, 141),
 		};
 
 		// Layers

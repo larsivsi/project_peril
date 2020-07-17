@@ -561,7 +561,9 @@ impl PresentPass
 		let surface = PresentPass::create_surface(&rs.entry, &rs.instance, &rs.window).unwrap();
 		let surface_formats;
 		unsafe {
-			assert!(surface_loader.get_physical_device_surface_support(rs.pdevice, rs.queue_family_index, surface));
+			assert!(surface_loader
+				.get_physical_device_surface_support(rs.pdevice, rs.queue_family_index, surface)
+				.unwrap());
 			surface_formats = surface_loader.get_physical_device_surface_formats(rs.pdevice, surface).unwrap();
 		}
 		let surface_format = surface_formats
