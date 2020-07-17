@@ -127,7 +127,7 @@ impl InputHandler
 		for consumer in self.immediate_action_consumers.iter()
 		{
 			let mut intersection = self.state.actions.clone();
-			intersection.intersect(&consumer.actions);
+			intersection.and(&consumer.actions);
 			if intersection.any()
 			{
 				consumer.ptr.borrow_mut().consume(intersection);
@@ -176,14 +176,14 @@ impl InputHandler
 			for consumer in self.immediate_action_consumers.iter()
 			{
 				let mut intersection = actions_consumed.clone();
-				intersection.intersect(&consumer.actions);
+				intersection.and(&consumer.actions);
 				debug_assert!(intersection.none());
 			}
 
 			for consumer in self.tick_action_consumers.iter()
 			{
 				let mut intersection = actions_consumed.clone();
-				intersection.intersect(&consumer.actions);
+				intersection.and(&consumer.actions);
 				debug_assert!(intersection.none());
 			}
 		}
@@ -212,7 +212,7 @@ impl InputHandler
 		for consumer in self.tick_action_consumers.iter()
 		{
 			let mut intersection = self.state.actions.clone();
-			intersection.intersect(&consumer.actions);
+			intersection.and(&consumer.actions);
 			if intersection.any()
 			{
 				consumer.ptr.borrow_mut().consume(intersection);
