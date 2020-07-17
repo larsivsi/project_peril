@@ -1,5 +1,4 @@
 use crate::core::{Drawable, Material, Mesh, Transform, Transformable};
-use std::any::Any;
 use std::rc::Rc;
 
 #[allow(non_camel_case_types)]
@@ -14,8 +13,6 @@ pub enum ComponentType
 pub trait Component
 {
 	fn get_component_type(&self) -> ComponentType;
-	fn as_any(&self) -> &dyn Any;
-	fn as_mutable_any(&mut self) -> &mut dyn Any;
 }
 
 pub struct DrawComponent
@@ -40,14 +37,6 @@ impl Component for DrawComponent
 	fn get_component_type(&self) -> ComponentType
 	{
 		return ComponentType::DRAW;
-	}
-	fn as_any(&self) -> &dyn Any
-	{
-		return self;
-	}
-	fn as_mutable_any(&mut self) -> &mut dyn Any
-	{
-		return self;
 	}
 }
 
@@ -83,14 +72,6 @@ impl Component for TransformComponent
 	fn get_component_type(&self) -> ComponentType
 	{
 		return ComponentType::TRANSFORM;
-	}
-	fn as_any(&self) -> &dyn Any
-	{
-		return self;
-	}
-	fn as_mutable_any(&mut self) -> &mut dyn Any
-	{
-		return self;
 	}
 }
 

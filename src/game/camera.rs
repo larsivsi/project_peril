@@ -54,61 +54,54 @@ impl InputConsumer for Camera
 			move_speed *= 10.0;
 		}
 
-		match self.object.get_component(ComponentType::TRANSFORM)
+		if let Some(transform_comp) = self.object.get_component::<TransformComponent>(ComponentType::TRANSFORM)
 		{
-			Some(comp) =>
+			if actions.get(Action::FORWARD as usize).unwrap()
 			{
-				let mut mutable_comp = comp.borrow_mut();
-				let transform_comp = mutable_comp.as_mutable_any().downcast_mut::<TransformComponent>().unwrap();
-
-				if actions.get(Action::FORWARD as usize).unwrap()
-				{
-					let translation = transform_comp.get_front_vector();
-					transform_comp.translate(translation * move_speed);
-				}
-				if actions.get(Action::LEFT as usize).unwrap()
-				{
-					let translation = transform_comp.get_right_vector() * -1.0;
-					transform_comp.translate(translation * move_speed);
-				}
-				if actions.get(Action::BACK as usize).unwrap()
-				{
-					let translation = transform_comp.get_front_vector() * -1.0;
-					transform_comp.translate(translation * move_speed);
-				}
-				if actions.get(Action::RIGHT as usize).unwrap()
-				{
-					let translation = transform_comp.get_right_vector();
-					transform_comp.translate(translation * move_speed);
-				}
-				if actions.get(Action::UP as usize).unwrap()
-				{
-					let translation = Vector3::unit_y();
-					transform_comp.translate(translation * move_speed);
-				}
-				if actions.get(Action::DOWN as usize).unwrap()
-				{
-					let translation = Vector3::unit_y() * -1.0;
-					transform_comp.translate(translation * move_speed);
-				}
-				if actions.get(Action::CAM_UP as usize).unwrap()
-				{
-					transform_comp.pitch(5.0);
-				}
-				if actions.get(Action::CAM_LEFT as usize).unwrap()
-				{
-					transform_comp.yaw(5.0);
-				}
-				if actions.get(Action::CAM_DOWN as usize).unwrap()
-				{
-					transform_comp.pitch(-5.0);
-				}
-				if actions.get(Action::CAM_RIGHT as usize).unwrap()
-				{
-					transform_comp.yaw(-5.0);
-				}
+				let translation = transform_comp.get_front_vector();
+				transform_comp.translate(translation * move_speed);
 			}
-			None => panic!("impossible!"),
+			if actions.get(Action::LEFT as usize).unwrap()
+			{
+				let translation = transform_comp.get_right_vector() * -1.0;
+				transform_comp.translate(translation * move_speed);
+			}
+			if actions.get(Action::BACK as usize).unwrap()
+			{
+				let translation = transform_comp.get_front_vector() * -1.0;
+				transform_comp.translate(translation * move_speed);
+			}
+			if actions.get(Action::RIGHT as usize).unwrap()
+			{
+				let translation = transform_comp.get_right_vector();
+				transform_comp.translate(translation * move_speed);
+			}
+			if actions.get(Action::UP as usize).unwrap()
+			{
+				let translation = Vector3::unit_y();
+				transform_comp.translate(translation * move_speed);
+			}
+			if actions.get(Action::DOWN as usize).unwrap()
+			{
+				let translation = Vector3::unit_y() * -1.0;
+				transform_comp.translate(translation * move_speed);
+			}
+			if actions.get(Action::CAM_UP as usize).unwrap()
+			{
+				transform_comp.pitch(5.0);
+			}
+			if actions.get(Action::CAM_LEFT as usize).unwrap()
+			{
+				transform_comp.yaw(5.0);
+			}
+			if actions.get(Action::CAM_DOWN as usize).unwrap()
+			{
+				transform_comp.pitch(-5.0);
+			}
+			if actions.get(Action::CAM_RIGHT as usize).unwrap()
+			{
+				transform_comp.yaw(-5.0);
+			}
 		}
 	}
 }
@@ -143,16 +136,10 @@ impl MouseConsumer for Camera
 			-self.mouse_sensitivity
 		};
 
-		match self.object.get_component(ComponentType::TRANSFORM)
+		if let Some(transform_comp) = self.object.get_component::<TransformComponent>(ComponentType::TRANSFORM)
 		{
-			Some(comp) =>
-			{
-				let mut mutable_comp = comp.borrow_mut();
-				let transform_comp = mutable_comp.as_mutable_any().downcast_mut::<TransformComponent>().unwrap();
-				transform_comp.yaw(mouse_yaw as f32);
-				transform_comp.pitch(mouse_pitch as f32);
-			}
-			None => panic!("impossible!"),
+			transform_comp.yaw(mouse_yaw as f32);
+			transform_comp.pitch(mouse_pitch as f32);
 		}
 	}
 }
