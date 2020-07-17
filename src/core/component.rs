@@ -12,6 +12,7 @@ pub enum ComponentType
 
 pub trait Component
 {
+	fn get_component_type_static() -> ComponentType;
 	fn get_component_type(&self) -> ComponentType;
 }
 
@@ -34,6 +35,11 @@ impl DrawComponent
 
 impl Component for DrawComponent
 {
+	fn get_component_type_static() -> ComponentType
+	{
+		return ComponentType::DRAW;
+	}
+
 	fn get_component_type(&self) -> ComponentType
 	{
 		return ComponentType::DRAW;
@@ -69,6 +75,11 @@ impl TransformComponent
 
 impl Component for TransformComponent
 {
+	fn get_component_type_static() -> ComponentType
+	{
+		return ComponentType::TRANSFORM;
+	}
+
 	fn get_component_type(&self) -> ComponentType
 	{
 		return ComponentType::TRANSFORM;

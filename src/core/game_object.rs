@@ -39,14 +39,15 @@ impl GameObject
 		return self.active_components.get(component_type as usize).unwrap();
 	}
 
-	pub fn get_component<T: Component + Any>(&mut self, component_type: ComponentType) -> Option<&mut T>
+	pub fn get_component<T: Component + Any>(&mut self) -> Option<&mut T>
 	{
-		if self.has_component(component_type)
+		if self.has_component(<T as Component>::get_component_type_static())
 		{
 			for component in self.components.iter_mut()
 			{
-				if let Some(_) = component.downcast_ref::<T>()
+				if let Some(found_comp) = component.downcast_ref::<T>()
 				{
+					debug_assert![found_comp.get_component_type() == <T as Component>::get_component_type_static()];
 					return component.downcast_mut::<T>();
 				}
 			}
