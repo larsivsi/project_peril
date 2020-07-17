@@ -123,8 +123,7 @@ impl Scene
 
 	pub fn get_view_matrix(&mut self) -> Matrix4<f32>
 	{
-		if let Some(transform_comp) =
-			self.camera.borrow_mut().object.get_component::<TransformComponent>(ComponentType::TRANSFORM)
+		if let Some(transform_comp) = self.camera.borrow_mut().object.get_component::<TransformComponent>()
 		{
 			return transform_comp.generate_view_matrix();
 		}
@@ -137,8 +136,7 @@ impl Scene
 	pub fn update(&mut self)
 	{
 		// For now, we know the rotating cube will be the first child of root
-		if let Some(transform_comp) =
-			self.root.children[0].get_component::<TransformComponent>(ComponentType::TRANSFORM)
+		if let Some(transform_comp) = self.root.children[0].get_component::<TransformComponent>()
 		{
 			transform_comp.globally_rotate(Quaternion::from_axis_angle(Vector3::new(0.0, 1.0, 0.0), Deg(-0.5)));
 			transform_comp.scale(1.001);
@@ -161,7 +159,7 @@ impl Scene
 			{
 				let model_matrix;
 				// All drawable objects will also have a transform component
-				if let Some(transform_comp) = node.get_component::<TransformComponent>(ComponentType::TRANSFORM)
+				if let Some(transform_comp) = node.get_component::<TransformComponent>()
 				{
 					model_matrix = transform_comp.generate_transformation_matrix();
 				}
@@ -170,7 +168,7 @@ impl Scene
 					panic!("Draw without transform!");
 				}
 
-				if let Some(draw_comp) = node.get_component::<DrawComponent>(ComponentType::DRAW)
+				if let Some(draw_comp) = node.get_component::<DrawComponent>()
 				{
 					draw_comp.draw(device, cmd_buf, pipeline_layout, &model_matrix, view_matrix, projection_matrix);
 				}

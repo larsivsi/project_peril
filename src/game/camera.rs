@@ -1,4 +1,4 @@
-use crate::core::{Action, ComponentType, GameObject, InputConsumer, MouseConsumer, TransformComponent, Transformable};
+use crate::core::{Action, GameObject, InputConsumer, MouseConsumer, TransformComponent, Transformable};
 use bit_vec::BitVec;
 use cgmath::{Point3, Vector3};
 
@@ -54,7 +54,7 @@ impl InputConsumer for Camera
 			move_speed *= 10.0;
 		}
 
-		if let Some(transform_comp) = self.object.get_component::<TransformComponent>(ComponentType::TRANSFORM)
+		if let Some(transform_comp) = self.object.get_component::<TransformComponent>()
 		{
 			if actions.get(Action::FORWARD as usize).unwrap()
 			{
@@ -136,7 +136,7 @@ impl MouseConsumer for Camera
 			-self.mouse_sensitivity
 		};
 
-		if let Some(transform_comp) = self.object.get_component::<TransformComponent>(ComponentType::TRANSFORM)
+		if let Some(transform_comp) = self.object.get_component::<TransformComponent>()
 		{
 			transform_comp.yaw(mouse_yaw as f32);
 			transform_comp.pitch(mouse_pitch as f32);
