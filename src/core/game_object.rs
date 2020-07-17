@@ -1,11 +1,10 @@
 use crate::core::{Component, ComponentType};
 use bit_vec::BitVec;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::any::Any;
 
 pub struct GameObject
 {
-	components: Vec<Rc<RefCell<dyn Component>>>,
+	components: Vec<Box<dyn Any>>,
 	active_components: BitVec,
 	pub children: Vec<GameObject>,
 }
@@ -26,12 +25,12 @@ impl GameObject
 		self.children.push(child);
 	}
 
-	pub fn add_component<T: Component + 'static>(&mut self, component: T)
+	pub fn add_component<T: Component + Any>(&mut self, component: T)
 	{
 		let component_type = component.get_component_type() as usize;
 		// Don't add components that are already set
 		debug_assert!(!self.active_components.get(component_type).unwrap());
-		self.components.push(Rc::new(RefCell::new(component)));
+		self.components.push(Box::new(component));
 		self.active_components.set(component_type, true);
 	}
 
@@ -40,15 +39,15 @@ impl GameObject
 		return self.active_components.get(component_type as usize).unwrap();
 	}
 
-	pub fn get_component(&mut self, component_type: ComponentType) -> Option<Rc<RefCell<dyn Component>>>
+	pub fn get_component<T: Component + Any>(&mut self, component_type: ComponentType) -> Option<&mut T>
 	{
 		if self.has_component(component_type)
 		{
 			for component in self.components.iter_mut()
 			{
-				if component.borrow().get_component_type() == component_type
+				if let Some(_) = component.downcast_ref::<T>()
 				{
-					return Some(component.clone());
+					return component.downcast_mut::<T>();
 				}
 			}
 		}
