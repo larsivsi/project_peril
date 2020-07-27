@@ -16,9 +16,6 @@ use std::os::raw::{c_char, c_void};
 use std::path::Path;
 use std::ptr;
 use std::rc::Rc;
-use winit;
-use winit::EventsLoop;
-use winit::Window;
 
 mod mainpass;
 mod presentpass;
@@ -63,9 +60,7 @@ pub struct RenderState
 	queue_family_index: u32,
 	graphics_queue: vk::Queue,
 
-	// Window
-	pub event_loop: EventsLoop,
-	pub window: Window,
+	pub window: sdl2::video::Window,
 
 	// Pools
 	commandpool: vk::CommandPool,
@@ -100,12 +95,11 @@ impl RenderState
 			api_version: vk::make_version(1, 2, 141),
 		};
 
-		// Layers
-		let mut layer_names_raw: Vec<*const i8> = Vec::new();
-		let requested_layers = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
 		// Only enable debug layers if requested
+		let mut layer_names_raw: Vec<*const i8> = Vec::new();
 		if cfg!(feature = "debug_layer")
 		{
+			let requested_layers = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
 			println!("Debug layers:");
 			let available_layers = entry.enumerate_instance_layer_properties().unwrap();
 			for layer in available_layers.iter()
@@ -273,14 +267,18 @@ impl RenderState
 	}
 
 	/// Initializes the RenderState based in the passed Config.
-	pub fn init(cfg: &Config) -> RenderState
+	pub fn init(cfg: &Config, video_subsystem: &sdl2::VideoSubsystem) -> RenderState
 	{
-		// Window and event handler
-		let event_loop = winit::EventsLoop::new();
-		let window = winit::WindowBuilder::new()
-			.with_title(format!("{} {}", cfg.app_name, cfg.version_to_string()))
-			.with_dimensions(winit::dpi::LogicalSize::new(cfg.window_width as f64, cfg.window_height as f64))
-			.build(&event_loop)
+		// Window
+		let window = video_subsystem
+			.window(
+				format!("{} {}", cfg.app_name, cfg.version_to_string()).as_str(),
+				cfg.window_width,
+				cfg.window_height,
+			)
+			.vulkan()
+			.resizable()
+			.build()
 			.unwrap();
 
 		// ash entry point
@@ -324,7 +322,6 @@ impl RenderState
 			graphics_queue: graphics_queue,
 
 			// Window
-			event_loop: event_loop,
 			window: window,
 
 			// Pools

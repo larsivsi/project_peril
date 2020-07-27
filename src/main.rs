@@ -2,7 +2,7 @@ mod core;
 mod game;
 mod renderer;
 
-use crate::core::{Action, ActionType, Config, InputConsumer, InputHandler};
+use crate::core::{Action, ActionType, Config, InputConsumer, InputHandler, KeyEventState};
 use crate::game::Scene;
 use crate::renderer::{MainPass, PresentPass, RenderState};
 use ash::util::Align;
@@ -10,6 +10,7 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use bit_vec::BitVec;
 use cgmath::{Deg, Matrix4, Rad};
+use sdl2::event::{Event, WindowEvent};
 use std::cell::RefCell;
 use std::io::Write;
 use std::mem::{align_of, size_of};
@@ -77,7 +78,10 @@ fn main()
 		}
 	};
 
-	let mut renderstate = RenderState::init(&cfg);
+	let sdl_context = sdl2::init().unwrap();
+	let video_subsystem = sdl_context.video().unwrap();
+	let renderstate = RenderState::init(&cfg, &video_subsystem);
+	let mut event_pump = sdl_context.event_pump().unwrap();
 	let mut presentpass = PresentPass::init(&renderstate);
 	let mut loading_image = renderstate.load_image("assets/original/textures/project_peril_logo.png", true);
 	presentpass.present_image(&renderstate, &mut loading_image);
@@ -163,63 +167,66 @@ fn main()
 		}
 
 		// INPUT
-		renderstate.event_loop.poll_events(|ev| match ev
+		for event in event_pump.poll_iter()
 		{
-			winit::Event::WindowEvent {
-				event,
-				..
-			} => match event
+			match event
 			{
-				winit::WindowEvent::CloseRequested => engine_state.borrow_mut().running = false,
-				winit::WindowEvent::Focused(has_focus) =>
+				Event::Quit {
+					..
+				} => engine_state.borrow_mut().running = false,
+				Event::KeyDown {
+					scancode,
+					..
+				} => input_handler.update_key(scancode.unwrap(), KeyEventState::PRESSED),
+				Event::KeyUp {
+					scancode,
+					..
+				} => input_handler.update_key(scancode.unwrap(), KeyEventState::RELEASED),
+				Event::MouseButtonDown {
+					mouse_btn,
+					..
+				} => input_handler.update_mouse_button(mouse_btn, KeyEventState::PRESSED),
+				Event::MouseButtonUp {
+					mouse_btn,
+					..
+				} => input_handler.update_mouse_button(mouse_btn, KeyEventState::RELEASED),
+				Event::MouseMotion {
+					xrel,
+					yrel,
+					..
+				} => input_handler.update_mouse_movement((xrel, yrel)),
+				Event::Window {
+					win_event,
+					..
+				} => match win_event
 				{
-					engine_state.borrow_mut().cursor_captured = has_focus;
-					engine_state.borrow_mut().cursor_state_dirty = true;
-				}
-				// Keyboard events
-				winit::WindowEvent::KeyboardInput {
-					input,
-					..
-				} =>
-				{
-					input_handler.update_key(input);
-				}
-				// Mouse presses
-				winit::WindowEvent::MouseInput {
-					button,
-					state,
-					..
-				} => input_handler.update_mouse_button(button, state),
-				_ => (),
-			},
-
-			winit::Event::DeviceEvent {
-				event,
-				..
-			} => match event
-			{
-				// Mouse Movement
-				// Use DeviceEvent as it gives raw unfiltered physical motion
-				winit::DeviceEvent::MouseMotion {
-					delta,
-					..
-				} => input_handler.update_mouse_movement(delta),
-				_ => (),
-			},
-			_ => (),
-		});
+					WindowEvent::FocusGained =>
+					{
+						engine_state.borrow_mut().cursor_captured = true;
+						engine_state.borrow_mut().cursor_state_dirty = true;
+					}
+					WindowEvent::FocusLost =>
+					{
+						engine_state.borrow_mut().cursor_captured = false;
+						engine_state.borrow_mut().cursor_state_dirty = true;
+					}
+					_ =>
+					{}
+				},
+				_ =>
+				{}
+			}
+		}
 
 		if engine_state.borrow().cursor_state_dirty
 		{
 			if engine_state.borrow().cursor_captured
 			{
-				renderstate.window.grab_cursor(true).expect("Failed to grab pointer");
-				renderstate.window.hide_cursor(true);
+				sdl_context.mouse().set_relative_mouse_mode(true);
 			}
 			else
 			{
-				renderstate.window.grab_cursor(false).expect("Failed to return pointer");
-				renderstate.window.hide_cursor(false);
+				sdl_context.mouse().set_relative_mouse_mode(false);
 			}
 			engine_state.borrow_mut().cursor_state_dirty = false;
 		}

@@ -1,24 +1,9 @@
 use crate::core::{InputConsumer, MouseConsumer};
 use bit_vec::BitVec;
+use sdl2::keyboard::Scancode;
+use sdl2::mouse::MouseButton;
 use std::cell::RefCell;
 use std::rc::Rc;
-use winit::{ElementState, KeyboardInput, MouseButton};
-
-const W_SCAN_CODE: u32 = 17;
-const A_SCAN_CODE: u32 = 30;
-const S_SCAN_CODE: u32 = 31;
-const D_SCAN_CODE: u32 = 32;
-const F_SCAN_CODE: u32 = 33;
-
-const UP_SCAN_CODE: u32 = 103;
-const LEFT_SCAN_CODE: u32 = 105;
-const DOWN_SCAN_CODE: u32 = 108;
-const RIGHT_SCAN_CODE: u32 = 106;
-
-const ESC_SCAN_CODE: u32 = 1;
-const SPACE_SCAN_CODE: u32 = 57;
-const LSHIFT_SCAN_CODE: u32 = 42;
-const LCTRL_SCAN_CODE: u32 = 29;
 
 #[allow(non_camel_case_types)]
 pub enum Action
@@ -45,6 +30,13 @@ pub enum ActionType
 	TICK,
 }
 
+#[derive(PartialEq)]
+pub enum KeyEventState
+{
+	PRESSED,
+	RELEASED,
+}
+
 struct Consumer
 {
 	actions: BitVec,
@@ -54,13 +46,12 @@ struct Consumer
 pub struct InputState
 {
 	actions: BitVec,
-	mouse_delta: (f64, f64),
+	mouse_delta: (i32, i32),
 }
 
 pub struct InputHandler
 {
 	state: InputState,
-	last_mouse_pos: (f64, f64),
 	tick_action_consumers: Vec<Consumer>,
 	immediate_action_consumers: Vec<Consumer>,
 	mouse_consumer: Option<Rc<RefCell<dyn MouseConsumer>>>,
@@ -73,9 +64,8 @@ impl InputHandler
 		InputHandler {
 			state: InputState {
 				actions: BitVec::from_elem(Action::LENGTH_OF_ENUM as usize, false),
-				mouse_delta: (0.0, 0.0),
+				mouse_delta: (0, 0),
 			},
-			last_mouse_pos: (0.0, 0.0),
 			// Can at most have LENGTH_OF_ENUM different consumers
 			tick_action_consumers: Vec::with_capacity(Action::LENGTH_OF_ENUM as usize),
 			immediate_action_consumers: Vec::with_capacity(Action::LENGTH_OF_ENUM as usize),
@@ -83,29 +73,35 @@ impl InputHandler
 		}
 	}
 
-	pub fn update_key(&mut self, event: KeyboardInput)
+	pub fn update_key(&mut self, scancode: Scancode, event_state: KeyEventState)
 	{
-		match event.scancode
+		match scancode
 		{
-			W_SCAN_CODE => self.state.actions.set(Action::FORWARD as usize, event.state == ElementState::Pressed),
-			A_SCAN_CODE => self.state.actions.set(Action::LEFT as usize, event.state == ElementState::Pressed),
-			S_SCAN_CODE => self.state.actions.set(Action::BACK as usize, event.state == ElementState::Pressed),
-			D_SCAN_CODE => self.state.actions.set(Action::RIGHT as usize, event.state == ElementState::Pressed),
-			SPACE_SCAN_CODE => self.state.actions.set(Action::UP as usize, event.state == ElementState::Pressed),
-			LCTRL_SCAN_CODE => self.state.actions.set(Action::DOWN as usize, event.state == ElementState::Pressed),
-			LSHIFT_SCAN_CODE => self.state.actions.set(Action::SPRINT as usize, event.state == ElementState::Pressed),
-			UP_SCAN_CODE => self.state.actions.set(Action::CAM_UP as usize, event.state == ElementState::Pressed),
-			LEFT_SCAN_CODE => self.state.actions.set(Action::CAM_LEFT as usize, event.state == ElementState::Pressed),
-			DOWN_SCAN_CODE => self.state.actions.set(Action::CAM_DOWN as usize, event.state == ElementState::Pressed),
-			RIGHT_SCAN_CODE => self.state.actions.set(Action::CAM_RIGHT as usize, event.state == ElementState::Pressed),
-			ESC_SCAN_CODE => self.state.actions.set(Action::TERMINATE as usize, event.state == ElementState::Pressed),
-			F_SCAN_CODE =>
+			Scancode::W => self.state.actions.set(Action::FORWARD as usize, event_state == KeyEventState::PRESSED),
+			Scancode::A => self.state.actions.set(Action::LEFT as usize, event_state == KeyEventState::PRESSED),
+			Scancode::S => self.state.actions.set(Action::BACK as usize, event_state == KeyEventState::PRESSED),
+			Scancode::D => self.state.actions.set(Action::RIGHT as usize, event_state == KeyEventState::PRESSED),
+			Scancode::Space => self.state.actions.set(Action::UP as usize, event_state == KeyEventState::PRESSED),
+			Scancode::LCtrl => self.state.actions.set(Action::DOWN as usize, event_state == KeyEventState::PRESSED),
+			Scancode::LShift => self.state.actions.set(Action::SPRINT as usize, event_state == KeyEventState::PRESSED),
+			Scancode::Up => self.state.actions.set(Action::CAM_UP as usize, event_state == KeyEventState::PRESSED),
+			Scancode::Left => self.state.actions.set(Action::CAM_LEFT as usize, event_state == KeyEventState::PRESSED),
+			Scancode::Down => self.state.actions.set(Action::CAM_DOWN as usize, event_state == KeyEventState::PRESSED),
+			Scancode::Right =>
 			{
-				self.state.actions.set(Action::CURSOR_CAPTURE_TOGGLE as usize, event.state == ElementState::Pressed)
+				self.state.actions.set(Action::CAM_RIGHT as usize, event_state == KeyEventState::PRESSED)
+			}
+			Scancode::Escape =>
+			{
+				self.state.actions.set(Action::TERMINATE as usize, event_state == KeyEventState::PRESSED)
+			}
+			Scancode::F =>
+			{
+				self.state.actions.set(Action::CURSOR_CAPTURE_TOGGLE as usize, event_state == KeyEventState::PRESSED)
 			}
 			_ =>
 			{
-				let statestr = if event.state == ElementState::Pressed
+				let statestr = if event_state == KeyEventState::PRESSED
 				{
 					"pressed"
 				}
@@ -113,7 +109,7 @@ impl InputHandler
 				{
 					"released"
 				};
-				println!("Unmapped key {} ({:?}) {}", event.scancode, event.virtual_keycode.unwrap(), statestr);
+				println!("Unmapped key {} {}", scancode.name(), statestr);
 			}
 		}
 
@@ -135,9 +131,9 @@ impl InputHandler
 		}
 	}
 
-	pub fn update_mouse_button(&mut self, button: MouseButton, state: ElementState)
+	pub fn update_mouse_button(&mut self, button: MouseButton, event_state: KeyEventState)
 	{
-		let statestr = if state == ElementState::Pressed
+		let statestr = if event_state == KeyEventState::PRESSED
 		{
 			"pressed"
 		}
@@ -148,15 +144,15 @@ impl InputHandler
 		match button
 		{
 			// Currently not mapped to any actions
-			winit::MouseButton::Left =>
+			MouseButton::Left =>
 			{
 				println!("Left mouse {}!", statestr);
 			}
-			winit::MouseButton::Right =>
+			MouseButton::Right =>
 			{
 				println!("Right mouse {}!", statestr);
 			}
-			winit::MouseButton::Middle =>
+			MouseButton::Middle =>
 			{
 				println!("Middle mouse {}!", statestr);
 			}
@@ -221,25 +217,22 @@ impl InputHandler
 	}
 
 	pub fn register_mouse_movement<T: MouseConsumer + 'static>(
-		&mut self, consumer: Rc<RefCell<T>>, mouse_invert: (bool, bool), mouse_sensitivity: f64,
+		&mut self, consumer: Rc<RefCell<T>>, mouse_invert: (bool, bool), mouse_sensitivity: f32,
 	)
 	{
 		consumer.borrow_mut().register_mouse_settings(mouse_invert, mouse_sensitivity);
 		self.mouse_consumer = Some(consumer);
 	}
 
-	pub fn update_mouse_movement(&mut self, mouse_delta: (f64, f64))
+	pub fn update_mouse_movement(&mut self, mouse_delta: (i32, i32))
 	{
-		let change = (self.last_mouse_pos.0 + mouse_delta.0, self.last_mouse_pos.1 + mouse_delta.1);
-		self.last_mouse_pos.0 = mouse_delta.0;
-		self.last_mouse_pos.1 = mouse_delta.1;
-		self.state.mouse_delta.0 += change.0;
-		self.state.mouse_delta.1 += change.1;
+		self.state.mouse_delta.0 += mouse_delta.0;
+		self.state.mouse_delta.1 += mouse_delta.1;
 	}
 
 	pub fn mouse_movement_tick(&mut self, cursor_captured: bool)
 	{
-		if self.state.mouse_delta == (0.0, 0.0)
+		if self.state.mouse_delta == (0, 0)
 		{
 			return;
 		}
@@ -256,6 +249,6 @@ impl InputHandler
 			}
 		}
 
-		self.state.mouse_delta = (0.0, 0.0);
+		self.state.mouse_delta = (0, 0);
 	}
 }
