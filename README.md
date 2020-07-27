@@ -47,6 +47,18 @@ $ vulkaninfo | grep VK_LAYER_LUNARG_standard_validation
 VK_LAYER_LUNARG_standard_validation (LunarG Standard Validation) Vulkan version 1.1.101, layer version 1
 ~~~
 
+### SDL2
+This project uses the SDL2 Rust crate in "bundled" mode. It therefore requires a C-compiler and cmake installed:
+~~~
+$ sudo apt install gcc cmake
+~~~
+In addition, the development headers for the current window system need to be available.  
+For X11, this requires:
+~~~
+$ sudo apt install libx11-dev libxext-dev
+~~~
+See [the rust-sdl2 github page](https://github.com/Rust-SDL2/rust-sdl2) for more details.
+
 Compile:
 --------
 ~~~bash

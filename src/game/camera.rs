@@ -6,7 +6,7 @@ pub struct Camera
 {
 	pub object: GameObject,
 	mouse_invert: (bool, bool),
-	mouse_sensitivity: f64,
+	mouse_sensitivity: f32,
 }
 
 impl Camera
@@ -108,15 +108,16 @@ impl InputConsumer for Camera
 
 impl MouseConsumer for Camera
 {
-	fn register_mouse_settings(&mut self, mouse_invert: (bool, bool), mouse_sensitivity: f64)
+	fn register_mouse_settings(&mut self, mouse_invert: (bool, bool), mouse_sensitivity: f32)
 	{
 		self.mouse_invert = mouse_invert;
 		self.mouse_sensitivity = mouse_sensitivity;
 	}
 
-	fn consume(&mut self, mouse_delta: (f64, f64))
+	fn consume(&mut self, mouse_delta: (i32, i32))
 	{
-		let (mut mouse_yaw, mut mouse_pitch) = mouse_delta;
+		let mut mouse_yaw = mouse_delta.0 as f32;
+		let mut mouse_pitch = mouse_delta.1 as f32;
 		let (x_invert, y_invert) = self.mouse_invert;
 		// Yaw and pitch will be in the opposite direction of mouse delta
 		mouse_yaw *= if x_invert
@@ -138,8 +139,8 @@ impl MouseConsumer for Camera
 
 		if let Some(transform_comp) = self.object.get_component::<TransformComponent>()
 		{
-			transform_comp.yaw(mouse_yaw as f32);
-			transform_comp.pitch(mouse_pitch as f32);
+			transform_comp.yaw(mouse_yaw);
+			transform_comp.pitch(mouse_pitch);
 		}
 	}
 }

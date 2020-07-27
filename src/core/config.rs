@@ -16,7 +16,7 @@ pub struct Config
 	pub horizontal_fov: u32,
 	pub mouse_invert_x: bool,
 	pub mouse_invert_y: bool,
-	pub mouse_sensitivity: f64,
+	pub mouse_sensitivity: f32,
 	pub render_width: u32,
 	pub render_height: u32,
 	pub window_width: u32,

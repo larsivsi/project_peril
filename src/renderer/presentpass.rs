@@ -1,14 +1,14 @@
-use ash::extensions::khr::{Surface, Swapchain, XlibSurface};
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use crate::renderer::{RenderState, Texture};
+use ash::extensions::khr::{Surface, Swapchain};
+use ash::version::{DeviceV1_0, InstanceV1_0};
 use ash::vk;
+use ash::vk::Handle;
 use ash::Device;
 use std;
+use std::convert::TryInto;
 use std::ffi::CString;
 use std::ptr;
 use std::rc::Rc;
-use winit;
-
-use crate::renderer::{RenderState, Texture};
 
 pub struct PresentPass
 {
@@ -48,29 +48,6 @@ pub struct PresentPass
 
 impl PresentPass
 {
-	/// Creates an X11 surface.
-	fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
-		entry: &E, instance: &I, window: &winit::Window,
-	) -> Result<vk::SurfaceKHR, vk::Result>
-	{
-		use winit::os::unix::WindowExt;
-		let x11_display = window.get_xlib_display().unwrap();
-		let x11_window = window.get_xlib_window().unwrap();
-		let x11_create_info = vk::XlibSurfaceCreateInfoKHR {
-			s_type: vk::StructureType::XLIB_SURFACE_CREATE_INFO_KHR,
-			p_next: ptr::null(),
-			flags: Default::default(),
-			window: x11_window as vk::Window,
-			dpy: x11_display as *mut vk::Display,
-		};
-		let xlib_surface_loader = XlibSurface::new(entry, instance);
-		let result;
-		unsafe {
-			result = xlib_surface_loader.create_xlib_surface(&x11_create_info, None);
-		}
-		result
-	}
-
 	/// Creates a vk::Swapchain and a vk::Rect2D for the current RenderState and surface.
 	///
 	/// Swapchain is used to queue and present stuff to the screen.
@@ -557,8 +534,13 @@ impl PresentPass
 	pub fn init(rs: &RenderState) -> PresentPass
 	{
 		// Surface
+		let vk_instance: vk::Instance = rs.instance.handle();
+		let raw_surface = rs
+			.window
+			.vulkan_create_surface(vk_instance.as_raw().try_into().unwrap())
+			.expect("Faied to create vulkan surface from SDL2 window");
+		let surface = vk::SurfaceKHR::from_raw(raw_surface);
 		let surface_loader = Surface::new(&rs.entry, &rs.instance);
-		let surface = PresentPass::create_surface(&rs.entry, &rs.instance, &rs.window).unwrap();
 		let surface_formats;
 		unsafe {
 			assert!(surface_loader

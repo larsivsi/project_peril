@@ -9,7 +9,7 @@ mod transform;
 pub use self::component::{Component, ComponentType, DrawComponent, TransformComponent};
 pub use self::config::Config;
 pub use self::game_object::GameObject;
-pub use self::input::{Action, ActionType, InputHandler};
+pub use self::input::{Action, ActionType, InputHandler, KeyEventState};
 pub use self::material::Material;
 pub use self::mesh::{Mesh, Vertex};
 pub use self::transform::{Transform, Transformable};
@@ -53,6 +53,6 @@ pub trait InputConsumer
 
 pub trait MouseConsumer
 {
-	fn register_mouse_settings(&mut self, mouse_invert: (bool, bool), mouse_sensitivity: f64);
-	fn consume(&mut self, mouse_delta: (f64, f64));
+	fn register_mouse_settings(&mut self, mouse_invert: (bool, bool), mouse_sensitivity: f32);
+	fn consume(&mut self, mouse_delta: (i32, i32));
 }
