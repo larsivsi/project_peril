@@ -97,9 +97,9 @@ impl RenderState
 
 		// Only enable debug layers if requested
 		let mut layer_names_raw: Vec<*const i8> = Vec::new();
+		let requested_layers = [CString::new("VK_LAYER_KHRONOS_validation").unwrap()];
 		if cfg!(feature = "debug_layer")
 		{
-			let requested_layers = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
 			println!("Debug layers:");
 			let available_layers = entry.enumerate_instance_layer_properties().unwrap();
 			for layer in available_layers.iter()
@@ -119,6 +119,7 @@ impl RenderState
 				}
 			}
 
+			debug_assert!(layer_names_raw.len() > 0);
 			println!("Will enable {} debug layers", layer_names_raw.len());
 		}
 
@@ -126,13 +127,12 @@ impl RenderState
 		let extension_names_raw = RenderState::extension_names();
 		let create_info = vk::InstanceCreateInfo {
 			s_type: vk::StructureType::INSTANCE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			p_application_info: &appinfo,
 			pp_enabled_layer_names: layer_names_raw.as_ptr(),
 			enabled_layer_count: layer_names_raw.len() as u32,
 			pp_enabled_extension_names: extension_names_raw.as_ptr(),
 			enabled_extension_count: extension_names_raw.len() as u32,
+			..Default::default()
 		};
 		let instance;
 		unsafe {
@@ -159,12 +159,11 @@ impl RenderState
 	{
 		let debug_info = vk::DebugReportCallbackCreateInfoEXT {
 			s_type: vk::StructureType::DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
-			p_next: ptr::null(),
 			flags: vk::DebugReportFlagsEXT::ERROR |
 				vk::DebugReportFlagsEXT::WARNING |
 				vk::DebugReportFlagsEXT::PERFORMANCE_WARNING,
 			pfn_callback: Some(RenderState::vulkan_debug_callback),
-			p_user_data: ptr::null_mut(),
+			..Default::default()
 		};
 		let debug_report_loader = DebugReport::new(entry, instance);
 		let debug_callback;
@@ -218,11 +217,10 @@ impl RenderState
 		let queue_priorities = [1.0]; // One queue of priority 1.0
 		let queue_info = vk::DeviceQueueCreateInfo {
 			s_type: vk::StructureType::DEVICE_QUEUE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			queue_family_index: queue_family_index,
 			p_queue_priorities: queue_priorities.as_ptr(),
 			queue_count: queue_priorities.len() as u32,
+			..Default::default()
 		};
 		let device_extension_names_raw = [Swapchain::name().as_ptr()]; // VK_KHR_swapchain
 		let features = vk::PhysicalDeviceFeatures {
@@ -232,15 +230,12 @@ impl RenderState
 		};
 		let device_create_info = vk::DeviceCreateInfo {
 			s_type: vk::StructureType::DEVICE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			queue_create_info_count: 1,
 			p_queue_create_infos: &queue_info,
-			enabled_layer_count: 0,
-			pp_enabled_layer_names: ptr::null(),
 			enabled_extension_count: device_extension_names_raw.len() as u32,
 			pp_enabled_extension_names: device_extension_names_raw.as_ptr(),
 			p_enabled_features: &features,
+			..Default::default()
 		};
 		let device;
 		unsafe {
@@ -360,9 +355,8 @@ impl RenderState
 
 		let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
 			s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
-			p_next: ptr::null(),
-			p_inheritance_info: ptr::null(),
 			flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+			..Default::default()
 		};
 		unsafe {
 			self.device.begin_command_buffer(cmd_buf, &cmd_buf_begin_info).expect("Begin commandbuffer");
@@ -380,14 +374,9 @@ impl RenderState
 
 		let submit_info = vk::SubmitInfo {
 			s_type: vk::StructureType::SUBMIT_INFO,
-			p_next: ptr::null(),
-			wait_semaphore_count: 0,
-			p_wait_semaphores: ptr::null(),
-			p_wait_dst_stage_mask: ptr::null(),
 			command_buffer_count: 1,
 			p_command_buffers: &cmd_buf,
-			signal_semaphore_count: 0,
-			p_signal_semaphores: ptr::null(),
+			..Default::default()
 		};
 		unsafe {
 			self.device
@@ -405,13 +394,10 @@ impl RenderState
 	{
 		let bufferinfo = vk::BufferCreateInfo {
 			s_type: vk::StructureType::BUFFER_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: vk::BufferCreateFlags::empty(),
 			size: buffersize,
 			usage: usage,
 			sharing_mode: vk::SharingMode::EXCLUSIVE,
-			queue_family_index_count: 0,
-			p_queue_family_indices: ptr::null(),
+			..Default::default()
 		};
 
 		let buffer;
@@ -529,10 +515,9 @@ impl RenderState
 		let shader_bytes: Vec<u8> = spv_file.bytes().filter_map(|byte| byte.ok()).collect();
 		let shader_info = vk::ShaderModuleCreateInfo {
 			s_type: vk::StructureType::SHADER_MODULE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			code_size: shader_bytes.len(),
 			p_code: shader_bytes.as_ptr() as *const u32,
+			..Default::default()
 		};
 		let shader_module;
 		unsafe {
@@ -559,8 +544,6 @@ impl RenderState
 
 		let texture_create_info = vk::ImageCreateInfo {
 			s_type: vk::StructureType::IMAGE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			image_type: texture_type,
 			format: texture_format,
 			extent: texture_dimensions,
@@ -570,9 +553,8 @@ impl RenderState
 			tiling: vk::ImageTiling::OPTIMAL,
 			usage: texture_usage,
 			sharing_mode: vk::SharingMode::EXCLUSIVE,
-			queue_family_index_count: 0,
-			p_queue_family_indices: ptr::null(),
 			initial_layout: vk::ImageLayout::UNDEFINED,
+			..Default::default()
 		};
 		let texture_image;
 		let texture_memory_req;
@@ -604,13 +586,9 @@ impl RenderState
 				// First transition the Image to TransferDstOptimal
 				let texture_barrier = vk::ImageMemoryBarrier {
 					s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
-					p_next: ptr::null(),
-					src_access_mask: Default::default(),
 					dst_access_mask: vk::AccessFlags::TRANSFER_WRITE,
 					old_layout: vk::ImageLayout::UNDEFINED,
 					new_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-					src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
-					dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
 					image: texture_image,
 					subresource_range: vk::ImageSubresourceRange {
 						aspect_mask: texture_aspect_mask,
@@ -619,6 +597,7 @@ impl RenderState
 						base_array_layer: 0,
 						layer_count: 1,
 					},
+					..Default::default()
 				};
 				unsafe {
 					self.device.cmd_pipeline_barrier(
@@ -661,13 +640,10 @@ impl RenderState
 				// Finally transition the Image to the correct layout
 				let texture_barrier = vk::ImageMemoryBarrier {
 					s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
-					p_next: ptr::null(),
 					src_access_mask: vk::AccessFlags::TRANSFER_WRITE,
 					dst_access_mask: initial_access_mask,
 					old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
 					new_layout: initial_layout,
-					src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
-					dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
 					image: texture_image,
 					subresource_range: vk::ImageSubresourceRange {
 						aspect_mask: texture_aspect_mask,
@@ -676,6 +652,7 @@ impl RenderState
 						base_array_layer: 0,
 						layer_count: 1,
 					},
+					..Default::default()
 				};
 				unsafe {
 					self.device.cmd_pipeline_barrier(
@@ -694,13 +671,9 @@ impl RenderState
 			{
 				let texture_barrier = vk::ImageMemoryBarrier {
 					s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
-					p_next: ptr::null(),
-					src_access_mask: Default::default(),
 					dst_access_mask: initial_access_mask,
 					old_layout: vk::ImageLayout::UNDEFINED,
 					new_layout: initial_layout,
-					src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
-					dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
 					image: texture_image,
 					subresource_range: vk::ImageSubresourceRange {
 						aspect_mask: texture_aspect_mask,
@@ -709,6 +682,7 @@ impl RenderState
 						base_array_layer: 0,
 						layer_count: 1,
 					},
+					..Default::default()
 				};
 				unsafe {
 					self.device.cmd_pipeline_barrier(
@@ -728,8 +702,6 @@ impl RenderState
 		// Create texture image view
 		let tex_image_view_info = vk::ImageViewCreateInfo {
 			s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			view_type: texture_view_type,
 			format: texture_create_info.format,
 			components: vk::ComponentMapping {
@@ -746,6 +718,7 @@ impl RenderState
 				layer_count: 1,
 			},
 			image: texture_image,
+			..Default::default()
 		};
 		let texture_view;
 		unsafe {
@@ -755,23 +728,14 @@ impl RenderState
 		// Create sampler
 		let sampler_info = vk::SamplerCreateInfo {
 			s_type: vk::StructureType::SAMPLER_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			mag_filter: vk::Filter::LINEAR,
 			min_filter: vk::Filter::LINEAR,
 			mipmap_mode: vk::SamplerMipmapMode::LINEAR,
 			address_mode_u: vk::SamplerAddressMode::MIRRORED_REPEAT,
 			address_mode_v: vk::SamplerAddressMode::MIRRORED_REPEAT,
 			address_mode_w: vk::SamplerAddressMode::MIRRORED_REPEAT,
-			mip_lod_bias: 0.0,
-			min_lod: 0.0,
-			max_lod: 0.0,
-			anisotropy_enable: 0,
-			max_anisotropy: 1.0,
 			border_color: vk::BorderColor::FLOAT_OPAQUE_WHITE,
-			compare_enable: 0,
-			compare_op: vk::CompareOp::NEVER,
-			unnormalized_coordinates: 0,
+			..Default::default()
 		};
 		let sampler;
 		unsafe {
@@ -862,13 +826,10 @@ impl RenderState
 
 		let texture_barrier = vk::ImageMemoryBarrier {
 			s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
-			p_next: ptr::null(),
 			src_access_mask: texture.current_access_mask,
 			dst_access_mask: new_access_mask,
 			old_layout: texture.current_layout,
 			new_layout: new_layout,
-			src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
-			dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
 			image: texture.image,
 			subresource_range: vk::ImageSubresourceRange {
 				aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -877,6 +838,7 @@ impl RenderState
 				base_array_layer: 0,
 				layer_count: 1,
 			},
+			..Default::default()
 		};
 
 		match opt_cmd_buf

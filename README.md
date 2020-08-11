@@ -43,8 +43,8 @@ $ sudo apt install vulkan-validationlayers vulkan-tools
 
 Then verify that they are available to your vulkan instance:
 ~~~bash
-$ vulkaninfo | grep VK_LAYER_LUNARG_standard_validation
-VK_LAYER_LUNARG_standard_validation (LunarG Standard Validation) Vulkan version 1.1.101, layer version 1
+$ vulkaninfo | grep VK_LAYER_KHRONOS_validation
+VK_LAYER_KHRONOS_validation (Khronos Validation Layer) Vulkan version 1.2.141, layer version 1:
 ~~~
 
 ### SDL2
