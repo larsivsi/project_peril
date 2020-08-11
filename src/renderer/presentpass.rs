@@ -826,8 +826,22 @@ impl PresentPass
 			p_image_indices: &(self.current_present_idx as u32),
 			p_results: ptr::null_mut(),
 		};
+		let result;
 		unsafe {
-			self.swapchain_loader.queue_present(rs.graphics_queue, &present_info).unwrap();
+			result = self.swapchain_loader.queue_present(rs.graphics_queue, &present_info);
+		}
+		match result
+		{
+			Ok(suboptimal) =>
+			{
+				debug_assert!(!suboptimal);
+			}
+			Err(vkres) =>
+			{
+				// In case the swapchain was out of date, recreate it.
+				debug_assert!(vkres == vk::Result::ERROR_OUT_OF_DATE_KHR);
+				self.recreate_swapchain(rs);
+			}
 		}
 
 		// Make sure we call begin_frame() before calling this function again
