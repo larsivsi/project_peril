@@ -92,7 +92,7 @@ The original assets of this project are licensed under [CC BY 4.0](assets/origin
 
 Contribute:
 ===========
-Please create pull requests with reviewers for commits to the master branch. This is currently enforced by GitHub option.  
+Please create pull requests with reviewers for commits to the main branch. This is currently enforced by GitHub option.  
 Please also use rustfmt on the code before opening code reviews. The project is currently using the nightly rustfmt,
 which is used as follows:
 
