@@ -76,24 +76,16 @@ impl MainPass
 			color_attachment_count: 1,
 			p_color_attachments: &color_attachment_ref,
 			p_depth_stencil_attachment: &depth_attachment_ref,
-			flags: Default::default(),
 			pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
-			input_attachment_count: 0,
-			p_input_attachments: ptr::null(),
-			p_resolve_attachments: ptr::null(),
-			preserve_attachment_count: 0,
-			p_preserve_attachments: ptr::null(),
+			..Default::default()
 		};
 		let renderpass_create_info = vk::RenderPassCreateInfo {
 			s_type: vk::StructureType::RENDER_PASS_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			attachment_count: renderpass_attachments.len() as u32,
 			p_attachments: renderpass_attachments.as_ptr(),
 			subpass_count: 1,
 			p_subpasses: &subpass,
-			dependency_count: 0,
-			p_dependencies: ptr::null(),
+			..Default::default()
 		};
 		let renderpass;
 		unsafe {
@@ -121,11 +113,10 @@ impl MainPass
 		];
 		let descriptor_pool_info = vk::DescriptorPoolCreateInfo {
 			s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			pool_size_count: descriptor_sizes.len() as u32,
 			p_pool_sizes: descriptor_sizes.as_ptr(),
 			max_sets: 8, // TODO figure out how to properly do this
+			..Default::default()
 		};
 		let descriptor_pool;
 		unsafe {
@@ -156,17 +147,15 @@ impl MainPass
 		}];
 		let color_normal_tex_info = vk::DescriptorSetLayoutCreateInfo {
 			s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			binding_count: color_normal_tex_dsl_bindings.len() as u32,
 			p_bindings: color_normal_tex_dsl_bindings.as_ptr(),
+			..Default::default()
 		};
 		let view_matrix_info = vk::DescriptorSetLayoutCreateInfo {
 			s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			binding_count: view_matrix_dsl_binding.len() as u32,
 			p_bindings: view_matrix_dsl_binding.as_ptr(),
+			..Default::default()
 		};
 
 		let descriptor_set_layouts;
@@ -185,12 +174,11 @@ impl MainPass
 
 		let layout_create_info = vk::PipelineLayoutCreateInfo {
 			s_type: vk::StructureType::PIPELINE_LAYOUT_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			set_layout_count: descriptor_set_layouts.len() as u32,
 			p_set_layouts: descriptor_set_layouts.as_ptr(),
 			push_constant_range_count: 1,
 			p_push_constant_ranges: &mv_matrices_push_constant,
+			..Default::default()
 		};
 
 		let pipeline_layout;
@@ -205,21 +193,17 @@ impl MainPass
 		let shader_stage_create_infos = [
 			vk::PipelineShaderStageCreateInfo {
 				s_type: vk::StructureType::PIPELINE_SHADER_STAGE_CREATE_INFO,
-				p_next: ptr::null(),
-				flags: Default::default(),
 				module: vertex_shader_module,
 				p_name: shader_entry_name.as_ptr(),
-				p_specialization_info: ptr::null(),
 				stage: vk::ShaderStageFlags::VERTEX,
+				..Default::default()
 			},
 			vk::PipelineShaderStageCreateInfo {
 				s_type: vk::StructureType::PIPELINE_SHADER_STAGE_CREATE_INFO,
-				p_next: ptr::null(),
-				flags: Default::default(),
 				module: fragment_shader_module,
 				p_name: shader_entry_name.as_ptr(),
-				p_specialization_info: ptr::null(),
 				stage: vk::ShaderStageFlags::FRAGMENT,
+				..Default::default()
 			},
 		];
 
@@ -309,99 +293,67 @@ impl MainPass
 		};
 		let viewport_state_info = vk::PipelineViewportStateCreateInfo {
 			s_type: vk::StructureType::PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			scissor_count: 1,
 			p_scissors: &scissor,
 			viewport_count: 1,
 			p_viewports: &viewport,
+			..Default::default()
 		};
 		let rasterization_info = vk::PipelineRasterizationStateCreateInfo {
 			s_type: vk::StructureType::PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			cull_mode: vk::CullModeFlags::BACK,
-			depth_bias_clamp: 0.0,
-			depth_bias_constant_factor: 0.0,
-			depth_bias_enable: 0,
-			depth_bias_slope_factor: 0.0,
-			depth_clamp_enable: 0,
 			front_face: vk::FrontFace::COUNTER_CLOCKWISE,
 			line_width: 1.0,
 			polygon_mode: vk::PolygonMode::FILL,
-			rasterizer_discard_enable: 0,
+			..Default::default()
 		};
 		let multisample_state_info = vk::PipelineMultisampleStateCreateInfo {
 			s_type: vk::StructureType::PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			rasterization_samples: vk::SampleCountFlags::TYPE_1,
-			sample_shading_enable: 0,
-			min_sample_shading: 0.0,
-			p_sample_mask: ptr::null(),
-			alpha_to_one_enable: 0,
-			alpha_to_coverage_enable: 0,
+			..Default::default()
 		};
 		let noop_stencil_state = vk::StencilOpState {
 			fail_op: vk::StencilOp::KEEP,
 			pass_op: vk::StencilOp::KEEP,
 			depth_fail_op: vk::StencilOp::KEEP,
 			compare_op: vk::CompareOp::ALWAYS,
-			compare_mask: 0,
-			write_mask: 0,
-			reference: 0,
+			..Default::default()
 		};
 		let depth_state_info = vk::PipelineDepthStencilStateCreateInfo {
 			s_type: vk::StructureType::PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			depth_test_enable: 1,
 			depth_write_enable: 1,
 			depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
-			depth_bounds_test_enable: 0,
-			stencil_test_enable: 0,
 			front: noop_stencil_state.clone(),
 			back: noop_stencil_state.clone(),
 			max_depth_bounds: 1.0,
 			min_depth_bounds: 0.0,
+			..Default::default()
 		};
 		let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
 			blend_enable: 0,
-			src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-			dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
-			color_blend_op: vk::BlendOp::ADD,
-			src_alpha_blend_factor: vk::BlendFactor::ZERO,
-			dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-			alpha_blend_op: vk::BlendOp::ADD,
 			color_write_mask: vk::ColorComponentFlags::all(),
+			..Default::default()
 		}];
 		let color_blend_state = vk::PipelineColorBlendStateCreateInfo {
 			s_type: vk::StructureType::PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
-			logic_op_enable: 0,
-			logic_op: vk::LogicOp::CLEAR,
 			attachment_count: color_blend_attachment_states.len() as u32,
 			p_attachments: color_blend_attachment_states.as_ptr(),
-			blend_constants: [0.0, 0.0, 0.0, 0.0],
+			..Default::default()
 		};
 		let dynamic_state = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
 		let dynamic_state_info = vk::PipelineDynamicStateCreateInfo {
 			s_type: vk::StructureType::PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			dynamic_state_count: dynamic_state.len() as u32,
 			p_dynamic_states: dynamic_state.as_ptr(),
+			..Default::default()
 		};
 		let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo {
 			s_type: vk::StructureType::GRAPHICS_PIPELINE_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: vk::PipelineCreateFlags::empty(),
 			stage_count: shader_stage_create_infos.len() as u32,
 			p_stages: shader_stage_create_infos.as_ptr(),
 			p_vertex_input_state: &vertex_input_state_info,
 			p_input_assembly_state: &vertex_input_assembly_state_info,
-			p_tessellation_state: ptr::null(),
 			p_viewport_state: &viewport_state_info,
 			p_rasterization_state: &rasterization_info,
 			p_multisample_state: &multisample_state_info,
@@ -410,9 +362,7 @@ impl MainPass
 			p_dynamic_state: &dynamic_state_info,
 			layout: pipeline_layout,
 			render_pass: renderpass,
-			subpass: 0,
-			base_pipeline_handle: vk::Pipeline::null(),
-			base_pipeline_index: 0,
+			..Default::default()
 		};
 		let graphics_pipelines;
 		unsafe {
@@ -438,14 +388,13 @@ impl MainPass
 		let framebuffer_attachments = [color_view, depth_view];
 		let frame_buffer_create_info = vk::FramebufferCreateInfo {
 			s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
-			p_next: ptr::null(),
-			flags: Default::default(),
 			render_pass: renderpass,
 			attachment_count: framebuffer_attachments.len() as u32,
 			p_attachments: framebuffer_attachments.as_ptr(),
 			width: render_size.width,
 			height: render_size.height,
 			layers: 1,
+			..Default::default()
 		};
 		let framebuffer;
 		unsafe {
@@ -564,9 +513,8 @@ impl MainPass
 		// Begin commandbuffer
 		let cmd_buf_begin_info = vk::CommandBufferBeginInfo {
 			s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
-			p_next: ptr::null(),
-			p_inheritance_info: ptr::null(),
-			flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
+			flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+			..Default::default()
 		};
 		let cmd_buf = self.commandbuffer;
 		unsafe {
@@ -614,15 +562,13 @@ impl MainPass
 		};
 		let write_desc_sets = [vk::WriteDescriptorSet {
 			s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-			p_next: ptr::null(),
 			dst_set: self.view_matrix_ds[0],
 			dst_binding: 0,
 			dst_array_element: 0,
 			descriptor_count: 1,
 			descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-			p_image_info: ptr::null(),
 			p_buffer_info: &view_matrix_ub_descriptor,
-			p_texel_buffer_view: ptr::null(),
+			..Default::default()
 		}];
 
 		unsafe {
@@ -665,14 +611,9 @@ impl MainPass
 		// Send the work off to the GPU
 		let submit_info = vk::SubmitInfo {
 			s_type: vk::StructureType::SUBMIT_INFO,
-			p_next: ptr::null(),
-			wait_semaphore_count: 0,
-			p_wait_semaphores: ptr::null(),
-			p_wait_dst_stage_mask: ptr::null(),
 			command_buffer_count: 1,
 			p_command_buffers: &cmd_buf,
-			signal_semaphore_count: 0,
-			p_signal_semaphores: ptr::null(),
+			..Default::default()
 		};
 		unsafe {
 			rs.device.queue_submit(rs.graphics_queue, &[submit_info], vk::Fence::null()).expect("queue submit failed.");
