@@ -1,6 +1,4 @@
-use crate::core::{
-	ActionType, Config, Drawable, InputConsumer, InputHandler, Material, Mesh, Transform, Transformable,
-};
+use crate::core::{ActionType, Config, Drawable, InputHandler, Material, Mesh, Transform, Transformable};
 use crate::game::{Camera, NURBSpline, Order};
 use crate::renderer::{MainPass, RenderState};
 use ash::{vk, Device};
@@ -115,7 +113,7 @@ impl Scene
 	pub fn new(rs: &RenderState, mp: &MainPass, cfg: &Config, input_handler: &mut InputHandler) -> Scene
 	{
 		let camera = Rc::new(RefCell::new(Camera::new(Point3::new(0.0, 0.0, 0.0), -Vector3::unit_z())));
-		input_handler.register_actions(camera.borrow().get_handled_actions(), ActionType::TICK, camera.clone());
+		input_handler.register_actions(camera.clone(), ActionType::TICK);
 		input_handler.register_mouse_movement(
 			camera.clone(),
 			(cfg.mouse_invert_x, cfg.mouse_invert_y),

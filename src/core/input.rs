@@ -171,15 +171,16 @@ impl InputHandler
 		}
 	}
 
-	pub fn register_actions<T: InputConsumer + 'static>(
-		&mut self, actions_consumed: BitVec, action_type: ActionType, consumer: Rc<RefCell<T>>,
-	)
+	pub fn register_actions<T: InputConsumer + 'static>(&mut self, consumer: Rc<RefCell<T>>, action_type: ActionType)
 	{
-		debug_assert_eq!(actions_consumed.len(), Action::LENGTH_OF_ENUM as usize);
+		let actions_consumed = consumer.borrow().get_handled_actions();
 
-		// Cannot register same action twice
 		if cfg!(debug_assertions)
 		{
+			debug_assert_eq!(actions_consumed.len(), Action::LENGTH_OF_ENUM as usize);
+			debug_assert!(actions_consumed.any());
+
+			// Cannot register same action twice
 			for consumer in self.immediate_action_consumers.iter()
 			{
 				let mut intersection = actions_consumed.clone();
