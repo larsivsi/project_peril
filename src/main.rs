@@ -88,11 +88,7 @@ fn main()
 	let mut mainpass = MainPass::init(&renderstate, &cfg);
 	let mut input_handler = InputHandler::new();
 	let engine_state = Rc::new(RefCell::new(EngineState::new()));
-	input_handler.register_actions(
-		engine_state.borrow().get_handled_actions(),
-		ActionType::IMMEDIATE,
-		engine_state.clone(),
-	);
+	input_handler.register_actions(engine_state.clone(), ActionType::IMMEDIATE);
 	let mut scene = Scene::new(&renderstate, &mainpass, &cfg, &mut input_handler);
 	let aspect_ratio = cfg.render_width as f32 / cfg.render_height as f32;
 	let vertical_fov = Rad::from(Deg(cfg.horizontal_fov as f32 / aspect_ratio));
