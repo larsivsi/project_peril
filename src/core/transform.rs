@@ -216,6 +216,6 @@ impl Transform
 		let right = front.cross(world_up).normalize();
 		let up = right.cross(front).normalize();
 
-		return Matrix4::look_at_dir(self.position, front, up);
+		return Matrix4::look_to_rh(self.position, front, up);
 	}
 }

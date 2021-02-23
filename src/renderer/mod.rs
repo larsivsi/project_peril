@@ -759,7 +759,7 @@ impl RenderState
 	pub fn load_image(&self, path: &str, srgb: bool) -> Texture
 	{
 		// Load the image data into a vk::Buffer
-		let image = image::open(path).unwrap().to_rgba();
+		let image = image::open(path).unwrap().to_rgba8();
 		let image_extent;
 		{
 			let image_dims = image.dimensions();
