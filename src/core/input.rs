@@ -1,4 +1,3 @@
-use crate::core::{InputConsumer, MouseConsumer};
 use bit_vec::BitVec;
 use sdl2::keyboard::Scancode;
 use sdl2::mouse::MouseButton;
@@ -43,7 +42,19 @@ struct Consumer
 	ptr: Rc<RefCell<dyn InputConsumer>>,
 }
 
-pub struct InputState
+pub trait InputConsumer
+{
+	fn get_handled_actions(&self) -> BitVec;
+	fn consume(&mut self, actions: BitVec);
+}
+
+pub trait MouseConsumer
+{
+	fn register_mouse_settings(&mut self, mouse_invert: (bool, bool), mouse_sensitivity: f32);
+	fn consume(&mut self, mouse_delta: (i32, i32));
+}
+
+struct InputState
 {
 	actions: BitVec,
 	mouse_delta: (i32, i32),
