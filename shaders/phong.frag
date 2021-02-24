@@ -18,7 +18,7 @@ struct PointLight {
 };
 
 //hardcoded for now
-PointLight light = PointLight(45.0, vec3(1.0, 1.0, 1.0));
+PointLight light = PointLight(1000.0, vec3(1.0, 1.0, 1.0));
 
 void main()
 {
