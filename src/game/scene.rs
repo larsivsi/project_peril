@@ -1,5 +1,5 @@
 use crate::core::{ActionType, Config, Drawable, InputHandler, Material, Mesh, Transform, Transformable};
-use crate::game::{Camera, NURBSpline, Order};
+use crate::game::{Camera, Car, NURBSpline, Order};
 use crate::renderer::{MainPass, RenderState};
 use ash::{vk, Device};
 use cgmath::prelude::*;
@@ -106,14 +106,15 @@ pub struct Scene
 	camera: Rc<RefCell<Camera>>,
 	static_stuff: Vec<StaticObject>,
 	spinning_cube: SpinningCube,
+	car: Rc<RefCell<Car>>,
 }
 
 impl Scene
 {
 	pub fn new(rs: &RenderState, mp: &MainPass, cfg: &Config, input_handler: &mut InputHandler) -> Scene
 	{
-		let camera = Rc::new(RefCell::new(Camera::new(Point3::new(0.0, 0.0, 0.0), -Vector3::unit_z())));
-		input_handler.register_actions(camera.clone(), ActionType::TICK);
+		let camera = Rc::new(RefCell::new(Camera::new(Point3::new(0.0, 10.0, 0.0), -Vector3::unit_z())));
+		// input_handler.register_actions(camera.clone(), ActionType::TICK);
 		input_handler.register_mouse_movement(
 			camera.clone(),
 			(cfg.mouse_invert_x, cfg.mouse_invert_y),
@@ -134,48 +135,21 @@ impl Scene
 		);
 
 		let mut static_stuff = Vec::new();
-		let points = vec![
-			Point3::new(1.0, 0.0, 0.0),
-			Point3::new(-1.0, 0.0, 0.0),
-			Point3::new(0.0, 1.0, 0.0),
-			Point3::new(0.0, -1.0, 0.0),
-			Point3::new(0.0, 0.0, -1.0),
-			Point3::new(0.0, 0.0, 1.0),
-		];
-		let directions = vec![
-			Vector3::new(0.0, -1.0, 0.0),
-			Vector3::new(0.0, 1.0, 0.0),
-			Vector3::new(1.0, 0.0, 0.0),
-			Vector3::new(-1.0, 0.0, 0.0),
-			Vector3::new(0.0, 0.0, 1.0),
-			Vector3::new(0.0, 0.0, 1.0),
-		];
-		let quad_mesh = Mesh::new_quad(rs, 1.0, 1.0);
-		let wall_size = 20.0;
-		for i in 0..6
-		{
-			let x: f32 = points[i].x;
-			let y: f32 = points[i].y;
-			let z: f32 = points[i].z;
-			let mut wall = StaticObject::new(quad_mesh.clone(), metal_panel_surface.clone());
-			wall.globally_rotate(Quaternion::from_axis_angle(directions[i], Deg(90.0)));
-			if i == 5
-			{
-				wall.globally_rotate(Quaternion::new(0.0, 0.0, 1.0, 0.0));
-			}
-			if i < 2
-			{
-				wall.globally_rotate(Quaternion::from_axis_angle(Vector3::new(-x, -y, -z), Deg(90.0)));
-			}
-			wall.set_position(Point3::new(wall_size * x, wall_size * y, wall_size * z));
-			wall.scale(wall_size);
 
-			static_stuff.push(wall);
-		}
+		let floor_mesh = Mesh::new_quad(rs, 1_000.0, 1_000.0);
+		let mut floor = StaticObject::new(floor_mesh.clone(), metal_panel_surface.clone());
+		floor.globally_rotate(Quaternion::from_axis_angle(Vector3::new(-1.0, 0.0, 0.0), Deg(90.0)));
+		static_stuff.push(floor);
 
 		let cuboid_mesh = Mesh::new_cuboid(rs, 2.0, 2.0, 2.0);
-		let mut spinning_cube = SpinningCube::new(cuboid_mesh, cube_surface);
-		spinning_cube.set_position(Point3::new(0.0, 0.0, -4.0));
+		let mut spinning_cube = SpinningCube::new(cuboid_mesh, cube_surface.clone());
+		spinning_cube.set_position(Point3::new(0.0, 5.0, -4.0));
+
+		// Some standard car numbers (1.8m wide, 1.5m tall, 4.3m long, 1524kg)
+		let car_mesh = Mesh::new_cuboid(rs, 1.8, 1.5, 4.3);
+		let car = Rc::new(RefCell::new(Car::new(1_524.0, car_mesh, cube_surface.clone())));
+		car.borrow_mut().set_position(Point3::new(0.0, 0.75, 0.0));
+		input_handler.register_actions(car.clone(), ActionType::TICK);
 
 		// For now, this is just done to not have the code unused.
 		let points = vec![
@@ -203,6 +177,7 @@ impl Scene
 			camera: camera,
 			static_stuff: static_stuff,
 			spinning_cube: spinning_cube,
+			car: car,
 		};
 
 		return scene;
@@ -216,6 +191,7 @@ impl Scene
 	pub fn update(&mut self)
 	{
 		self.spinning_cube.update();
+		self.car.borrow_mut().update();
 	}
 
 	pub fn draw(
@@ -228,7 +204,10 @@ impl Scene
 			let model_matrix = obj.generate_transformation_matrix();
 			obj.draw(device, cmd_buf, pipeline_layout, &model_matrix, view_matrix, projection_matrix);
 		}
-		let model_matrix = self.spinning_cube.generate_transformation_matrix();
+		let mut model_matrix = self.spinning_cube.generate_transformation_matrix();
 		self.spinning_cube.draw(device, cmd_buf, pipeline_layout, &model_matrix, view_matrix, projection_matrix);
+
+		model_matrix = self.car.borrow().generate_transformation_matrix();
+		self.car.borrow().draw(device, cmd_buf, pipeline_layout, &model_matrix, view_matrix, projection_matrix);
 	}
 }
